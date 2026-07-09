@@ -5,6 +5,7 @@ theme:
   name: material
 nav:
   - Home: index.md
+  - CPU Vehicle: vehicle.md
   - Development: development.md
 markdown_extensions:
   - admonition

@@ -1,0 +1,138 @@
+<mujoco model="controller_learning_car">
+  <compiler angle="radian" autolimits="true" inertiafromgeom="true"/>
+
+  <option
+    timestep="0.005"
+    gravity="0 0 -9.81"
+    integrator="implicitfast"
+    solver="Newton"
+    iterations="20"
+    ls_iterations="5"
+    cone="elliptic"
+    jacobian="dense"
+  >
+    <flag autoreset="disable"/>
+  </option>
+
+  <default>
+    <geom solref="0.03 1" solimp="0.9 0.95 0.001 0.5 2"/>
+    <default class="wheel">
+      <joint type="hinge" axis="0 1 0" damping="0.2" armature="0.2"/>
+      <geom
+        type="cylinder"
+        size="0.34 0.1"
+        zaxis="0 1 0"
+        mass="20"
+        contype="2"
+        conaffinity="1"
+        condim="3"
+        friction="1.2 0.005 0.0001"
+        priority="1"
+        rgba="0.08 0.08 0.1 1"
+      />
+    </default>
+    <default class="steering">
+      <joint
+        type="hinge"
+        axis="0 0 1"
+        range="-0.6 0.6"
+        damping="20"
+        armature="0.5"
+      />
+    </default>
+  </default>
+
+  <worldbody>
+    <light name="sun" pos="0 0 10" dir="0 0 -1" diffuse="0.8 0.8 0.8"/>
+    <geom
+      name="ground"
+      type="plane"
+      size="1000 1000 0.1"
+      contype="1"
+      conaffinity="6"
+      condim="3"
+      friction="1.2 0.005 0.0001"
+      rgba="0.18 0.2 0.22 1"
+    />
+
+    <body name="chassis" pos="0 0 0.56">
+      <freejoint name="chassis_free"/>
+      <geom
+        name="chassis_collision"
+        type="box"
+        size="2.1 0.72 0.2"
+        mass="1120"
+        contype="4"
+        conaffinity="1"
+        friction="0.8 0.005 0.0001"
+        rgba="0.1 0.32 0.8 1"
+      />
+      <site name="rear_axle_reference" pos="-1.35 0 -0.22" size="0.025" rgba="1 0.2 0.2 1"/>
+
+      <body name="front_left_wheel_body" pos="1.35 0.8 -0.22">
+        <joint name="front_left_steer" class="steering"/>
+        <joint name="front_left_wheel" class="wheel"/>
+        <geom name="front_left_wheel_geom" class="wheel"/>
+      </body>
+
+      <body name="front_right_wheel_body" pos="1.35 -0.8 -0.22">
+        <joint name="front_right_steer" class="steering"/>
+        <joint name="front_right_wheel" class="wheel"/>
+        <geom name="front_right_wheel_geom" class="wheel"/>
+      </body>
+
+      <body name="rear_left_wheel_body" pos="-1.35 0.8 -0.22">
+        <joint name="rear_left_wheel" class="wheel"/>
+        <geom name="rear_left_wheel_geom" class="wheel"/>
+      </body>
+
+      <body name="rear_right_wheel_body" pos="-1.35 -0.8 -0.22">
+        <joint name="rear_right_wheel" class="wheel"/>
+        <geom name="rear_right_wheel_geom" class="wheel"/>
+      </body>
+    </body>
+  </worldbody>
+
+  <actuator>
+    <position
+      name="front_left_steer_position"
+      joint="front_left_steer"
+      kp="8000"
+      kv="400"
+      ctrlrange="-0.6 0.6"
+      forcerange="-5000 5000"
+    />
+    <position
+      name="front_right_steer_position"
+      joint="front_right_steer"
+      kp="8000"
+      kv="400"
+      ctrlrange="-0.6 0.6"
+      forcerange="-5000 5000"
+    />
+    <motor
+      name="front_left_drive"
+      joint="front_left_wheel"
+      ctrlrange="-816 816"
+      forcerange="-816 816"
+    />
+    <motor
+      name="front_right_drive"
+      joint="front_right_wheel"
+      ctrlrange="-816 816"
+      forcerange="-816 816"
+    />
+    <motor
+      name="rear_left_drive"
+      joint="rear_left_wheel"
+      ctrlrange="-816 816"
+      forcerange="-816 816"
+    />
+    <motor
+      name="rear_right_drive"
+      joint="rear_right_wheel"
+      ctrlrange="-816 816"
+      forcerange="-816 816"
+    />
+  </actuator>
+</mujoco>

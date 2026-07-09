@@ -72,8 +72,10 @@ lint = { cmd = "ruff check .", description = "Run Python lint checks" }
 tests = { cmd = "pytest", description = "Run CPU tests" }
 docs = { cmd = "mkdocs build --strict", description = "Build documentation" }
 actions-lint = { cmd = "actionlint", description = "Validate GitHub Actions workflows" }
-package = { cmd = "python -m build --no-isolation --sdist --wheel --outdir dist", description = "Build release packages" }
+package = { cmd = "python -m build --no-isolation --outdir dist", description = "Build an sdist, then build the wheel from that sdist" }
 package-check = { cmd = "twine check dist/*", depends-on = ["package"], description = "Validate release package metadata" }
+benchmark-cpu-vehicle = { cmd = "python scripts/benchmark_cpu_vehicle.py", description = "Run the formal M1 CPU vehicle benchmark" }
+view-cpu-vehicle = { cmd = "python scripts/view_cpu_vehicle.py", description = "Open the CPU MuJoCo vehicle viewer" }
 ci = { depends-on = ["format-check", "lint", "tests", "docs", "actions-lint", "package-check"], description = "Run CPU CI checks" }
 
 [tool.pixi.feature.gpu.tasks]

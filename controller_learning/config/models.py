@@ -24,7 +24,7 @@ def _validate_schema_version(value: int, config_name: str) -> None:
 
 @dataclass(frozen=True, slots=True)
 class VehicleGeometryConfig:
-    """Candidate physical dimensions used by the M1 vehicle model."""
+    """Physical dimensions shared by the vehicle model and public configuration."""
 
     mass_kg: float
     wheelbase_m: float
@@ -72,7 +72,7 @@ class ActuatorConfig:
 
 @dataclass(frozen=True, slots=True)
 class SimulationConfig:
-    """Candidate simulation and Controller timing."""
+    """Simulation and Controller timing, subject to the current milestone gates."""
 
     physics_dt_s: float
     control_dt_s: float
@@ -95,7 +95,7 @@ class SimulationConfig:
 
 @dataclass(frozen=True, slots=True)
 class VehicleConfig:
-    """Complete candidate vehicle configuration."""
+    """Complete vehicle configuration."""
 
     schema_version: int
     vehicle: VehicleGeometryConfig

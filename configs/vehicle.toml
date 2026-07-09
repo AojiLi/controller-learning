@@ -15,6 +15,6 @@ max_acceleration_mps2 = 4.0
 max_deceleration_mps2 = 8.0
 
 [simulation]
-# Candidate for M1 comparison against 0.010 s and 0.002 s.
+# M1-selected CPU candidate; M2 must still verify or revise it for MJX-Warp.
 physics_dt_s = 0.005
 control_dt_s = 0.05
