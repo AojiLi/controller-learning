@@ -4,32 +4,42 @@ Last updated: 2026-07-10
 
 ## Current Direction
 
-Finish M0 before starting vehicle work. The local repository foundation and both locked Pixi
-environments are implemented and verified; the remaining M0 acceptance evidence is a successful
-CPU workflow run in the private GitHub repository.
+Implement and prove the M1 CPU MuJoCo four-wheel vehicle. M0 is complete: the private GitHub
+repository exists, both Pixi environments are locked and locally verified, and the hosted CPU
+workflow passes on `main`.
 
 ## Current Narrow Focus
 
-Publish the verified M0 foundation to a private GitHub repository and confirm that its locked CPU
-Actions workflow passes. This is an external GitHub operation and requires the user's approval.
+Build the actual simulation-truth vehicle and its CPU reference interface before any vector or
+track work:
+
+- one free 6-DoF chassis;
+- four independently rotating physical wheels;
+- two front steering joints;
+- shared steering-angle and longitudinal-acceleration actuator mapping;
+- typed state extraction in the confirmed SI/world/body convention;
+- measured stability and behavior at the 100/200/500 Hz timestep candidates.
 
 ## Current Goal
 
-Complete M0 by obtaining a green GitHub CPU CI run for the exact local lockfile and commit. Do not
-start M1 until that evidence exists.
+Complete M1 with a stable CPU MuJoCo vehicle that passes rest, straight-line, steering, braking,
+action-limit, contact, coordinate, and timestep-scan tests. Record measured results and select a
+candidate physics timestep for M2 without claiming GPU equivalence yet.
 
 ## Scope for the Next Implementation Change
 
 In scope:
 
-- create `AojiLi/controller-learning` as a private GitHub repository after approval;
-- push the verified local M0 commit;
-- monitor and, if necessary, fix the CPU CI workflow;
-- record the successful Actions run and advance `ACTIVE_CONTEXT.md` to M1.
+- `controller_learning/assets/vehicle/car.xml` and only the assets it actually needs;
+- CPU model loading, reset, actuator conversion, stepping, and state extraction;
+- front steering and four wheel-spin joint semantics;
+- deterministic CPU rollout tests and a versioned M1 measurement report;
+- headless tests as the required gate, with the MuJoCo viewer only as an optional debug CLI.
 
 Out of scope:
 
-- beginning the final four-wheel MJCF before M0 is accepted;
+- MJX-Warp batching or GPU performance claims;
+- adding suspension, a detailed differential, Pacejka tires, or aerodynamics;
 - track generation, Gymnasium environments, Controller algorithms, or PPO;
 - advertising GPU throughput before M2 evidence;
 - macOS/Windows/WSL2 support;
@@ -38,6 +48,7 @@ Out of scope:
 ## Confirmed Judgments
 
 - `PROJECT_PLAN.md` is approved and is the detailed decision source.
+- M0 is complete. Hosted CPU CI run `29054661176` passed for `main` with the locked environment.
 - Python 3.11.15 is locked in both Pixi environments.
 - `pixi run ci` passes 14 CPU tests, Ruff format/lint, and strict documentation build.
 - The GPU environment jointly runs JAX 0.10.2, MuJoCo/MJX-Warp 3.10.0, Warp 1.13.0, and
@@ -49,12 +60,12 @@ Out of scope:
 
 ## Open Experimental Questions
 
-There are no open product-direction questions. The only remaining M0 dependency is authorization
-for the external private GitHub repository operation and its hosted CI run. Physics, contact,
-track-capacity, MPC, and PPO numeric parameters remain deliberately open until their planned
-benchmarks.
+There are no open product-direction questions. M1 must experimentally select among the confirmed
+physics timestep candidates and tune ordinary MuJoCo contact/solver parameters. Those measurements
+may change candidate numeric configuration values but must not change the four-wheel truth model.
 
 ## Next Step
 
-After user approval, create the private GitHub repository, push the local M0 commit, and monitor the
-CPU workflow to completion. If it passes, record M0 complete and advance to M1.
+Implement the smallest complete CPU four-wheel vehicle slice: MJCF structure, loader/state schema,
+actuator mapping, and rest/straight/steer/brake tests. Then run the timestep scan and record M1
+evidence before entering M2.
