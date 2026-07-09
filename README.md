@@ -7,8 +7,12 @@ Controller Learning is a benchmark and teaching platform for developing and comp
 controllers under one environment, vehicle, task, and evaluation protocol. PID, MPC, and PPO are
 provided as examples; the reusable Challenge and Controller interface are the core product.
 
-> **Project status:** M0 repository infrastructure is complete. M1 CPU four-wheel vehicle work is
-> active. The benchmark, Controllers, and published performance results are not available yet.
+> **Project status:** M1 is complete: the CPU four-wheel vehicle and measured timestep report are
+> available. M2 MJX-Warp GPU validation is active. The racing benchmark, Controllers, and GPU
+> performance results are not available yet.
+
+The reviewed CPU evidence is available in
+[the M1 machine-readable report](benchmarks/v0.1/m1_cpu_report.json).
 
 ## Why This Project Exists
 

@@ -51,3 +51,21 @@ Rest and non-steering scenarios require at least 98% per-wheel contact participa
 The report embeds the benchmark source hash. Changing an action schedule, threshold, convergence
 tolerance, or metric implementation therefore changes the protocol identity even if the human
 protocol version is unchanged.
+
+## Measured M1 Result
+
+The reviewed M1 report selected 0.005 seconds (200 Hz) as the largest passing CPU candidate:
+
+| Physics step | Result | Reason |
+| --- | --- | --- |
+| 0.010 s | Fail | Stress penetration and vertical-motion limits; stress convergence |
+| 0.005 s | Pass, selected | All absolute, determinism, symmetry, and convergence gates |
+| 0.002 s | Pass, reference | All gates |
+
+At 0.005 seconds, the 60-second stress run maintained 80.15% minimum per-wheel physics-substep
+contact participation, a 55 ms maximum continuous contact gap, 0.791 mm steady penetration P99,
+7.936 m/s mean driven speed, and no MuJoCo warnings or unexpected contacts. The straight scenario
+travelled 19.997 m, mirrored steering produced the expected turn signs, and braking finished at
+0.066 m/s without reversing. These are CPU reference measurements, not GPU performance claims.
+
+The complete machine-readable evidence is `benchmarks/v0.1/m1_cpu_report.json`.

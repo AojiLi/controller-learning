@@ -2,46 +2,55 @@
 
 Last updated: 2026-07-10
 
-**Status:** M0 is complete. M1 CPU MuJoCo four-wheel vehicle implementation is active.
+**Status:** M1 is complete. M2 MJX-Warp GPU go/no-go is active.
 
 ## Main Line
 
-Prove a stable four-wheel CPU MuJoCo vehicle at a measured physics timestep, then use the same MJCF
-for the mandatory M2 MJX-Warp GPU gate.
+Move the proven CPU four-wheel MJCF into MJX-Warp, establish CPU/GPU short-rollout agreement, and
+measure native 1/64/256/1024-world GPU stability before building tracks or Controllers.
 
 ## Timeline
 
-- Confirmed the product identity, v0.1 scope, Challenge architecture, public Controller API, benchmark protocol, platform policy, and M0–M8 milestone gates in `PROJECT_PLAN.md`.
-- Added project-specific Codex routing, durable context, active direction, and status files on 2026-07-10.
-- Initialized local Git on `main`, excluded `reference/` and generated artifacts, and added the MIT
-  License, English README/docs, package skeleton, typed immutable TOML schemas, Pixi lock, tests,
-  and CPU workflow.
-- Verified both locked Pixi environments on 2026-07-10:
-  - CPU: Python 3.11.15; 14 tests passed and 1 GPU test deselected; Ruff, strict docs,
-    `actionlint`, wheel/sdist builds, and Twine metadata checks passed.
-  - GPU: JAX 0.10.2, MuJoCo/MJX-Warp 3.10.0, Warp 1.13.0, PyTorch 2.11.0+cu128; one finite
-    MJX-Warp JIT step and the GPU pytest passed on an RTX 5070 Ti Laptop GPU.
-- Created the private repository <https://github.com/AojiLi/controller-learning> and pushed `main`.
-- Completed M0 after hosted CPU CI run
-  [29054661176](https://github.com/AojiLi/controller-learning/actions/runs/29054661176) passed in 33
-  seconds using the locked environment. No platform, throughput, or Controller-performance claim
-  is inferred from this infrastructure result.
+- Confirmed the product identity, v0.1 scope, Challenge architecture, public Controller API,
+  benchmark protocol, platform policy, and M0–M8 milestone gates in `PROJECT_PLAN.md`.
+- Completed M0 repository/Pixi/package/configuration infrastructure and created the private GitHub
+  repository at <https://github.com/AojiLi/controller-learning>. Hosted CPU CI run
+  [29054661176](https://github.com/AojiLi/controller-learning/actions/runs/29054661176) passed.
+- Verified the locked GPU environment on the local RTX 5070 Ti Laptop GPU with JAX 0.10.2,
+  MuJoCo/MJX-Warp 3.10.0, Warp 1.13.0, and PyTorch 2.11.0+cu128. One finite MJX-Warp smoke step
+  passed; this was dependency/device evidence, not a vehicle-scale result.
+- Completed the M1 physical vehicle in implementation commit
+  `237f5046dc369095e4247efefe80e2b728254044`: one rigid 6-DoF chassis, four physical rotating
+  wheels, two front steering joints, four-wheel drive/brake mapping, rear-axle state extraction,
+  substep contact diagnostics, CPU viewer, installed-wheel asset validation, and formal benchmark.
+- Local M1 CPU CI passed 44 tests with one GPU test deselected, strict docs, Actions lint,
+  sdist-to-wheel construction, installed-wheel MJCF loading, and package metadata checks.
+- Generated the clean, hash-backed `benchmarks/v0.1/m1_cpu_report.json`:
+  - 0.010 s failed long-stress penetration, vertical-motion, and convergence gates;
+  - 0.005 s and 0.002 s passed, so 0.005 s is the largest passing CPU candidate;
+  - the selected 0.005 s stress run completed 60 seconds with no warnings or unexpected contacts,
+    80.15% minimum per-wheel substep contact participation, a 55 ms maximum continuous contact gap,
+    and 0.791 mm steady penetration P99;
+  - rest, straight, mirrored steering, braking, action clipping/rate limiting, determinism, symmetry,
+    and convergence checks all passed.
 
 ## Current Thinking
 
-M1 must keep the plant physically four-wheeled while remaining simple enough for M2 throughput:
-rigid chassis, four wheel-spin joints, two front steering joints, and wheel-ground contact, without
-suspension or detailed drivetrain scope. Timestep and contact parameters remain measurements, not
-assumptions.
+The CPU model is now sufficiently stable and reproducible to attempt M2. Its 0.005 s selection is a
+starting candidate, not a GPU result. The next risk is whether the same contact-rich MJCF remains
+stable, consistent, and memory-efficient under MJX-Warp native batching.
 
 ## Next Step
 
-Implement the M1 MJCF vehicle and CPU reference API, then verify rest, straight driving, steering,
-braking, action limits, contact stability, coordinates, and the 100/200/500 Hz timestep candidates.
+Implement batch-size-one MJX-Warp load/reset/step and a short CPU comparison. If that passes, scale
+to 64, 256, and 1024 worlds, then run the required 1024-world × 10,000-step endurance benchmark and
+write `benchmarks/v0.1/gpu_report.json`.
 
 ## Risks and Blockers
 
-- Wheel-ground contact may be unstable or too sensitive at larger timesteps; M1 must measure it.
-- A model that is stable in CPU MuJoCo may still fail or scale poorly in MJX-Warp; M2 remains a
-  separate mandatory gate.
-- GPU scale and vehicle stability remain unverified until M2; no performance claim should be published yet.
+- CPU MuJoCo stability does not prove MJX-Warp compatibility or numerical agreement.
+- Fixed contact/constraint capacities may overflow or consume too much memory at 1024 worlds.
+- The local GPU memory budget may require buffer tuning or the smaller 0.002 s timestep.
+- M2 may trigger the approved pure-JAX planar four-wheel fallback if measured tuning cannot make the
+  formal vehicle stable and scalable; CPU multiprocessing and a bicycle truth model remain invalid
+  fallbacks.

@@ -69,6 +69,12 @@ The reference project's useful pattern is its Challenge layering, not its drone 
 ### Physics and GPU
 
 - The default simulation truth is one rigid 6-DoF chassis with four physical wheels, four wheel rotation joints, and two front steering joints.
+- The CPU `CpuVehicle` state is expressed at the rear-axle reference site. One public control step
+  is 0.05 seconds and advances an integer number of MuJoCo physics substeps.
+- The standardized actuator layer clips and rate-limits steering targets, applies equal positive
+  drive torque to all four wheels, and makes negative acceleration a non-reversing brake command.
+- M1 selected 0.005 seconds as the largest passing CPU physics timestep candidate. This is the M2
+  starting point, not a claim that MJX-Warp has accepted the same timestep.
 - Controllers may use a simplified kinematic or bicycle prediction model internally.
 - Formal v0.1 training and evaluation use MJX-Warp; CPU MuJoCo is for development and bounded consistency tests.
 - Native leading-dimension GPU batching and independent masked autoreset are hard requirements.
@@ -147,26 +153,37 @@ Directories above are planned and may not exist until their milestone is impleme
 
 Do not bypass a milestone stop condition simply to add visible features. Resolve the blocked foundation or explicitly revise the architecture first.
 
-## Planned Commands
+## Commands
 
-These commands are part of the confirmed interface but do not exist until M0 implements the relevant Pixi tasks:
+The following commands exist now:
 
 ```bash
 pixi install
 pixi run tests
-pixi run sim
+pixi run ci
+pixi run benchmark-cpu-vehicle
+pixi run view-cpu-vehicle -- --scenario demo --duration 12
 
 pixi install -e gpu
 pixi run -e gpu gpu-tests
-pixi run -e gpu benchmark-gpu
-pixi run -e gpu train-ppo
 ```
 
-CPU CI is expected to run a locked Pixi install, Ruff format/lint, unit tests, track and Controller checks, CPU model load/short rollout, and docs build. GPU verification remains local for v0.1 and produces `benchmarks/v0.1/gpu_report.json`.
+`benchmark-gpu` and `train-ppo` are confirmed future task names and must be added only in their
+respective milestones. CPU CI currently checks formatting, lint, CPU tests, installed wheel
+contents, strict docs, GitHub Actions syntax, and package metadata. GPU verification remains local
+for v0.1 and will produce `benchmarks/v0.1/gpu_report.json`.
+
+Reviewed M1 CPU evidence is stored at `benchmarks/v0.1/m1_cpu_report.json`. The report records the
+source revision, dirty-worktree gate, dependency lock, model/config/protocol hashes, runtime, all
+candidate results, and the selected M2 candidate.
 
 ## Experimental Decisions
 
-The exact physics timestep, solver/contact capacities, actuator mapping, track array capacity/resolution, track scale bounds, stable world count, PPO hyperparameters, MPC horizon/weights, and CPU/GPU consistency tolerance must be selected from M1–M3 measurements. They are intentionally not durable constants yet.
+M1 fixed the CPU candidate physics timestep at 0.005 seconds and proved the standardized actuator
+mapping on CPU. M2 may revise that timestep if MJX-Warp stability, consistency, buffer capacity, or
+throughput requires it. Solver/contact capacities, track array capacity/resolution, track scale
+bounds, stable world count, PPO hyperparameters, MPC horizon/weights, and CPU/GPU consistency
+tolerance remain experimental decisions for M2–M3 or their later implementation milestones.
 
 ## External Reference
 
