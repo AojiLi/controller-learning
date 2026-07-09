@@ -1,0 +1,12 @@
+site_name: Controller Learning
+site_description: A GPU-parallel race car control benchmark
+repo_name: controller-learning
+theme:
+  name: material
+nav:
+  - Home: index.md
+  - Development: development.md
+markdown_extensions:
+  - admonition
+  - tables
+strict: true

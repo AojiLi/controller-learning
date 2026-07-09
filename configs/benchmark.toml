@@ -1,0 +1,19 @@
+schema_version = 1
+
+[benchmark]
+version = "0.1"
+official_level = 1
+test_track_count = 20
+
+[controller]
+frequency_hz = 20.0
+init_timeout_s = 30.0
+compute_deadline_s = 0.05
+
+[episode]
+minimum_timeout_s = 60.0
+timeout_reference_speed_mps = 3.0
+
+[ranking]
+primary = "success_rate"
+tiebreak = "mean_successful_lap_time"

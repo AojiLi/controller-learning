@@ -1,0 +1,96 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "controller-learning"
+version = "0.1.0.dev0"
+description = "A GPU-parallel race car control benchmark"
+readme = "README.md"
+requires-python = ">=3.11,<3.12"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Controller Learning contributors" }]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Education",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "gymnasium[array-api]>=1.2.2,<2",
+    "matplotlib>=3.10,<4",
+    "mujoco==3.10.0",
+    "numpy>=2.2,<3",
+    "scipy>=1.15,<2",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["controller_learning"]
+
+[tool.pixi.workspace]
+channels = ["conda-forge"]
+platforms = ["linux-64"]
+requires-pixi = ">=0.69,<1"
+
+[tool.pixi.dependencies]
+python = "3.11.*"
+hatchling = ">=1.27,<2"
+
+[tool.pixi.pypi-dependencies]
+controller-learning = { path = ".", editable = true }
+
+[tool.pixi.feature.cpu.pypi-dependencies]
+jax = "==0.10.2"
+mujoco-mjx = "==3.10.0"
+
+[tool.pixi.feature.gpu.pypi-dependencies]
+jax = { version = "==0.10.2", extras = ["cuda12"] }
+mujoco-mjx = { version = "==3.10.0", extras = ["warp"] }
+torch = { version = "==2.11.0", index = "https://download.pytorch.org/whl/cu128" }
+tensorboard = ">=2.20,<3"
+
+[tool.pixi.feature.dev.dependencies]
+mkdocs = ">=1.6,<2"
+mkdocs-material = ">=9.6,<10"
+pytest = ">=8.3,<10"
+pytest-cov = ">=6,<8"
+ruff = ">=0.12,<1"
+
+[tool.pixi.feature.dev.tasks]
+format = { cmd = "ruff format .", description = "Format Python files" }
+format-check = { cmd = "ruff format --check .", description = "Check Python formatting" }
+lint = { cmd = "ruff check .", description = "Run Python lint checks" }
+tests = { cmd = "pytest", description = "Run CPU tests" }
+docs = { cmd = "mkdocs build --strict", description = "Build documentation" }
+ci = { depends-on = ["format-check", "lint", "tests", "docs"], description = "Run CPU CI checks" }
+
+[tool.pixi.feature.gpu.tasks]
+gpu-check = { cmd = "python scripts/check_gpu_environment.py", description = "Verify GPU dependencies and one MJX-Warp step" }
+gpu-tests = { cmd = "pytest -m gpu tests/gpu", description = "Run GPU tests" }
+
+[tool.pixi.environments]
+default = { features = ["cpu", "dev"], solve-group = "cpu" }
+gpu = { features = ["gpu", "dev"], solve-group = "gpu" }
+
+[tool.pytest.ini_options]
+addopts = ["-ra", "--strict-config", "--strict-markers", "-m", "not gpu"]
+testpaths = ["tests"]
+markers = ["gpu: requires an NVIDIA GPU and the Pixi gpu environment"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = ["reference"]
+
+[tool.ruff.lint]
+select = ["B", "E", "F", "I", "RUF", "SIM", "UP"]
+
+[tool.ruff.format]
+docstring-code-format = true
+line-ending = "lf"

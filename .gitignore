@@ -1,0 +1,44 @@
+# Local reference material is never part of the public repository.
+/reference/
+
+# Pixi and Python environments.
+/.pixi/
+/.venv/
+/venv/
+
+# Python caches and build products.
+__pycache__/
+*.py[cod]
+*.so
+/.pytest_cache/
+/.ruff_cache/
+/.mypy_cache/
+/.coverage
+/htmlcov/
+/build/
+/dist/
+*.egg-info/
+
+# Documentation output.
+/site/
+
+# Training, evaluation, and local benchmark output.
+/runs/
+/results/
+/benchmarks/local/
+/wandb/
+/videos/
+
+# Editor and operating-system files.
+/.idea/
+/.vscode/
+.DS_Store
+Thumbs.db
+*~
+
+# Local secrets and environment overrides.
+.env
+.env.*
+!.env.example
+*.pem
+*.key

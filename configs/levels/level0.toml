@@ -1,0 +1,13 @@
+schema_version = 1
+
+[level]
+id = 0
+name = "level0"
+random_track_geometry = false
+fixed_vehicle_parameters = true
+fixed_start_state = true
+full_state_observation = true
+
+[track]
+source = "fixed"
+width_m = 7.0

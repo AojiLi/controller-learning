@@ -1,0 +1,20 @@
+schema_version = 1
+
+[vehicle]
+mass_kg = 1200.0
+wheelbase_m = 2.7
+track_width_m = 1.6
+vehicle_width_m = 1.8
+wheel_radius_m = 0.34
+max_speed_mps = 15.0
+
+[actuator]
+max_steering_angle_rad = 0.6
+max_steering_rate_rad_s = 1.2
+max_acceleration_mps2 = 4.0
+max_deceleration_mps2 = 8.0
+
+[simulation]
+# Candidate for M1 comparison against 0.010 s and 0.002 s.
+physics_dt_s = 0.005
+control_dt_s = 0.05

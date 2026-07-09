@@ -1,0 +1,13 @@
+schema_version = 1
+
+[level]
+id = 1
+name = "level1"
+random_track_geometry = true
+fixed_vehicle_parameters = true
+fixed_start_state = true
+full_state_observation = true
+
+[track]
+source = "procedural_pool"
+width_m = 7.0
