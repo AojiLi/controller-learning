@@ -8,6 +8,8 @@ pixi run format-check
 pixi run lint
 pixi run tests
 pixi run docs
+pixi run actions-lint
+pixi run package-check
 ```
 
 `pixi run ci` executes the complete CPU validation used by GitHub Actions.

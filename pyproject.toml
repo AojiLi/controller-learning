@@ -56,11 +56,14 @@ torch = { version = "==2.11.0", index = "https://download.pytorch.org/whl/cu128"
 tensorboard = ">=2.20,<3"
 
 [tool.pixi.feature.dev.dependencies]
+actionlint = ">=1.7,<2"
 mkdocs = ">=1.6,<2"
 mkdocs-material = ">=9.6,<10"
 pytest = ">=8.3,<10"
 pytest-cov = ">=6,<8"
+python-build = ">=1.3,<2"
 ruff = ">=0.12,<1"
+twine = ">=6,<7"
 
 [tool.pixi.feature.dev.tasks]
 format = { cmd = "ruff format .", description = "Format Python files" }
@@ -68,7 +71,10 @@ format-check = { cmd = "ruff format --check .", description = "Check Python form
 lint = { cmd = "ruff check .", description = "Run Python lint checks" }
 tests = { cmd = "pytest", description = "Run CPU tests" }
 docs = { cmd = "mkdocs build --strict", description = "Build documentation" }
-ci = { depends-on = ["format-check", "lint", "tests", "docs"], description = "Run CPU CI checks" }
+actions-lint = { cmd = "actionlint", description = "Validate GitHub Actions workflows" }
+package = { cmd = "python -m build --no-isolation --sdist --wheel --outdir dist", description = "Build release packages" }
+package-check = { cmd = "twine check dist/*", depends-on = ["package"], description = "Validate release package metadata" }
+ci = { depends-on = ["format-check", "lint", "tests", "docs", "actions-lint", "package-check"], description = "Run CPU CI checks" }
 
 [tool.pixi.feature.gpu.tasks]
 gpu-check = { cmd = "python scripts/check_gpu_environment.py", description = "Verify GPU dependencies and one MJX-Warp step" }

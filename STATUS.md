@@ -18,7 +18,8 @@ path before expanding into tracks, Controller examples, and RL.
   License, English README/docs, package skeleton, typed immutable TOML schemas, Pixi lock, tests,
   and CPU workflow.
 - Verified both locked Pixi environments on 2026-07-10:
-  - CPU: Python 3.11.15; 14 tests passed and 1 GPU test deselected; Ruff and strict docs passed.
+  - CPU: Python 3.11.15; 14 tests passed and 1 GPU test deselected; Ruff, strict docs,
+    `actionlint`, wheel/sdist builds, and Twine metadata checks passed.
   - GPU: JAX 0.10.2, MuJoCo/MJX-Warp 3.10.0, Warp 1.13.0, PyTorch 2.11.0+cu128; one finite
     MJX-Warp JIT step and the GPU pytest passed on an RTX 5070 Ti Laptop GPU.
 
