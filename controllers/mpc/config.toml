@@ -1,0 +1,45 @@
+name = "mpc"
+description = "Warm-started Frenet tracking MPC with a kinematic car prediction model"
+schema_version = 1
+
+[horizon]
+steps = 20
+
+[planning]
+minimum_speed_mps = 2.5
+maximum_speed_mps = 5.0
+maximum_lateral_acceleration_mps2 = 1.5
+braking_deceleration_mps2 = 3.0
+speed_preview_distance_m = 40.0
+speed_preview_step_m = 1.0
+track_margin_m = 0.25
+projection_backward_segments = 8
+projection_forward_segments = 32
+
+[weights]
+lateral_error = 40.0
+heading_error = 15.0
+speed_error = 2.0
+steering_feedforward = 0.5
+acceleration = 0.04
+steering_change = 6.0
+acceleration_change = 0.02
+terminal_lateral_error = 80.0
+terminal_heading_error = 30.0
+terminal_speed_error = 4.0
+
+[solver]
+maximum_iterations = 60
+tolerance = 0.00001
+acceptable_tolerance = 0.0001
+acceptable_iterations = 3
+maximum_wall_time_s = 0.045
+feasibility_tolerance = 0.001
+
+[fallback]
+lateral_error_gain = 0.45
+heading_error_gain = 1.4
+speed_error_gain = 1.5
+
+[debug]
+prediction_stride = 2
