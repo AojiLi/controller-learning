@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 import json
+from dataclasses import asdict, replace
 from pathlib import Path
 from typing import Any
 
@@ -46,6 +47,26 @@ def _fake_snapshot(_root: Path) -> dict[str, Any]:
         "relevant_source_clean": True,
         "source_files_sha256": {relative: "a" * 64 for relative in benchmark.RELEVANT_SOURCE_PATHS},
     }
+
+
+def _replace_compute_samples(report: dict[str, Any], value: float) -> None:
+    for controller in ("pid", "mpc"):
+        controller_result = report["evaluations"][controller]
+        combined: list[float] = []
+        for split in ("level0", "validation"):
+            evaluation = controller_result[split]
+            aggregate: list[float] = []
+            for episode in evaluation["episodes"]:
+                samples = [value] * episode["steps"]
+                episode["compute_times_s"] = samples
+                episode["compute_timing"] = asdict(summarize_compute_times(samples))
+                aggregate.extend(samples)
+            evaluation["compute_timing"] = asdict(summarize_compute_times(aggregate))
+            combined.extend(aggregate)
+        controller_result["combined_timing"] = asdict(summarize_compute_times(combined))
+        controller_result["realtime_qualification"] = benchmark._realtime_qualification(
+            controller_result["combined_timing"]
+        )
 
 
 def _evaluation(
@@ -147,6 +168,38 @@ def test_cli_exposes_only_the_report_path() -> None:
     assert suffix_error.value.code == 2
 
 
+@pytest.mark.parametrize(
+    ("snapshot_update", "message"),
+    [
+        ({"git_revision": None}, "non-empty Git revision"),
+        ({"relevant_source_clean": False}, "clean relevant source"),
+        ({"source_files_sha256": {}}, "does not cover every input"),
+    ],
+)
+def test_source_preflight_rejects_before_expensive_work(
+    snapshot_update: dict[str, Any],
+    message: str,
+) -> None:
+    snapshot = _fake_snapshot(PROJECT_ROOT)
+    snapshot.update(snapshot_update)
+    calls: list[str] = []
+
+    def forbidden_asset_loader(*_args):
+        calls.append("assets")
+        raise AssertionError("asset loading must not start after a failed source preflight")
+
+    with pytest.raises(RuntimeError, match=message):
+        benchmark.run_benchmark(
+            benchmark.BenchmarkOptions(),
+            project_root=PROJECT_ROOT,
+            asset_loader=forbidden_asset_loader,
+            snapshot_loader=lambda _root: snapshot,
+            runtime_loader=_fake_runtime,
+        )
+
+    assert calls == []
+
+
 def test_official_loader_reads_only_level0_and_validation(monkeypatch) -> None:
     config = load_project_config(PROJECT_ROOT)
     original = benchmark.load_manifest_track_batch
@@ -210,12 +263,13 @@ def test_report_gates_recompute_and_realtime_is_diagnostic(passing_report) -> No
     report, _calls = passing_report
 
     assert benchmark.evaluate_report_gates(report) == report["checks"]
-    report["evaluations"]["mpc"]["realtime_qualification"]["eligible"] = False
-    report["evaluations"]["mpc"]["combined_timing"]["p99_s"] = 0.2
+    _replace_compute_samples(report, 0.06)
 
     required_checks = benchmark.evaluate_report_gates(report)
 
     assert all(check["passed"] for check in required_checks)
+    assert report["evaluations"]["pid"]["realtime_qualification"]["eligible"] is False
+    assert report["evaluations"]["mpc"]["realtime_qualification"]["eligible"] is False
 
 
 def test_mpc_validation_below_eighty_percent_fails_exact_threshold_gate(
@@ -224,8 +278,17 @@ def test_mpc_validation_below_eighty_percent_fails_exact_threshold_gate(
     report, _calls = passing_report
     failing = copy.deepcopy(report)
     validation = failing["evaluations"]["mpc"]["validation"]
+    episode = validation["episodes"][79]
+    episode["success"] = False
+    episode["lap_time_s"] = None
+    episode["terminated"] = False
+    episode["truncated"] = True
+    episode["termination_reason"] = 4
     validation["success_count"] = 79
     validation["success_rate"] = 0.79
+    validation["mean_successful_lap_time_s"] = float(
+        np.mean([item["lap_time_s"] for item in validation["episodes"] if item["success"]])
+    )
 
     failed = {
         check["id"] for check in benchmark.evaluate_report_gates(failing) if not check["passed"]
@@ -245,7 +308,93 @@ def test_gate_rejects_invalid_action_and_incomplete_timing(passing_report) -> No
         check["id"] for check in benchmark.evaluate_report_gates(failing) if not check["passed"]
     }
 
-    assert failed == {"controllers.no_invalid_action", "controllers.timing_complete"}
+    assert failed == {"controllers.no_invalid_action", "controllers.timing_consistency"}
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("backend", "cpu_reference"),
+        ("level_id", 9),
+        ("controller_directory", "controllers/pid"),
+    ],
+)
+def test_gate_rejects_evaluation_identity_mutations(passing_report, field, value) -> None:
+    report, _calls = passing_report
+    failing = copy.deepcopy(report)
+    failing["evaluations"]["mpc"]["validation"][field] = value
+
+    failed = {
+        check["id"] for check in benchmark.evaluate_report_gates(failing) if not check["passed"]
+    }
+
+    assert failed == {"protocol.evaluation_identity"}
+
+
+def test_runtime_rejects_evaluator_identity_mismatch(official_assets) -> None:
+    def evaluator(config, level_id, batch, generator_version, directory, backend, **kwargs):
+        del config, generator_version, backend
+        result = _evaluation(batch, Path(directory), level_id, kwargs["reset_seeds"])
+        return replace(result, backend="cpu_reference")
+
+    with pytest.raises(ValueError, match="non-formal backend"):
+        benchmark.run_benchmark(
+            benchmark.BenchmarkOptions(),
+            project_root=PROJECT_ROOT,
+            asset_loader=lambda _config, _root: official_assets,
+            evaluator=evaluator,
+            snapshot_loader=_fake_snapshot,
+            runtime_loader=_fake_runtime,
+        )
+
+
+def test_gate_recomputes_success_and_lap_aggregates(passing_report) -> None:
+    report, _calls = passing_report
+    failing = copy.deepcopy(report)
+    episode = failing["evaluations"]["mpc"]["validation"]["episodes"][0]
+    episode["success"] = False
+    episode["lap_time_s"] = None
+    episode["terminated"] = False
+    episode["truncated"] = True
+    episode["termination_reason"] = 4
+
+    failed = {
+        check["id"] for check in benchmark.evaluate_report_gates(failing) if not check["passed"]
+    }
+
+    assert failed == {"controllers.aggregate_consistency"}
+
+
+def test_gate_recomputes_timing_summaries_and_realtime_qualification(passing_report) -> None:
+    report, _calls = passing_report
+    bad_timing = copy.deepcopy(report)
+    bad_timing["evaluations"]["pid"]["level0"]["episodes"][0]["compute_timing"]["p99_s"] = 0.02
+
+    failed_timing = {
+        check["id"] for check in benchmark.evaluate_report_gates(bad_timing) if not check["passed"]
+    }
+    assert failed_timing == {"controllers.timing_consistency"}
+
+    bad_realtime = copy.deepcopy(report)
+    bad_realtime["evaluations"]["mpc"]["realtime_qualification"]["eligible"] = False
+    failed_realtime = {
+        check["id"]
+        for check in benchmark.evaluate_report_gates(bad_realtime)
+        if not check["passed"]
+    }
+    assert failed_realtime == {"controllers.realtime_qualification_consistency"}
+
+
+def test_gate_rejects_controller_init_over_thirty_seconds(passing_report) -> None:
+    report, _calls = passing_report
+    failing = copy.deepcopy(report)
+    failing["evaluations"]["pid"]["validation"]["episodes"][0]["controller_init_time_s"] = 30.000001
+
+    failed = {
+        check["id"] for check in benchmark.evaluate_report_gates(failing) if not check["passed"]
+    }
+
+    assert failed == {"controllers.init_timeout"}
 
 
 def test_strict_json_is_atomic_and_report_is_private(
@@ -309,3 +458,20 @@ def test_relevant_sources_are_unique_relative_and_present() -> None:
     for relative in benchmark.RELEVANT_SOURCE_PATHS:
         assert not Path(relative).is_absolute()
         assert (PROJECT_ROOT / relative).is_file(), relative
+
+    package_sources = {
+        path.relative_to(PROJECT_ROOT).as_posix()
+        for path in (PROJECT_ROOT / "controller_learning").rglob("*.py")
+    }
+    assert package_sources.issubset(benchmark.RELEVANT_SOURCE_PATHS)
+    assert {
+        "controller_learning/__init__.py",
+        "controller_learning/config/__init__.py",
+        "controller_learning/control/__init__.py",
+        "controller_learning/control/debug_draw.py",
+        "controller_learning/evaluation/__init__.py",
+        "controller_learning/physics/__init__.py",
+        "controller_learning/tracks/hashing.py",
+        "controller_learning/tracks/pool.py",
+        "controller_learning/tracks/specs.py",
+    }.issubset(benchmark.RELEVANT_SOURCE_PATHS)

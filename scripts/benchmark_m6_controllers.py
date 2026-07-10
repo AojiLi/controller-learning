@@ -53,6 +53,7 @@ FORMAL_MPC_VALIDATION_TRACKS = 100
 FORMAL_LEVEL0_TRACKS = 1
 REALTIME_P99_LIMIT_S = 0.05
 REALTIME_MISS_RATE_LIMIT = 0.01
+FORMAL_INIT_TIMEOUT_S = 30.0
 DEFAULT_OUTPUT = Path("benchmarks/v0.1/m6_controller_report.json")
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
@@ -62,7 +63,7 @@ _GPU_UUID_PATTERN = re.compile(
 )
 _WINDOWS_ABSOLUTE_PATTERN = re.compile(r"^[A-Za-z]:[\\/]")
 
-RELEVANT_SOURCE_PATHS = (
+_NON_PACKAGE_SOURCE_PATHS = (
     "pixi.lock",
     "pyproject.toml",
     "configs/benchmark.toml",
@@ -75,28 +76,6 @@ RELEVANT_SOURCE_PATHS = (
     "controller_learning/assets/tracks/v0.1/validation.json",
     "controller_learning/assets/tracks/v0.1/validation.npz",
     "controller_learning/assets/vehicle/car.xml",
-    "controller_learning/config/loader.py",
-    "controller_learning/config/models.py",
-    "controller_learning/control/base.py",
-    "controller_learning/control/configuration.py",
-    "controller_learning/control/geometry.py",
-    "controller_learning/control/loader.py",
-    "controller_learning/control/runner.py",
-    "controller_learning/control/speed_profile.py",
-    "controller_learning/envs/_vehicle_driver.py",
-    "controller_learning/envs/car_racing.py",
-    "controller_learning/envs/configuration.py",
-    "controller_learning/envs/episode.py",
-    "controller_learning/envs/observation.py",
-    "controller_learning/envs/race_core.py",
-    "controller_learning/envs/vector_racing.py",
-    "controller_learning/evaluation/controller.py",
-    "controller_learning/physics/actuation.py",
-    "controller_learning/physics/mjx_warp.py",
-    "controller_learning/physics/model.py",
-    "controller_learning/tracks/assets.py",
-    "controller_learning/tracks/official_assets.py",
-    "controller_learning/tracks/types.py",
     "controllers/pid/config.toml",
     "controllers/pid/controller.py",
     "controllers/pid/helpers.py",
@@ -106,6 +85,11 @@ RELEVANT_SOURCE_PATHS = (
     "controllers/mpc/solver.py",
     "scripts/benchmark_m6_controllers.py",
 )
+_PACKAGE_SOURCE_PATHS = tuple(
+    path.relative_to(PROJECT_ROOT).as_posix()
+    for path in sorted((PROJECT_ROOT / "controller_learning").rglob("*.py"))
+)
+RELEVANT_SOURCE_PATHS = tuple(sorted((*_NON_PACKAGE_SOURCE_PATHS, *_PACKAGE_SOURCE_PATHS)))
 
 
 @dataclass(frozen=True, slots=True)
@@ -243,6 +227,24 @@ def _source_snapshot(project_root: Path) -> dict[str, Any]:
         "relevant_source_clean": None if status is None else not bool(status),
         "source_files_sha256": hashes,
     }
+
+
+def _require_source_preflight(snapshot: Mapping[str, Any]) -> None:
+    """Reject an unreproducible checkout before starting the expensive formal workload."""
+
+    revision = snapshot.get("git_revision")
+    if not isinstance(revision, str) or not revision:
+        raise RuntimeError("formal M6 evaluation requires a readable non-empty Git revision")
+    if snapshot.get("relevant_source_clean") is not True:
+        raise RuntimeError("formal M6 evaluation requires a clean relevant source checkout")
+    hashes = snapshot.get("source_files_sha256")
+    if not isinstance(hashes, Mapping) or set(hashes) != set(RELEVANT_SOURCE_PATHS):
+        raise RuntimeError("formal M6 evaluation source snapshot does not cover every input")
+    if any(
+        not isinstance(value, str) or _SHA256_PATTERN.fullmatch(value) is None
+        for value in hashes.values()
+    ):
+        raise RuntimeError("formal M6 evaluation source snapshot contains an invalid SHA-256")
 
 
 def _package_version(package: str) -> str | None:
@@ -409,9 +411,23 @@ def _evaluation_payload(
     evaluation: ControllerEvaluation,
     *,
     controller_directory: str,
+    project_root: Path,
+    expected_level_id: int,
 ) -> dict[str, Any]:
     if not isinstance(evaluation, ControllerEvaluation):
         raise TypeError("Controller evaluator must return ControllerEvaluation")
+    expected_path = (project_root / controller_directory).resolve()
+    actual_path = Path(evaluation.controller_directory).expanduser()
+    if not actual_path.is_absolute():
+        actual_path = project_root / actual_path
+    if actual_path.resolve() != expected_path:
+        raise ValueError(
+            "Controller evaluator returned a result for an unexpected Controller directory"
+        )
+    if evaluation.level_id != expected_level_id:
+        raise ValueError("Controller evaluator returned a result for an unexpected Level")
+    if evaluation.backend != FORMAL_BACKEND:
+        raise ValueError("Controller evaluator returned a result for a non-formal backend")
     payload = _json_value(evaluation)
     if not isinstance(payload, dict):  # pragma: no cover - dataclass conversion invariant
         raise AssertionError("ControllerEvaluation must serialize to an object")
@@ -453,11 +469,22 @@ def _controller_result(
     validation: ControllerEvaluation,
     *,
     directory: str,
+    project_root: Path,
 ) -> dict[str, Any]:
     combined_timing = _combined_timing((level0, validation))
     return {
-        "level0": _evaluation_payload(level0, controller_directory=directory),
-        "validation": _evaluation_payload(validation, controller_directory=directory),
+        "level0": _evaluation_payload(
+            level0,
+            controller_directory=directory,
+            project_root=project_root,
+            expected_level_id=0,
+        ),
+        "validation": _evaluation_payload(
+            validation,
+            controller_directory=directory,
+            project_root=project_root,
+            expected_level_id=1,
+        ),
         "combined_timing": combined_timing,
         "realtime_qualification": _realtime_qualification(combined_timing),
     }
@@ -519,11 +546,13 @@ def _run_controller_evaluations(
             pid_level0,
             pid_validation_result,
             directory="controllers/pid",
+            project_root=project_root,
         ),
         "mpc": _controller_result(
             mpc_level0,
             mpc_validation_result,
             directory="controllers/mpc",
+            project_root=project_root,
         ),
     }
 
@@ -533,21 +562,27 @@ def _mapping(value: object) -> Mapping[str, Any]:
 
 
 def _episodes(report: Mapping[str, Any], controller: str, split: str) -> list[Any]:
-    evaluations = _mapping(report.get("evaluations"))
-    controller_result = _mapping(evaluations.get(controller))
-    result = _mapping(controller_result.get(split))
+    result = _evaluation_result(report, controller, split)
     episodes = result.get("episodes")
     return episodes if isinstance(episodes, list) else []
 
 
-def _track_count(report: Mapping[str, Any], controller: str, split: str) -> object:
+def _evaluation_result(
+    report: Mapping[str, Any],
+    controller: str,
+    split: str,
+) -> Mapping[str, Any]:
     evaluations = _mapping(report.get("evaluations"))
-    return _mapping(_mapping(evaluations.get(controller)).get(split)).get("track_count")
+    controller_result = _mapping(evaluations.get(controller))
+    return _mapping(controller_result.get(split))
+
+
+def _track_count(report: Mapping[str, Any], controller: str, split: str) -> object:
+    return _evaluation_result(report, controller, split).get("track_count")
 
 
 def _success_rate(report: Mapping[str, Any], controller: str, split: str) -> object:
-    evaluations = _mapping(report.get("evaluations"))
-    return _mapping(_mapping(evaluations.get(controller)).get(split)).get("success_rate")
+    return _evaluation_result(report, controller, split).get("success_rate")
 
 
 def _episode_values(episodes: Sequence[object], key: str) -> list[Any]:
@@ -569,48 +604,192 @@ def _normal_episode(episode: object) -> bool:
     )
 
 
-def _timing_complete(report: Mapping[str, Any]) -> bool:
+def _finite_number(value: object, *, minimum: float = 0.0) -> bool:
+    return (
+        isinstance(value, (int, float))
+        and not isinstance(value, bool)
+        and math.isfinite(float(value))
+        and float(value) >= minimum
+    )
+
+
+def _close_number(actual: object, expected: float, *, tolerance: float = 1.0e-15) -> bool:
+    return _finite_number(actual) and math.isclose(
+        float(actual),
+        expected,
+        rel_tol=0.0,
+        abs_tol=tolerance,
+    )
+
+
+def _evaluation_identity_findings(report: Mapping[str, Any]) -> list[str]:
+    findings: list[str] = []
+    for controller in ("pid", "mpc"):
+        for split, level_id in (("level0", 0), ("validation", 1)):
+            result = _evaluation_result(report, controller, split)
+            prefix = f"{controller}.{split}"
+            expected = {
+                "backend": FORMAL_BACKEND,
+                "level_id": level_id,
+                "controller_directory": f"controllers/{controller}",
+            }
+            for key, value in expected.items():
+                actual = result.get(key)
+                if actual != value or (key == "level_id" and type(actual) is not int):
+                    findings.append(f"{prefix}.{key}")
+    return findings
+
+
+def _aggregate_findings(report: Mapping[str, Any]) -> list[str]:
+    findings: list[str] = []
+    for controller in ("pid", "mpc"):
+        for split in ("level0", "validation"):
+            prefix = f"{controller}.{split}"
+            result = _evaluation_result(report, controller, split)
+            episodes = result.get("episodes")
+            if not isinstance(episodes, list) or not episodes:
+                findings.append(f"{prefix}.episodes")
+                continue
+            track_count = result.get("track_count")
+            if type(track_count) is not int or track_count != len(episodes):
+                findings.append(f"{prefix}.track_count")
+
+            successes: list[bool] = []
+            successful_laps: list[float] = []
+            episode_schema_valid = True
+            for index, episode in enumerate(episodes):
+                if not isinstance(episode, Mapping) or type(episode.get("success")) is not bool:
+                    findings.append(f"{prefix}.episodes[{index}].success")
+                    episode_schema_valid = False
+                    continue
+                success = bool(episode["success"])
+                successes.append(success)
+                lap_time = episode.get("lap_time_s")
+                if success:
+                    if not _finite_number(lap_time, minimum=np.finfo(np.float64).tiny):
+                        findings.append(f"{prefix}.episodes[{index}].lap_time_s")
+                        episode_schema_valid = False
+                    else:
+                        successful_laps.append(float(lap_time))
+                elif lap_time is not None:
+                    findings.append(f"{prefix}.episodes[{index}].lap_time_s")
+                    episode_schema_valid = False
+
+            if not episode_schema_valid or len(successes) != len(episodes):
+                continue
+            success_count = sum(successes)
+            success_rate = success_count / len(episodes)
+            reported_success_count = result.get("success_count")
+            if type(reported_success_count) is not int or reported_success_count != success_count:
+                findings.append(f"{prefix}.success_count")
+            if not _close_number(result.get("success_rate"), success_rate):
+                findings.append(f"{prefix}.success_rate")
+            mean_lap = result.get("mean_successful_lap_time_s")
+            if successful_laps:
+                expected_mean = float(np.mean(successful_laps, dtype=np.float64))
+                if not _close_number(mean_lap, expected_mean, tolerance=1.0e-12):
+                    findings.append(f"{prefix}.mean_successful_lap_time_s")
+            elif mean_lap is not None:
+                findings.append(f"{prefix}.mean_successful_lap_time_s")
+    return findings
+
+
+def _timing_summary_matches(summary: object, samples: Sequence[object]) -> bool:
+    if not isinstance(summary, Mapping):
+        return False
+    try:
+        expected = _json_value(
+            summarize_compute_times(samples, deadline_s=REALTIME_P99_LIMIT_S)  # type: ignore[arg-type]
+        )
+    except (TypeError, ValueError):
+        return False
+    if not isinstance(expected, Mapping):  # pragma: no cover - dataclass conversion invariant
+        raise AssertionError("TimingSummary must serialize to an object")
+    integer_fields = ("sample_count", "deadline_miss_count")
+    float_fields = (
+        "deadline_s",
+        "p50_s",
+        "p95_s",
+        "p99_s",
+        "max_s",
+        "deadline_miss_rate",
+    )
+    return (
+        set(summary) == set(expected)
+        and all(
+            type(summary.get(field)) is int and summary.get(field) == expected[field]
+            for field in integer_fields
+        )
+        and all(_close_number(summary.get(field), float(expected[field])) for field in float_fields)
+    )
+
+
+def _timing_findings(report: Mapping[str, Any]) -> list[str]:
+    findings: list[str] = []
     evaluations = _mapping(report.get("evaluations"))
     for controller in ("pid", "mpc"):
         controller_result = _mapping(evaluations.get(controller))
-        combined_expected = 0
+        combined_samples: list[object] = []
         for split in ("level0", "validation"):
             result = _mapping(controller_result.get(split))
             episodes = result.get("episodes")
             if not isinstance(episodes, list) or not episodes:
-                return False
-            aggregate_expected = 0
-            for episode in episodes:
+                findings.append(f"{controller}.{split}.episodes")
+                continue
+            aggregate_samples: list[object] = []
+            for index, episode in enumerate(episodes):
                 if not isinstance(episode, Mapping):
-                    return False
+                    findings.append(f"{controller}.{split}.episodes[{index}]")
+                    continue
                 steps = episode.get("steps")
                 samples = episode.get("compute_times_s")
-                timing = _mapping(episode.get("compute_timing"))
                 if (
                     not isinstance(steps, int)
                     or isinstance(steps, bool)
                     or not isinstance(samples, list)
                     or len(samples) != steps
-                    or timing.get("sample_count") != steps
-                    or any(
-                        not isinstance(sample, (int, float))
-                        or isinstance(sample, bool)
-                        or not math.isfinite(float(sample))
-                        or float(sample) < 0.0
-                        for sample in samples
-                    )
                 ):
-                    return False
-                aggregate_expected += steps
-            if _mapping(result.get("compute_timing")).get("sample_count") != aggregate_expected:
-                return False
-            combined_expected += aggregate_expected
-        if (
-            _mapping(controller_result.get("combined_timing")).get("sample_count")
-            != combined_expected
+                    findings.append(f"{controller}.{split}.episodes[{index}].compute_times_s")
+                    continue
+                if not _timing_summary_matches(episode.get("compute_timing"), samples):
+                    findings.append(f"{controller}.{split}.episodes[{index}].compute_timing")
+                aggregate_samples.extend(samples)
+            if not aggregate_samples or not _timing_summary_matches(
+                result.get("compute_timing"), aggregate_samples
+            ):
+                findings.append(f"{controller}.{split}.compute_timing")
+            combined_samples.extend(aggregate_samples)
+        if not combined_samples or not _timing_summary_matches(
+            controller_result.get("combined_timing"), combined_samples
         ):
-            return False
-    return True
+            findings.append(f"{controller}.combined_timing")
+    return findings
+
+
+def _realtime_findings(report: Mapping[str, Any]) -> list[str]:
+    findings: list[str] = []
+    evaluations = _mapping(report.get("evaluations"))
+    for controller in ("pid", "mpc"):
+        controller_result = _mapping(evaluations.get(controller))
+        expected = _realtime_qualification(_mapping(controller_result.get("combined_timing")))
+        if controller_result.get("realtime_qualification") != expected:
+            findings.append(f"{controller}.realtime_qualification")
+    return findings
+
+
+def _init_timeout_findings(report: Mapping[str, Any]) -> list[str]:
+    findings: list[str] = []
+    for controller in ("pid", "mpc"):
+        for split in ("level0", "validation"):
+            for index, episode in enumerate(_episodes(report, controller, split)):
+                value = (
+                    episode.get("controller_init_time_s") if isinstance(episode, Mapping) else None
+                )
+                if not _finite_number(value) or float(value) > FORMAL_INIT_TIMEOUT_S:
+                    findings.append(
+                        f"{controller}.{split}.episodes[{index}].controller_init_time_s"
+                    )
+    return findings
 
 
 def _privacy_findings(value: object) -> dict[str, list[str]]:
@@ -677,6 +856,7 @@ def evaluate_report_gates(report: Mapping[str, Any]) -> list[dict[str, Any]]:
             and protocol.get("validation_selection") == "manifest_order_prefix"
             and protocol.get("test_split_policy") == "not_loaded_or_evaluated"
             and protocol.get("compute_deadline_s") == REALTIME_P99_LIMIT_S
+            and protocol.get("controller_init_timeout_s") == FORMAL_INIT_TIMEOUT_S
             and protocol.get("realtime_p99_limit_s") == REALTIME_P99_LIMIT_S
             and protocol.get("realtime_deadline_miss_rate_limit") == REALTIME_MISS_RATE_LIMIT
             and protocol.get("realtime_qualification_required_for_m6_pass") is False,
@@ -690,6 +870,7 @@ def evaluate_report_gates(report: Mapping[str, Any]) -> list[dict[str, Any]]:
                 "validation_selection": "manifest_order_prefix",
                 "test_split_policy": "not_loaded_or_evaluated",
                 "compute_deadline_s": REALTIME_P99_LIMIT_S,
+                "controller_init_timeout_s": FORMAL_INIT_TIMEOUT_S,
                 "realtime_p99_limit_s": REALTIME_P99_LIMIT_S,
                 "realtime_deadline_miss_rate_limit": REALTIME_MISS_RATE_LIMIT,
                 "realtime_qualification_required_for_m6_pass": False,
@@ -852,8 +1033,25 @@ def evaluate_report_gates(report: Mapping[str, Any]) -> list[dict[str, Any]]:
         and episode.get("termination_reason") == int(RaceTermination.INVALID_ACTION)
         for episode in all_episodes
     )
+    identity_findings = _evaluation_identity_findings(report)
+    aggregate_findings = _aggregate_findings(report)
+    timing_findings = _timing_findings(report)
+    realtime_findings = _realtime_findings(report)
+    init_timeout_findings = _init_timeout_findings(report)
     checks.extend(
         (
+            _check(
+                "protocol.evaluation_identity",
+                not identity_findings,
+                identity_findings,
+                [],
+            ),
+            _check(
+                "controllers.aggregate_consistency",
+                not aggregate_findings,
+                aggregate_findings,
+                [],
+            ),
             _check(
                 "controllers.no_invalid_action",
                 len(all_episodes) == 112 and invalid_count == 0,
@@ -861,10 +1059,22 @@ def evaluate_report_gates(report: Mapping[str, Any]) -> list[dict[str, Any]]:
                 {"episode_count": 112, "invalid_action_count": 0},
             ),
             _check(
-                "controllers.timing_complete",
-                _timing_complete(report),
-                _timing_complete(report),
-                True,
+                "controllers.timing_consistency",
+                not timing_findings,
+                timing_findings,
+                [],
+            ),
+            _check(
+                "controllers.realtime_qualification_consistency",
+                not realtime_findings,
+                realtime_findings,
+                [],
+            ),
+            _check(
+                "controllers.init_timeout",
+                not init_timeout_findings,
+                init_timeout_findings,
+                [],
             ),
         )
     )
@@ -981,11 +1191,14 @@ def run_benchmark(
     load_runtime = _runtime_evidence if runtime_loader is None else runtime_loader
 
     before = dict(take_snapshot(root))
+    _require_source_preflight(before)
     config = load_project_config(root)
     if config.benchmark.version != "0.1":
         raise RuntimeError("formal M6 evaluation is locked to benchmark version 0.1")
     if config.benchmark.validation_track_count != FORMAL_MPC_VALIDATION_TRACKS:
         raise RuntimeError("formal M6 evaluation requires exactly 100 Validation Tracks")
+    if config.benchmark.controller.init_timeout_s != FORMAL_INIT_TIMEOUT_S:
+        raise RuntimeError("formal M6 evaluation requires the fixed 30 second init timeout")
     assets = load_assets(config, root)
     if int(assets.level0_batch.seed.shape[0]) != FORMAL_LEVEL0_TRACKS:
         raise RuntimeError("formal Level 0 asset must contain exactly one Track")
@@ -1015,6 +1228,7 @@ def run_benchmark(
             "reset_seed_policy": "row_index_uint32",
             "test_split_policy": "not_loaded_or_evaluated",
             "compute_deadline_s": config.benchmark.controller.compute_deadline_s,
+            "controller_init_timeout_s": config.benchmark.controller.init_timeout_s,
             "realtime_p99_limit_s": REALTIME_P99_LIMIT_S,
             "realtime_deadline_miss_rate_limit": REALTIME_MISS_RATE_LIMIT,
             "realtime_qualification_required_for_m6_pass": False,
