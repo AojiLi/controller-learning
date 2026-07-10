@@ -6,6 +6,7 @@ import hashlib
 import importlib
 import json
 import math
+import subprocess
 from collections import Counter, defaultdict
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, replace
@@ -39,6 +40,15 @@ TRACK_POINT_ROUNDING = 64
 CHECKPOINT_ROUNDING = 8
 
 CandidateValidator = Callable[[TrackCandidate], Any]
+
+_RELEVANT_SOURCE_PATHS = (
+    "controller_learning/tracks/types.py",
+    "controller_learning/tracks/geometry.py",
+    "controller_learning/tracks/generator.py",
+    "controller_learning/tracks/validator.py",
+    "controller_learning/tracks/capacity_benchmark.py",
+    "scripts/benchmark_track_capacity.py",
+)
 
 
 def _load_candidate_validator() -> CandidateValidator | None:
@@ -81,6 +91,43 @@ def _json_value(value: Any) -> Any:
     if isinstance(value, (str, int, float, bool)) or value is None:
         return value
     return repr(value)
+
+
+def _implementation_evidence() -> dict[str, Any]:
+    """Record revision and content hashes without leaking local filesystem paths."""
+
+    root = Path(__file__).resolve().parents[2]
+    hashes = {
+        relative: hashlib.sha256((root / relative).read_bytes()).hexdigest()
+        for relative in _RELEVANT_SOURCE_PATHS
+    }
+    try:
+        revision_process = subprocess.run(
+            ("git", "rev-parse", "HEAD"),
+            cwd=root,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        status_process = subprocess.run(
+            ("git", "status", "--porcelain", "--", *_RELEVANT_SOURCE_PATHS),
+            cwd=root,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        revision: str | None = revision_process.stdout.strip()
+        relevant_source_clean: bool | None = not bool(status_process.stdout.strip())
+    except (FileNotFoundError, subprocess.SubprocessError):
+        revision = None
+        relevant_source_clean = None
+    return {
+        "git_revision": revision,
+        "relevant_source_clean": relevant_source_clean,
+        "source_files_sha256": hashes,
+    }
 
 
 def _candidate_fingerprint(candidate: TrackCandidate) -> str:
@@ -492,6 +539,7 @@ def run_track_capacity_benchmark(
     return {
         "schema_version": REPORT_SCHEMA_VERSION,
         "benchmark_version": "v0.1",
+        "implementation": _implementation_evidence(),
         "protocol": {
             "seed_range": {
                 "start_inclusive": seed_start,

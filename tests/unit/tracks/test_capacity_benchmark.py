@@ -46,6 +46,10 @@ def test_report_schema_seed_range_and_percentiles(small_report) -> None:
         "p99_9",
         "max",
     ]
+    implementation = small_report["implementation"]
+    assert implementation["git_revision"] is None or len(implementation["git_revision"]) == 40
+    assert implementation["relevant_source_clean"] in (True, False, None)
+    assert all(len(digest) == 64 for digest in implementation["source_files_sha256"].values())
     result = small_report["spacing_results"][0]
     generated = result["statistics"]["generated_candidates"]
     assert generated["count"] == result["generation"]["succeeded_count"]
