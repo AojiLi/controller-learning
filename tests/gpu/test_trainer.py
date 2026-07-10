@@ -341,6 +341,7 @@ def test_training_loop_is_seed_reproducible_accounts_budget_and_persists_records
     assert summary.counts.terminal_events == 3
     assert summary.counts.terminated_events == 2
     assert summary.counts.truncated_events == 1
+    assert summary.discarded_pending_reset_slots == 0
     assert summary.episodes.successful_episodes == 1
     assert summary.episodes.offtrack_episodes == 1
     assert summary.episodes.invalid_action_episodes == 0
@@ -394,6 +395,11 @@ def test_training_loop_is_seed_reproducible_accounts_budget_and_persists_records
     assert tuple(rows[0]) == trainer.TRAINING_METRICS_COLUMNS
     assert [int(row["update_index"]) for row in rows] == [1, 2, 3]
     assert [int(row["vector_steps"]) for row in rows] == [2, 4, 6]
+    assert [int(row["cumulative_discarded_pending_reset_slots"]) for row in rows] == [
+        0,
+        0,
+        0,
+    ]
     assert first_fsync_count == 2
     assert len(fsync_calls) == 4
     assert first.writer.path == tmp_path / "first"
@@ -485,6 +491,7 @@ def test_resume_restores_rng_numbering_cadence_and_appends_validated_csv(
     assert checkpoint.is_scheduled and checkpoint.is_final
     assert checkpoint.resume_state == checkpoint.to_resume_state()
     assert checkpoint.resume_state.starting_update == 2
+    assert checkpoint.resume_state.discarded_pending_reset_slots == 0
     assert checkpoint.resume_state.episodes.episode_length_sum_steps == 6
     resume_state = dataclasses.replace(
         checkpoint.resume_state,
@@ -578,15 +585,22 @@ def test_resume_restores_rng_numbering_cadence_and_appends_validated_csv(
     assert resumed.counts.raw_transitions == config.world_step_slot_budget
     assert resumed.counts.valid_transitions == 6_143
     assert resumed.counts.dummy_reset_transitions == 1
+    assert resumed.discarded_pending_reset_slots == 1
     assert resumed.episodes.episode_length_sum_steps == 8
     assert resumed.episodes.mean_episode_length_steps == pytest.approx(8.0 / 3.0)
     assert len(resumed_checkpoints) == 1
     assert not resumed_checkpoints[0].is_scheduled
     assert resumed_checkpoints[0].is_final
     assert resumed_checkpoints[0].resume_state.starting_update == 3
+    assert resumed_checkpoints[0].resume_state.discarded_pending_reset_slots == 1
     with resumed.metrics_path.open(encoding="utf-8", newline="") as file:
         rows = list(csv.DictReader(file))
     assert [int(row["update_index"]) for row in rows] == [1, 2, 3]
+    assert [int(row["cumulative_discarded_pending_reset_slots"]) for row in rows] == [
+        0,
+        0,
+        1,
+    ]
     assert [float(row["learning_rate"]) for row in rows] == pytest.approx(
         (
             config.ppo.learning_rate,
@@ -594,6 +608,47 @@ def test_resume_restores_rng_numbering_cadence_and_appends_validated_csv(
             config.ppo.learning_rate / 3.0,
         )
     )
+
+
+def test_resume_state_rejects_uncompensated_pending_carry_outside_vector_width() -> None:
+    torch = _torch()
+    trainer = _trainer_module()
+    rollout = importlib.import_module("controller_learning.rl.rollout")
+    counts = rollout.TransitionCounts(
+        num_envs=2,
+        environment_step_calls=1,
+        raw_transitions=2,
+        valid_transitions=2,
+        dummy_reset_transitions=0,
+        autoreset_slots=0,
+        terminal_events=2,
+        terminated_events=2,
+        truncated_events=0,
+    )
+    episodes = trainer.EpisodeMetrics(
+        episodes=2,
+        successful_episodes=0,
+        offtrack_episodes=2,
+        invalid_action_episodes=0,
+        timeout_episodes=0,
+        successful_lap_time_sum_s=0.0,
+        episode_length_sum_steps=2,
+    )
+    generator = torch.Generator(device=_device()).manual_seed(1)
+    state = generator.get_state()
+
+    with pytest.raises(ValueError, match="uncompensated pending-reset slots"):
+        trainer.TrainingResumeState(
+            starting_update=1,
+            counts=counts,
+            discarded_pending_reset_slots=3,
+            episodes=episodes,
+            cumulative_reward_sum=0.0,
+            cumulative_compute_update_seconds=1.0,
+            wall_elapsed_before_persistence_seconds=1.0,
+            policy_rng_state=state,
+            minibatch_rng_state=state,
+        )
 
 
 def test_body_and_tensorboard_cleanup_failures_are_both_reported(

@@ -780,7 +780,10 @@ def _training_accounting(
         raise RuntimeError("autoreset slots do not equal reset-only slots")
     if counts.terminal_events != counts.terminated_events + counts.truncated_events:
         raise RuntimeError("terminal events do not equal terminated plus truncated events")
-    final_pending = counts.terminal_events - counts.autoreset_slots
+    discarded_pending = summary.discarded_pending_reset_slots
+    if type(discarded_pending) is not int or discarded_pending < 0:
+        raise RuntimeError("discarded pending-reset slots must be a non-negative integer")
+    final_pending = counts.terminal_events - counts.autoreset_slots - discarded_pending
     if not 0 <= final_pending <= config.environment.num_envs:
         raise RuntimeError("NEXT_STEP terminal/autoreset conservation is invalid")
     if summary.episodes.episodes != counts.terminal_events:
@@ -798,6 +801,7 @@ def _training_accounting(
         "valid_transitions": counts.valid_transitions,
         "dummy_reset_transitions": counts.dummy_reset_transitions,
         "autoreset_slots": counts.autoreset_slots,
+        "discarded_pending_reset_slots": discarded_pending,
         "terminal_events": counts.terminal_events,
         "terminated_events": counts.terminated_events,
         "truncated_events": counts.truncated_events,
@@ -963,6 +967,45 @@ def _verify_existing_run(
     return manifest
 
 
+def _record_training_failure(
+    run_directory: Path,
+    *,
+    error: BaseException,
+    memory: MemoryEvidenceRecorder | None,
+    prior_manifest_bytes: bytes | None,
+) -> None:
+    """Record a fresh-run failure or restore the exact prior manifest for a failed resume."""
+
+    manifest_path = run_directory / "manifest.json"
+    if prior_manifest_bytes is not None:
+        try:
+            current = manifest_path.read_bytes()
+        except OSError:
+            current = None
+        if current != prior_manifest_bytes:
+            atomic_write_bytes(
+                run_directory,
+                "manifest.json",
+                prior_manifest_bytes,
+            )
+        return
+    if not run_directory.is_dir() or not manifest_path.is_file():
+        return
+    failed = read_strict_json(run_directory, "manifest.json")
+    failed.update(
+        {
+            "status": "failed",
+            "failed_at_utc": datetime.now(UTC).isoformat(),
+            "failure": {
+                "type": type(error).__name__,
+                "message": str(error),
+            },
+            "memory": None if memory is None else memory.report(),
+        }
+    )
+    atomic_write_json(run_directory, "manifest.json", _json_value(failed))
+
+
 def _load_resume_checkpoint(
     run_directory: Path,
     *,
@@ -1005,6 +1048,7 @@ def _checkpoint_callback(
             valid_transitions=counts.valid_transitions,
             dummy_reset_transitions=counts.dummy_reset_transitions,
             autoreset_slots=counts.autoreset_slots,
+            discarded_pending_reset_slots=request.discarded_pending_reset_slots,
             terminal_events=counts.terminal_events,
             terminated_events=counts.terminated_events,
             truncated_events=counts.truncated_events,
@@ -1070,6 +1114,7 @@ def _trainer_resume_state(loaded: LoadedTrainingCheckpoint | None) -> Any:
             terminated_events=continuation.terminated_events,
             truncated_events=continuation.truncated_events,
         ),
+        discarded_pending_reset_slots=continuation.discarded_pending_reset_slots,
         episodes=EpisodeMetrics(
             episodes=continuation.episodes,
             successful_episodes=continuation.successful_episodes,
@@ -1138,6 +1183,7 @@ def run_training(options: TrainingOptions, *, project_root: Path = PROJECT_ROOT)
     runtime, gpu_uuid = runtime_evidence()
     run_wall_started = time.perf_counter()
 
+    prior_manifest_bytes: bytes | None = None
     if options.resume:
         existing_manifest = _verify_existing_run(
             run_directory,
@@ -1149,6 +1195,7 @@ def run_training(options: TrainingOptions, *, project_root: Path = PROJECT_ROOT)
             sha256=identity.configuration_sha256,
             size_bytes=len(config_bytes),
         )
+        prior_manifest_bytes = (run_directory / "manifest.json").read_bytes()
     else:
         if run_directory.exists() or run_directory.is_symlink():
             relative_run = run_directory.relative_to(root)
@@ -1189,7 +1236,10 @@ def run_training(options: TrainingOptions, *, project_root: Path = PROJECT_ROOT)
                 "completed_update": None,
             }
         )
-    atomic_write_json(run_directory, "manifest.json", manifest)
+    # A resume keeps the prior successful manifest byte-for-byte until the new invocation commits
+    # its final manifest. This also protects the prior audit record from hard process termination.
+    if prior_manifest_bytes is None:
+        atomic_write_json(run_directory, "manifest.json", manifest)
 
     stack: FormalTrainingStack | None = None
     memory: MemoryEvidenceRecorder | None = None
@@ -1244,7 +1294,8 @@ def run_training(options: TrainingOptions, *, project_root: Path = PROJECT_ROOT)
         )
         memory.sample("after_compile_warmup")
         manifest["runtime"] = dict(runtime)
-        atomic_write_json(run_directory, "manifest.json", manifest)
+        if prior_manifest_bytes is None:
+            atomic_write_json(run_directory, "manifest.json", manifest)
 
         from controller_learning.rl.trainer import TorchCudaMemoryMetrics, train_ppo
 
@@ -1399,20 +1450,12 @@ def run_training(options: TrainingOptions, *, project_root: Path = PROJECT_ROOT)
             except BaseException as cleanup_error:
                 cleanup_errors.append(cleanup_error)
         try:
-            if run_directory.is_dir() and (run_directory / "manifest.json").is_file():
-                failed = read_strict_json(run_directory, "manifest.json")
-                failed.update(
-                    {
-                        "status": "failed",
-                        "failed_at_utc": datetime.now(UTC).isoformat(),
-                        "failure": {
-                            "type": type(error).__name__,
-                            "message": str(error),
-                        },
-                        "memory": None if memory is None else memory.report(),
-                    }
-                )
-                atomic_write_json(run_directory, "manifest.json", _json_value(failed))
+            _record_training_failure(
+                run_directory,
+                error=error,
+                memory=memory,
+                prior_manifest_bytes=prior_manifest_bytes,
+            )
         except BaseException as cleanup_error:
             cleanup_errors.append(cleanup_error)
         if cleanup_errors:

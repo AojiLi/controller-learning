@@ -37,6 +37,7 @@ class PickleTorch:
         self.fail_load = False
         self.corrupt_metadata_update: int | None = None
         self.corrupt_continuation_update: int | None = None
+        self.corrupt_discarded_pending_update: int | None = None
 
     def save(self, value: Any, file: Any) -> None:
         if self.fail_save:
@@ -64,6 +65,8 @@ class PickleTorch:
             value["metadata"]["vector_steps"] += 1
         if value["metadata"]["update_index"] == self.corrupt_continuation_update:
             value["continuation_state"]["timeout_episodes"] += 1
+        if value["metadata"]["update_index"] == self.corrupt_discarded_pending_update:
+            value["continuation_state"]["discarded_pending_reset_slots"] += 1
         return value
 
 
@@ -131,6 +134,7 @@ def _continuation(update: int) -> artifacts.TrainingContinuationState:
         valid_transitions=update * 1020,
         dummy_reset_transitions=update * 4,
         autoreset_slots=update * 4,
+        discarded_pending_reset_slots=0,
         terminal_events=update * 4,
         terminated_events=update * 3,
         truncated_events=update,
@@ -399,11 +403,13 @@ def test_training_continuation_state_matches_trainer_resume_accounting() -> None
     metadata = _metadata(2)
 
     continuation.validate_checkpoint_metadata(metadata)
+    assert continuation.schema_version == artifacts.TRAINING_CONTINUATION_SCHEMA_VERSION == 2
     assert artifacts.TrainingContinuationState.from_dict(continuation.to_dict()) == continuation
     assert set(continuation.to_dict()) == {
         "autoreset_slots",
         "cumulative_compute_update_seconds",
         "cumulative_reward_sum",
+        "discarded_pending_reset_slots",
         "dummy_reset_transitions",
         "environment_step_calls",
         "episode_length_sum_steps",
@@ -434,6 +440,8 @@ def test_training_continuation_rejects_accounting_reason_and_time_violations() -
         replace(continuation, raw_transitions=continuation.raw_transitions + 1)
     with pytest.raises(ArtifactValidationError, match="autoreset_slots"):
         replace(continuation, autoreset_slots=continuation.autoreset_slots + 1)
+    with pytest.raises(ArtifactValidationError, match="integer >= 0"):
+        replace(continuation, discarded_pending_reset_slots=-1)
     with pytest.raises(ArtifactValidationError, match=r"terminated \+ truncated"):
         replace(continuation, terminal_events=continuation.terminal_events + 1)
     with pytest.raises(ArtifactValidationError, match="four reason counts"):
@@ -455,6 +463,38 @@ def test_training_continuation_rejects_accounting_reason_and_time_violations() -
         )
     with pytest.raises(ArtifactValidationError, match="keys differ"):
         artifacts.TrainingContinuationState.from_dict({**continuation.to_dict(), "unexpected": 1})
+
+
+def test_training_continuation_validates_discarded_pending_reset_compensation() -> None:
+    continuation = _continuation(1)
+    compensated = replace(
+        continuation,
+        valid_transitions=1022,
+        dummy_reset_transitions=2,
+        autoreset_slots=2,
+        discarded_pending_reset_slots=1,
+    )
+    fully_compensated = replace(compensated, discarded_pending_reset_slots=2)
+
+    assert compensated.terminal_events - compensated.autoreset_slots == 2
+    assert (
+        compensated.terminal_events
+        - compensated.autoreset_slots
+        - compensated.discarded_pending_reset_slots
+        == 1
+    )
+    assert fully_compensated.discarded_pending_reset_slots == 2
+
+    with pytest.raises(ArtifactValidationError, match="cannot exceed terminal_events"):
+        replace(compensated, discarded_pending_reset_slots=3)
+    with pytest.raises(ArtifactValidationError, match=r"must be in \[0, num_envs\]"):
+        replace(
+            _continuation(3),
+            valid_transitions=3072,
+            dummy_reset_transitions=0,
+            autoreset_slots=0,
+            discarded_pending_reset_slots=0,
+        )
 
 
 @pytest.mark.parametrize(
@@ -610,6 +650,22 @@ def test_checkpoint_continuation_readback_failure_preserves_prior_latest(
     latest_path = tmp_path / first.latest_pointer.relative_path
     prior_latest = latest_path.read_bytes()
     backend.corrupt_continuation_update = 2
+
+    with pytest.raises(ArtifactWriteError, match="schema readback"):
+        _save(tmp_path, 2, backend=backend)
+
+    assert latest_path.read_bytes() == prior_latest
+    assert not (tmp_path / "checkpoints/update_00000002.pt").exists()
+
+
+def test_checkpoint_discarded_pending_tampering_preserves_prior_latest(
+    tmp_path: Path,
+) -> None:
+    backend = PickleTorch()
+    first = _save(tmp_path, 1, backend=backend)
+    latest_path = tmp_path / first.latest_pointer.relative_path
+    prior_latest = latest_path.read_bytes()
+    backend.corrupt_discarded_pending_update = 2
 
     with pytest.raises(ArtifactWriteError, match="schema readback"):
         _save(tmp_path, 2, backend=backend)
@@ -802,6 +858,7 @@ def test_load_training_checkpoint_verifies_payload_and_full_expected_identity(
     assert loaded.pointer.published_updates == (1,)
     assert loaded.metadata == _metadata(1, identity=identity)
     assert loaded.continuation_state == _continuation(1)
+    assert loaded.continuation_state.discarded_pending_reset_slots == 0
     assert loaded.payload["model_state_dict"] == {"weight": [1, 2]}
     assert loaded.payload["optimizer_state_dict"]["param_groups"][0]["lr"] == 3.0e-4
     with pytest.raises(TypeError):
@@ -823,6 +880,15 @@ def test_load_rejects_in_memory_continuation_tampering(tmp_path: Path) -> None:
     backend.corrupt_continuation_update = 1
 
     with pytest.raises(ArtifactValidationError, match="four reason counts"):
+        artifacts.load_training_checkpoint(
+            tmp_path,
+            expected_identity=identity,
+            torch_module=backend,
+        )
+
+    backend.corrupt_continuation_update = None
+    backend.corrupt_discarded_pending_update = 1
+    with pytest.raises(ArtifactValidationError, match="cannot exceed terminal_events"):
         artifacts.load_training_checkpoint(
             tmp_path,
             expected_identity=identity,

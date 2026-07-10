@@ -289,6 +289,7 @@ def test_training_accounting_recomputes_budget_next_step_and_physics_identities(
         completed_updates=2,
         configured_budget_completed=False,
         counts=counts,
+        discarded_pending_reset_slots=1,
         episodes=episodes,
     )
 
@@ -305,9 +306,19 @@ def test_training_accounting_recomputes_budget_next_step_and_physics_identities(
     assert evidence["terminal_events"] == (
         evidence["terminated_events"] + evidence["truncated_events"]
     )
-    assert evidence["final_pending_reset_slots"] == 2
+    assert evidence["discarded_pending_reset_slots"] == 1
+    assert evidence["final_pending_reset_slots"] == 1
     assert evidence["physics_substeps"] == 2_621_440
 
+    summary.discarded_pending_reset_slots = 3
+    with pytest.raises(RuntimeError, match="conservation"):
+        train_ppo._training_accounting(
+            config=config,
+            project=project,
+            summary=summary,
+        )
+
+    summary.discarded_pending_reset_slots = 1
     summary.episodes = SimpleNamespace(episodes=6, invalid_action_episodes=1)
     with pytest.raises(RuntimeError, match="invalid-action episode"):
         train_ppo._training_accounting(
@@ -350,6 +361,47 @@ def test_resume_verifies_canonical_manifest_full_identity_and_exact_config(tmp_p
             identity=identity,
             config_bytes=b"different\n",
         )
+
+
+@pytest.mark.parametrize(
+    "resume_error",
+    (
+        ArtifactValidationError("corrupted resume checkpoint"),
+        RuntimeError("formal stack validation failed"),
+    ),
+)
+def test_resume_failure_restores_prior_manifest_exact_bytes(
+    tmp_path: Path,
+    resume_error: BaseException,
+) -> None:
+    atomic_write_json(
+        tmp_path,
+        "manifest.json",
+        {
+            "schema_version": train_ppo.TRAINING_MANIFEST_SCHEMA_VERSION,
+            "status": "smoke_complete",
+            "counts": {"completed_updates": 2},
+            "artifacts": {"metrics_csv": {"sha256": "a" * 64}},
+        },
+    )
+    prior_bytes = (tmp_path / "manifest.json").read_bytes()
+    atomic_write_json(
+        tmp_path,
+        "manifest.json",
+        {
+            "schema_version": train_ppo.TRAINING_MANIFEST_SCHEMA_VERSION,
+            "status": "running",
+        },
+    )
+
+    train_ppo._record_training_failure(
+        tmp_path,
+        error=resume_error,
+        memory=None,
+        prior_manifest_bytes=prior_bytes,
+    )
+
+    assert (tmp_path / "manifest.json").read_bytes() == prior_bytes
 
 
 def test_completed_run_artifacts_bind_csv_tensorboard_checkpoint_and_pointer(
@@ -437,6 +489,7 @@ def test_checkpoint_callback_wires_cumulative_metadata_and_all_resume_state(
         vector_steps=5,
         elapsed_seconds=1.0,
         counts=counts,
+        discarded_pending_reset_slots=1,
         resume_state=resume_state,
         model_state_dict={"model": 1},
         optimizer_state_dict={"optimizer": 2},
@@ -461,6 +514,7 @@ def test_checkpoint_callback_wires_cumulative_metadata_and_all_resume_state(
     assert continuation.starting_update == 10
     assert continuation.raw_transitions == 10
     assert continuation.valid_transitions == 9
+    assert continuation.discarded_pending_reset_slots == 1
     assert continuation.episodes == 2
     assert continuation.episode_length_sum_steps == 5
     assert continuation.cumulative_reward_sum == -1.5

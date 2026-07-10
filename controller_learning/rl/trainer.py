@@ -45,6 +45,7 @@ TRAINING_METRICS_COLUMNS = (
     "cumulative_valid_transitions",
     "cumulative_dummy_reset_transitions",
     "cumulative_autoreset_slots",
+    "cumulative_discarded_pending_reset_slots",
     "cumulative_terminal_events",
     "cumulative_terminated_events",
     "cumulative_truncated_events",
@@ -132,6 +133,24 @@ def _zero_transition_counts(num_envs: int) -> TransitionCounts:
         terminated_events=0,
         truncated_events=0,
     )
+
+
+def _pending_reset_slots(
+    counts: TransitionCounts,
+    discarded_pending_reset_slots: object,
+    *,
+    name: str,
+) -> int:
+    """Validate cumulative fresh-reset compensation and return the live pending carry."""
+
+    if not isinstance(counts, TransitionCounts):
+        raise TypeError(f"{name}.counts must be TransitionCounts")
+    if type(discarded_pending_reset_slots) is not int or discarded_pending_reset_slots < 0:
+        raise ValueError(f"{name}.discarded_pending_reset_slots must be a non-negative integer")
+    pending = counts.terminal_events - counts.autoreset_slots - discarded_pending_reset_slots
+    if not 0 <= pending <= counts.num_envs:
+        raise ValueError(f"{name} uncompensated pending-reset slots must be in [0, num_envs]")
+    return pending
 
 
 @dataclass(frozen=True, slots=True)
@@ -255,6 +274,7 @@ class UpdateRecord:
     vector_steps: int
     rollout_counts: TransitionCounts
     cumulative_counts: TransitionCounts
+    discarded_pending_reset_slots: int
     rollout_episodes: EpisodeMetrics
     cumulative_episodes: EpisodeMetrics
     rollout_reward_sum: float
@@ -278,6 +298,11 @@ class UpdateRecord:
             raise ValueError("rollout and cumulative transition widths differ")
         if self.vector_steps != self.cumulative_counts.environment_step_calls:
             raise ValueError("vector_steps must equal cumulative environment step calls")
+        _pending_reset_slots(
+            self.cumulative_counts,
+            self.discarded_pending_reset_slots,
+            name="update record",
+        )
         if not isinstance(self.rollout_episodes, EpisodeMetrics) or not isinstance(
             self.cumulative_episodes, EpisodeMetrics
         ):
@@ -359,6 +384,7 @@ class UpdateRecord:
             "cumulative_valid_transitions": cumulative.valid_transitions,
             "cumulative_dummy_reset_transitions": cumulative.dummy_reset_transitions,
             "cumulative_autoreset_slots": cumulative.autoreset_slots,
+            "cumulative_discarded_pending_reset_slots": (self.discarded_pending_reset_slots),
             "cumulative_terminal_events": cumulative.terminal_events,
             "cumulative_terminated_events": cumulative.terminated_events,
             "cumulative_truncated_events": cumulative.truncated_events,
@@ -455,6 +481,7 @@ class TrainingResumeState:
 
     starting_update: int
     counts: TransitionCounts
+    discarded_pending_reset_slots: int
     episodes: EpisodeMetrics
     cumulative_reward_sum: float
     cumulative_compute_update_seconds: float
@@ -468,6 +495,11 @@ class TrainingResumeState:
             raise TypeError("counts must be TransitionCounts")
         if not isinstance(self.episodes, EpisodeMetrics):
             raise TypeError("episodes must be EpisodeMetrics")
+        _pending_reset_slots(
+            self.counts,
+            self.discarded_pending_reset_slots,
+            name="resume state",
+        )
         if self.episodes.episodes != self.counts.terminal_events:
             raise ValueError("resume episodes must equal resume terminal events")
         object.__setattr__(
@@ -509,6 +541,7 @@ class TrainingResumeState:
         return (
             self.starting_update == other.starting_update
             and self.counts == other.counts
+            and self.discarded_pending_reset_slots == other.discarded_pending_reset_slots
             and self.episodes == other.episodes
             and self.cumulative_reward_sum == other.cumulative_reward_sum
             and self.cumulative_compute_update_seconds == other.cumulative_compute_update_seconds
@@ -531,6 +564,7 @@ class TrainingCheckpointRequest:
     vector_steps: int
     elapsed_seconds: float
     counts: TransitionCounts
+    discarded_pending_reset_slots: int
     episodes: EpisodeMetrics
     record: UpdateRecord
     model_state_dict: Mapping[str, Any]
@@ -547,6 +581,8 @@ class TrainingCheckpointRequest:
             raise ValueError("checkpoint vector_steps differs from its update record")
         if self.counts != self.record.cumulative_counts:
             raise ValueError("checkpoint counts differ from its update record")
+        if self.discarded_pending_reset_slots != self.record.discarded_pending_reset_slots:
+            raise ValueError("checkpoint discarded pending slots differ from its update record")
         if self.episodes != self.record.cumulative_episodes:
             raise ValueError("checkpoint episodes differ from its update record")
         object.__setattr__(
@@ -581,6 +617,7 @@ class TrainingCheckpointRequest:
         return TrainingResumeState(
             starting_update=self.update_index,
             counts=self.counts,
+            discarded_pending_reset_slots=self.discarded_pending_reset_slots,
             episodes=self.episodes,
             cumulative_reward_sum=self.record.cumulative_reward_sum,
             cumulative_compute_update_seconds=(self.record.cumulative_compute_update_seconds),
@@ -612,6 +649,7 @@ class TrainingSummary:
     configured_budget_completed: bool
     vector_steps: int
     counts: TransitionCounts
+    discarded_pending_reset_slots: int
     episodes: EpisodeMetrics
     cumulative_reward_sum: float
     compute_update_seconds: float
@@ -645,6 +683,13 @@ class TrainingSummary:
             raise ValueError("summary episode metrics differ from the final record")
         if self.vector_steps != self.counts.environment_step_calls:
             raise ValueError("summary vector_steps differ from transition counts")
+        if self.records[-1].discarded_pending_reset_slots != self.discarded_pending_reset_slots:
+            raise ValueError("summary discarded pending slots differ from the final record")
+        _pending_reset_slots(
+            self.counts,
+            self.discarded_pending_reset_slots,
+            name="training summary",
+        )
         object.__setattr__(
             self,
             "cumulative_reward_sum",
@@ -779,6 +824,7 @@ class FixedColumnCsvWriter:
             "cumulative_valid_transitions": state.counts.valid_transitions,
             "cumulative_dummy_reset_transitions": state.counts.dummy_reset_transitions,
             "cumulative_autoreset_slots": state.counts.autoreset_slots,
+            "cumulative_discarded_pending_reset_slots": (state.discarded_pending_reset_slots),
             "cumulative_terminal_events": state.counts.terminal_events,
             "cumulative_terminated_events": state.counts.terminated_events,
             "cumulative_truncated_events": state.counts.truncated_events,
@@ -910,6 +956,11 @@ def _validate_resume_state(
         raise ValueError("resume vector-step count differs from starting_update")
     if state.counts.raw_transitions != expected_raw:
         raise ValueError("resume raw transition count differs from starting_update")
+    _pending_reset_slots(
+        state.counts,
+        state.discarded_pending_reset_slots,
+        name="resume state",
+    )
     return state.starting_update
 
 
@@ -1177,6 +1228,7 @@ def _checkpoint_request(
         vector_steps=record.vector_steps,
         elapsed_seconds=record.wall_elapsed_before_persistence_seconds,
         counts=record.cumulative_counts,
+        discarded_pending_reset_slots=record.discarded_pending_reset_slots,
         episodes=record.cumulative_episodes,
         record=record,
         model_state_dict=model_state,
@@ -1237,12 +1289,21 @@ def train_ppo(
         policy_generator.set_state(resume_state.policy_rng_state)
         minibatch_generator.set_state(resume_state.minibatch_rng_state)
         cumulative_counts = resume_state.counts
+        outstanding_pending_reset_slots = _pending_reset_slots(
+            cumulative_counts,
+            resume_state.discarded_pending_reset_slots,
+            name="resume state",
+        )
+        cumulative_discarded_pending_reset_slots = (
+            resume_state.discarded_pending_reset_slots + outstanding_pending_reset_slots
+        )
         cumulative_episodes = resume_state.episodes
         cumulative_reward_sum = resume_state.cumulative_reward_sum
         cumulative_compute_seconds = resume_state.cumulative_compute_update_seconds
         prior_wall_before_persistence_seconds = resume_state.wall_elapsed_before_persistence_seconds
     else:
         cumulative_counts = _zero_transition_counts(config.environment.num_envs)
+        cumulative_discarded_pending_reset_slots = 0
         cumulative_episodes = _zero_episode_metrics()
         cumulative_reward_sum = 0.0
         cumulative_compute_seconds = 0.0
@@ -1311,6 +1372,7 @@ def train_ppo(
                 vector_steps=cumulative_counts.environment_step_calls,
                 rollout_counts=rollout.counts,
                 cumulative_counts=cumulative_counts,
+                discarded_pending_reset_slots=cumulative_discarded_pending_reset_slots,
                 rollout_episodes=rollout_episodes,
                 cumulative_episodes=cumulative_episodes,
                 rollout_reward_sum=rollout_reward_sum,
@@ -1407,6 +1469,7 @@ def train_ppo(
         configured_budget_completed=configured_budget_completed,
         vector_steps=vector_steps,
         counts=cumulative_counts,
+        discarded_pending_reset_slots=cumulative_discarded_pending_reset_slots,
         episodes=cumulative_episodes,
         cumulative_reward_sum=cumulative_reward_sum,
         compute_update_seconds=invocation_compute_seconds,

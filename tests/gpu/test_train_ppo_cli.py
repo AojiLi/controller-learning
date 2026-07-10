@@ -106,6 +106,7 @@ def test_formal_factory_uses_verified_train_pool_and_exact_1024_world_public_sta
             valid_transitions=131_072,
             dummy_reset_transitions=0,
             autoreset_slots=0,
+            discarded_pending_reset_slots=0,
             terminal_events=0,
             terminated_events=0,
             truncated_events=0,
@@ -147,6 +148,7 @@ def test_formal_factory_uses_verified_train_pool_and_exact_1024_world_public_sta
         torch.testing.assert_close(stack.policy.log_std, original_log_std)
         assert resume.starting_update == 1
         assert resume.counts.raw_transitions == 131_072
+        assert resume.discarded_pending_reset_slots == 0
         assert resume.episodes.episodes == 0
         assert resume.cumulative_compute_update_seconds == 0.1
         assert resume.wall_elapsed_before_persistence_seconds == 0.2

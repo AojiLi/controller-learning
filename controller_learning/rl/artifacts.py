@@ -36,7 +36,7 @@ from controller_learning.rl.schema import (
 ARTIFACT_SCHEMA_VERSION: Final = 1
 RUN_IDENTITY_SCHEMA_VERSION: Final = 1
 TRAINING_CHECKPOINT_SCHEMA_VERSION: Final = 1
-TRAINING_CONTINUATION_SCHEMA_VERSION: Final = 1
+TRAINING_CONTINUATION_SCHEMA_VERSION: Final = 2
 LATEST_CHECKPOINT_SCHEMA_VERSION: Final = 1
 RESUME_SEMANTICS: Final = "optimizer_continuation_with_environment_reset"
 M7_FEATURE_SCHEMA_VERSION: Final = LOCAL_TRACK_FEATURE_SCHEMA_VERSION
@@ -781,6 +781,7 @@ class TrainingContinuationState:
     valid_transitions: int
     dummy_reset_transitions: int
     autoreset_slots: int
+    discarded_pending_reset_slots: int
     terminal_events: int
     terminated_events: int
     truncated_events: int
@@ -821,6 +822,7 @@ class TrainingContinuationState:
             "valid_transitions",
             "dummy_reset_transitions",
             "autoreset_slots",
+            "discarded_pending_reset_slots",
             "terminal_events",
             "terminated_events",
             "truncated_events",
@@ -863,6 +865,18 @@ class TrainingContinuationState:
         if self.terminal_events > self.valid_transitions:
             raise ArtifactValidationError(
                 "continuation.terminal_events cannot exceed valid_transitions"
+            )
+        pending_after_compensation = (
+            self.terminal_events - self.autoreset_slots - self.discarded_pending_reset_slots
+        )
+        if self.discarded_pending_reset_slots > (self.terminal_events - self.autoreset_slots):
+            raise ArtifactValidationError(
+                "continuation.discarded_pending_reset_slots cannot exceed terminal_events - "
+                "autoreset_slots"
+            )
+        if not 0 <= pending_after_compensation <= self.num_envs:
+            raise ArtifactValidationError(
+                "continuation uncompensated pending-reset slots must be in [0, num_envs]"
             )
         categorized = (
             self.successful_episodes
@@ -961,6 +975,7 @@ class TrainingContinuationState:
             "autoreset_slots": self.autoreset_slots,
             "cumulative_compute_update_seconds": self.cumulative_compute_update_seconds,
             "cumulative_reward_sum": self.cumulative_reward_sum,
+            "discarded_pending_reset_slots": self.discarded_pending_reset_slots,
             "dummy_reset_transitions": self.dummy_reset_transitions,
             "environment_step_calls": self.environment_step_calls,
             "episode_length_sum_steps": self.episode_length_sum_steps,
@@ -993,6 +1008,7 @@ class TrainingContinuationState:
             "autoreset_slots",
             "cumulative_compute_update_seconds",
             "cumulative_reward_sum",
+            "discarded_pending_reset_slots",
             "dummy_reset_transitions",
             "environment_step_calls",
             "episode_length_sum_steps",
