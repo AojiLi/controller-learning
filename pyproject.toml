@@ -98,7 +98,14 @@ default = { features = ["cpu", "dev"], solve-group = "cpu" }
 gpu = { features = ["gpu", "dev"], solve-group = "gpu" }
 
 [tool.pytest.ini_options]
-addopts = ["-ra", "--strict-config", "--strict-markers", "-m", "not gpu"]
+addopts = [
+  "-ra",
+  "--strict-config",
+  "--strict-markers",
+  "--import-mode=importlib",
+  "-m",
+  "not gpu",
+]
 testpaths = ["tests"]
 markers = ["gpu: requires an NVIDIA GPU and the Pixi gpu environment"]
 
