@@ -571,11 +571,55 @@ class MjxWarpVehicle:
 
         return self.config.simulation.physics_steps_per_control
 
-    def initial_state(self) -> MjxWarpVehicleState:
-        """Return an immutable initial batch state with exact integer time counters."""
+    def _initial_data_at_rear_axle_pose(self, rear_axle_pose: Any | None) -> Any:
+        """Return initial data placed at per-world ``(x, y, yaw)`` rear-axle poses."""
+
+        if rear_axle_pose is None:
+            return self._initial_data
+        pose = jnp.asarray(rear_axle_pose, dtype=jnp.float32)
+        expected_shape = (self.num_worlds, 3)
+        if pose.shape != expected_shape:
+            raise MjxWarpShapeError(
+                f"rear-axle pose batch must have shape {expected_shape}, got {pose.shape}"
+            )
+
+        rear_offset = jnp.asarray(
+            self.host_model.site_pos[self.indices.rear_axle_site],
+            dtype=jnp.float32,
+        )
+        yaw = pose[:, 2]
+        cosine = jnp.cos(yaw)
+        sine = jnp.sin(yaw)
+        rotated_rear_xy = jnp.stack(
+            (
+                cosine * rear_offset[0] - sine * rear_offset[1],
+                sine * rear_offset[0] + cosine * rear_offset[1],
+            ),
+            axis=1,
+        )
+        half_yaw = 0.5 * yaw
+        quaternion = jnp.stack(
+            (
+                jnp.cos(half_yaw),
+                jnp.zeros_like(yaw),
+                jnp.zeros_like(yaw),
+                jnp.sin(half_yaw),
+            ),
+            axis=1,
+        )
+        qpos = self._initial_data.qpos.at[:, :2].set(pose[:, :2] - rotated_rear_xy)
+        qpos = qpos.at[:, 3:7].set(quaternion)
+        return self._initial_data.replace(qpos=qpos)
+
+    def initial_state(self, rear_axle_pose: Any | None = None) -> MjxWarpVehicleState:
+        """Return an immutable initial batch state with exact integer time counters.
+
+        ``rear_axle_pose`` optionally supplies one ``(x_m, y_m, yaw_rad)`` row per world.
+        Omitting it preserves the M1/M2 MJCF default pose.
+        """
 
         return MjxWarpVehicleState(
-            data=self._initial_data,
+            data=self._initial_data_at_rear_axle_pose(rear_axle_pose),
             steering_target_rad=jnp.zeros(self.num_worlds, dtype=jnp.float32),
             control_step_count=jnp.zeros(self.num_worlds, dtype=jnp.int32),
             wheel_no_contact_substeps=jnp.zeros((self.num_worlds, 4), dtype=jnp.int32),
@@ -648,15 +692,16 @@ class MjxWarpVehicle:
         self,
         state: MjxWarpVehicleState,
         reset_mask: Any,
+        rear_axle_pose: Any | None = None,
     ) -> MjxWarpVehicleState:
-        """Reset selected worlds while preserving every unmasked public dynamic field."""
+        """Reset selected worlds, optionally at per-world rear-axle poses."""
 
         mask = jnp.asarray(reset_mask, dtype=bool)
         if mask.shape != (self.num_worlds,):
             raise MjxWarpShapeError(
                 f"reset mask must have shape ({self.num_worlds},), got {mask.shape}"
             )
-        initial = self._initial_data
+        initial = self._initial_data_at_rear_axle_pose(rear_axle_pose)
 
         def choose(current: jax.Array, reset: jax.Array) -> jax.Array:
             expanded_mask = mask.reshape((self.num_worlds,) + (1,) * (current.ndim - 1))

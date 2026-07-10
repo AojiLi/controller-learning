@@ -73,6 +73,27 @@ def test_reset_is_deterministic_after_motion(vehicle_config) -> None:
     assert reset == initial
 
 
+def test_reset_accepts_a_rear_axle_pose_without_changing_the_default(vehicle_config) -> None:
+    vehicle = CpuVehicle(vehicle_config)
+    default = vehicle.reset()
+
+    pose = (12.5, -4.0, pi / 2.0)
+    placed = vehicle.reset(rear_axle_pose=pose)
+
+    assert placed.position_world_m[:2] == pytest.approx(pose[:2], abs=1e-12)
+    assert placed.yaw_rad == pytest.approx(pose[2], abs=1e-12)
+    assert placed.velocity_body_mps == pytest.approx((0.0, 0.0, 0.0), abs=1e-12)
+    assert vehicle.reset() == default
+
+
+@pytest.mark.parametrize("pose", [(0.0, 0.0), (0.0, 0.0, np.nan)])
+def test_reset_rejects_an_invalid_rear_axle_pose(vehicle_config, pose) -> None:
+    vehicle = CpuVehicle(vehicle_config)
+
+    with pytest.raises(ValueError, match="rear_axle_pose"):
+        vehicle.reset(rear_axle_pose=pose)
+
+
 def test_body_velocity_is_expressed_in_the_rotated_vehicle_frame(vehicle_config) -> None:
     vehicle = CpuVehicle(vehicle_config)
     yaw = pi / 2.0

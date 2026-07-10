@@ -141,10 +141,39 @@ class CpuVehicle:
 
         return _warning_count(self.data)
 
-    def reset(self) -> VehicleState:
-        """Restore the deterministic standard pose without a hidden settling warmup."""
+    def reset(
+        self,
+        *,
+        rear_axle_pose: tuple[float, float, float] | NDArray[np.floating] | None = None,
+    ) -> VehicleState:
+        """Restore a deterministic rear-axle pose without a hidden settling warmup.
+
+        ``rear_axle_pose`` is ``(x_m, y_m, yaw_rad)``.  Omitting it preserves the
+        original MJCF pose used by the M1/M2 reference evidence.
+        """
 
         mujoco.mj_resetData(self.model, self.data)
+        if rear_axle_pose is not None:
+            pose = np.asarray(rear_axle_pose, dtype=np.float64)
+            if pose.shape != (3,) or not np.isfinite(pose).all():
+                raise ValueError("rear_axle_pose must be a finite shape-(3,) value")
+            yaw = float(pose[2])
+            cosine = float(np.cos(yaw))
+            sine = float(np.sin(yaw))
+            rear_offset = self.model.site_pos[self.indices.rear_axle_site]
+            rotated_rear_xy = np.asarray(
+                (
+                    cosine * rear_offset[0] - sine * rear_offset[1],
+                    sine * rear_offset[0] + cosine * rear_offset[1],
+                )
+            )
+            self.data.qpos[:2] = pose[:2] - rotated_rear_xy
+            self.data.qpos[3:7] = (
+                np.cos(0.5 * yaw),
+                0.0,
+                0.0,
+                np.sin(0.5 * yaw),
+            )
         self.data.ctrl.fill(0.0)
         self._steering_target_rad = 0.0
         self._last_applied_action = replace(

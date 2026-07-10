@@ -200,6 +200,41 @@ def test_masked_reset_changes_only_selected_worlds(four_world_vehicle) -> None:
         )
 
 
+def test_initial_and_masked_reset_accept_rear_axle_poses(four_world_vehicle) -> None:
+    poses = jnp.asarray(
+        ((0.0, 0.0, 0.0), (4.0, -2.0, np.pi / 2.0), (-3.0, 5.0, -0.3), (8.0, 1.0, 0.7)),
+        dtype=jnp.float32,
+    )
+    placed = four_world_vehicle.initial_state(poses)
+    placed_view = jax.device_get(four_world_vehicle.read_state(placed))
+
+    np.testing.assert_allclose(placed_view.position_world_m[:, :2], poses[:, :2], atol=2e-6)
+    np.testing.assert_allclose(placed_view.yaw_rad, poses[:, 2], atol=2e-6)
+    np.testing.assert_array_equal(placed_view.velocity_body_mps, np.zeros((4, 3)))
+
+    moved = four_world_vehicle.initial_state()
+    for _ in range(5):
+        moved, _, _ = four_world_vehicle.step(
+            moved,
+            jnp.asarray(((0.0, 1.0),) * 4, dtype=jnp.float32),
+        )
+    mask = np.asarray((False, True, False, True))
+    before = np.asarray(moved.data.qpos)
+    reset = four_world_vehicle.masked_reset(moved, mask, poses)
+    reset_view = jax.device_get(four_world_vehicle.read_state(reset))
+
+    np.testing.assert_array_equal(np.asarray(reset.data.qpos)[~mask], before[~mask])
+    np.testing.assert_allclose(reset_view.position_world_m[mask, :2], poses[mask, :2], atol=2e-6)
+    np.testing.assert_allclose(reset_view.yaw_rad[mask], poses[mask, 2], atol=2e-6)
+
+    next_state, _, diagnostics = four_world_vehicle.step(
+        reset,
+        jnp.zeros((4, 2), dtype=jnp.float32),
+    )
+    jax.block_until_ready(next_state.data.qpos)
+    assert np.all(np.asarray(diagnostics.finite_per_world))
+
+
 @pytest.mark.parametrize("actions", [(0.0, 0.0), np.zeros((1, 3)), np.zeros((2, 2))])
 def test_action_batch_shape_is_enforced(one_world_vehicle, actions) -> None:
     with pytest.raises(MjxWarpShapeError, match="batched actions must have shape"):
@@ -209,6 +244,11 @@ def test_action_batch_shape_is_enforced(one_world_vehicle, actions) -> None:
 def test_reset_mask_shape_is_enforced(one_world_vehicle) -> None:
     with pytest.raises(MjxWarpShapeError, match="reset mask must have shape"):
         one_world_vehicle.masked_reset(one_world_vehicle.initial_state(), (True, False))
+
+
+def test_rear_axle_pose_batch_shape_is_enforced(one_world_vehicle) -> None:
+    with pytest.raises(MjxWarpShapeError, match="rear-axle pose batch"):
+        one_world_vehicle.initial_state((0.0, 0.0, 0.0))
 
 
 def _scheduled_action(step: int) -> tuple[float, float]:
