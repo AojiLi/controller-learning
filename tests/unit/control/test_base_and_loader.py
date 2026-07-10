@@ -32,11 +32,12 @@ def _write_plugin(
 
 def test_template_loads_as_class_and_returns_float32_action() -> None:
     controller_class = load_controller(TEMPLATE_DIRECTORY)
+    controller_config = load_controller_config(TEMPLATE_DIRECTORY)
 
     assert issubclass(controller_class, Controller)
-    controller = controller_class(
-        {}, {"controller_seed": 7}, load_controller_config(TEMPLATE_DIRECTORY)
-    )
+    assert tuple(controller_config) == ("name", "description")
+    assert controller_config["name"] == "template"
+    controller = controller_class({}, {"controller_seed": 7}, controller_config)
     action = controller.compute_control({})
 
     assert action.shape == (2,)
