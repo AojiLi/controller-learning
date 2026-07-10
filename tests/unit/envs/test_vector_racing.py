@@ -12,10 +12,16 @@ from gymnasium import error
 from gymnasium.vector import AutoresetMode
 
 from controller_learning.config import load_project_config
-from controller_learning.envs.episode import PUBLIC_INFO_KEYS
+from controller_learning.envs.episode import (
+    PUBLIC_INFO_KEYS,
+    initialize_episode_identities,
+    masked_next_episode,
+    track_pool_seeds,
+)
 from controller_learning.envs.race_core import RaceTermination
 from controller_learning.envs.vector_racing import VecCarRacingEnv
 from controller_learning.tracks.generator import generate_track_candidate, pack_track
+from controller_learning.tracks.pool import TrackPool
 from controller_learning.tracks.specs import (
     generation_spec_from_project,
     track_capacity_from_project,
@@ -37,6 +43,20 @@ def track(project_config):
     )
 
 
+@pytest.fixture(scope="module")
+def track_pool(project_config):
+    generation = generation_spec_from_project(project_config)
+    capacity = track_capacity_from_project(project_config)
+    tracks = tuple(
+        pack_track(generate_track_candidate(seed, generation), capacity) for seed in (101, 202, 303)
+    )
+    return TrackPool.from_tracks(
+        tracks,
+        benchmark_version=project_config.benchmark.version,
+        split="train",
+    )
+
+
 def _environment(project_config, track) -> VecCarRacingEnv:
     return VecCarRacingEnv(
         num_envs=1,
@@ -48,6 +68,13 @@ def _environment(project_config, track) -> VecCarRacingEnv:
 
 
 def test_constructor_requires_explicit_compatible_level_and_tracks(project_config, track) -> None:
+    with pytest.raises(ValueError, match="exactly one"):
+        VecCarRacingEnv(
+            num_envs=1,
+            project_config=project_config,
+            level_id=1,
+            backend="cpu_reference",
+        )
     with pytest.raises(ValueError, match="one Track per world"):
         VecCarRacingEnv(
             num_envs=1,
@@ -91,6 +118,26 @@ def test_constructor_requires_explicit_compatible_level_and_tracks(project_confi
         )
 
 
+def test_constructor_requires_one_compatible_pool_source(project_config, track, track_pool) -> None:
+    with pytest.raises(ValueError, match="exactly one"):
+        VecCarRacingEnv(
+            num_envs=1,
+            project_config=project_config,
+            level_id=1,
+            tracks=(track,),
+            track_pool=track_pool,
+            backend="cpu_reference",
+        )
+    with pytest.raises(ValueError, match="does not permit"):
+        VecCarRacingEnv(
+            num_envs=1,
+            project_config=project_config,
+            level_id=0,
+            track_pool=track_pool,
+            backend="cpu_reference",
+        )
+
+
 def test_reset_returns_jax_batch_and_restricted_reproducible_info(project_config, track) -> None:
     env = _environment(project_config, track)
     try:
@@ -119,7 +166,7 @@ def test_reset_returns_jax_batch_and_restricted_reproducible_info(project_config
             np.testing.assert_array_equal(first_observation[key], repeated_observation[key])
         for key in first_info:
             np.testing.assert_array_equal(first_info[key], repeated_info[key])
-        assert first_info["track_id"].tolist() == [f"{track.generator_version}:{track.seed}"]
+        assert first_info["track_id"].tolist() == [track.seed]
     finally:
         env.close()
 
@@ -200,6 +247,69 @@ def test_next_step_autoreset_ignores_action_and_advances_only_episode(
         assert reset_info["track_id"][0] == initial_info["track_id"][0]
         assert env._race_state is not None
         assert int(env._race_state.elapsed_steps[0]) == 0
+    finally:
+        env.close()
+
+
+def test_pool_reset_and_next_step_selection_are_reproducible_and_atomic(
+    project_config,
+    track_pool,
+) -> None:
+    env = VecCarRacingEnv(
+        num_envs=1,
+        project_config=project_config,
+        level_id=1,
+        track_pool=track_pool,
+        backend="cpu_reference",
+    )
+    try:
+        identity = initialize_episode_identities(123, 1)
+        initial_index = int(track_pool_seeds(identity)[0]) % track_pool.size
+        initial_id = int(track_pool.batch.seed[initial_index])
+
+        first_observation, first_info = env.reset(seed=123)
+        repeated_observation, repeated_info = env.reset(seed=123)
+        assert int(first_info["track_id"][0]) == initial_id
+        for key in first_observation:
+            np.testing.assert_array_equal(first_observation[key], repeated_observation[key])
+        for key in first_info:
+            np.testing.assert_array_equal(first_info[key], repeated_info[key])
+        np.testing.assert_array_equal(
+            first_observation["centerline"][0],
+            track_pool.batch.centerline_m[initial_index],
+        )
+
+        _, _, terminated, _, terminal_info = env.step(
+            np.asarray(((np.nan, 0.0),), dtype=np.float32)
+        )
+        assert bool(terminated[0])
+        assert int(terminal_info["track_id"][0]) == initial_id
+
+        next_identity = masked_next_episode(identity, np.asarray((True,), dtype=np.bool_))
+        next_index = int(track_pool_seeds(next_identity)[0]) % track_pool.size
+        next_id = int(track_pool.batch.seed[next_index])
+        observation, reward, terminated, truncated, reset_info = env.step(
+            np.asarray(((np.nan, np.inf),), dtype=np.float32)
+        )
+
+        np.testing.assert_array_equal(reward, (0.0,))
+        np.testing.assert_array_equal(terminated, (False,))
+        np.testing.assert_array_equal(truncated, (False,))
+        assert int(reset_info["track_id"][0]) == next_id
+        np.testing.assert_array_equal(
+            observation["centerline"][0],
+            track_pool.batch.centerline_m[next_index],
+        )
+        np.testing.assert_allclose(
+            observation["position"][0],
+            track_pool.batch.start_pose[next_index, :2],
+            rtol=0.0,
+            atol=1.0e-6,
+        )
+        assert float(observation["yaw"][0]) == pytest.approx(
+            float(track_pool.batch.start_pose[next_index, 2]),
+            abs=1.0e-6,
+        )
     finally:
         env.close()
 

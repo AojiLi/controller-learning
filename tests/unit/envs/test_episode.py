@@ -19,6 +19,8 @@ from controller_learning.envs.episode import (
     masked_next_episode,
     masked_next_episode_device,
     track_id_from_track,
+    track_pool_seeds,
+    track_pool_seeds_device,
     unbatch_public_info,
 )
 from controller_learning.envs.race_core import (
@@ -132,6 +134,12 @@ def test_seed_contract_has_stable_known_values() -> None:
         3879327873,
         843055831,
     ]
+    assert track_pool_seeds(identities).tolist() == [
+        1833086389,
+        4191639932,
+        520241612,
+        3717981140,
+    ]
 
 
 @pytest.mark.parametrize("root_seed", (0, 123456, np.iinfo(np.uint32).max))
@@ -146,6 +154,10 @@ def test_device_identity_matches_host_seed_sequence_across_masked_updates(root_s
         "controller_seed",
     ):
         np.testing.assert_array_equal(np.asarray(getattr(device, field)), getattr(host, field))
+    np.testing.assert_array_equal(
+        np.asarray(track_pool_seeds_device(device)),
+        track_pool_seeds(host),
+    )
 
     advance_device = jax.jit(masked_next_episode_device)
     masks = (
@@ -169,6 +181,10 @@ def test_device_identity_matches_host_seed_sequence_across_masked_updates(root_s
                 np.asarray(getattr(device, field)),
                 getattr(host, field),
             )
+        np.testing.assert_array_equal(
+            np.asarray(track_pool_seeds_device(device)),
+            track_pool_seeds(host),
+        )
 
 
 def test_identity_is_frozen_and_owns_read_only_arrays() -> None:
@@ -246,18 +262,18 @@ def test_reset_info_has_only_whitelisted_leading_arrays() -> None:
     assert tuple(info) == PUBLIC_INFO_KEYS
     assert info["episode_seed"].dtype == np.uint32
     assert info["controller_seed"].dtype == np.uint32
-    assert info["track_id"].dtype.kind == "U"
+    assert info["track_id"].dtype == np.uint32
     assert info["benchmark_version"].dtype.kind == "U"
     assert info["termination_reason"].dtype == np.int32
     assert info["lap_completed"].dtype == np.bool_
     assert info["lap_time_s"].dtype == np.float32
     assert all(value.shape == (2,) for value in info.values())
-    assert info["track_id"].tolist() == ["trackgen-v1:41", "trackgen-v1:99"]
+    assert info["track_id"].tolist() == [41, 99]
     assert info["benchmark_version"].tolist() == ["v0.1", "v0.1"]
     np.testing.assert_array_equal(info["termination_reason"], RaceTermination.NONE)
     assert not info["lap_completed"].any()
     np.testing.assert_array_equal(info["lap_time_s"], 0.0)
-    assert track_id_from_track(tracks[0]) == "trackgen-v1:41"
+    assert track_id_from_track(tracks[0]) == np.uint32(41)
 
 
 def test_step_info_exposes_outcome_without_race_or_backend_internals() -> None:
@@ -340,12 +356,12 @@ def test_unbatch_returns_python_scalars_and_rejects_nonpublic_info() -> None:
     assert tuple(scalar) == PUBLIC_INFO_KEYS
     assert type(scalar["episode_seed"]) is int
     assert type(scalar["controller_seed"]) is int
-    assert type(scalar["track_id"]) is str
+    assert type(scalar["track_id"]) is int
     assert type(scalar["benchmark_version"]) is str
     assert type(scalar["termination_reason"]) is int
     assert type(scalar["lap_completed"]) is bool
     assert type(scalar["lap_time_s"]) is float
-    assert scalar["track_id"] == "trackgen-v1:99"
+    assert scalar["track_id"] == 99
     assert scalar["lap_completed"] is True
     assert scalar["lap_time_s"] == pytest.approx(1.0)
 

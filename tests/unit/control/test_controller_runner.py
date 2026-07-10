@@ -64,7 +64,7 @@ class FakeEnv:
         info = {
             "episode_seed": 11,
             "controller_seed": 29,
-            "track_id": "trackgen-v1:7",
+            "track_id": 7,
             "benchmark_version": "v0.1",
             "termination_reason": 0,
             "lap_completed": False,
@@ -171,7 +171,7 @@ def test_runner_orders_lifecycle_and_returns_an_immutable_result(tmp_path: Path)
     assert result.debug_commands == ()
     assert isinstance(result.final_info, Mapping)
     with pytest.raises(TypeError):
-        result.final_info["track_id"] = "changed"  # type: ignore[index]
+        result.final_info["track_id"] = 8  # type: ignore[index]
     assert env.closed is False
 
 

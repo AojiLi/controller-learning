@@ -26,7 +26,7 @@ from controller_learning.envs.episode import (
     episode_identity_to_device,
     initialize_episode_identities,
     masked_next_episode_device,
-    track_id_from_track,
+    track_pool_seeds_device,
 )
 from controller_learning.envs.observation import (
     action_space,
@@ -41,6 +41,12 @@ from controller_learning.envs.race_core import (
     masked_reset_race_state,
     reset_race_state,
     step_race_core,
+)
+from controller_learning.tracks.pool import (
+    TrackPool,
+    gather_track_batch,
+    masked_replace_track_batch,
+    track_pool_indices,
 )
 from controller_learning.tracks.types import Track, TrackBatch, TrackCapacity, stack_tracks
 
@@ -148,6 +154,43 @@ def _device_track_batch(tracks: tuple[Track, ...]) -> TrackBatch:
     return jax.tree.map(jnp.asarray, stack_tracks(tracks))
 
 
+def _validated_track_pool(
+    track_pool: object,
+    *,
+    config: ProjectConfig,
+    level_id: int,
+) -> TrackPool:
+    if not isinstance(track_pool, TrackPool):
+        raise TypeError("track_pool must be an immutable TrackPool")
+    level = _selected_level(config, level_id)
+    if not level.random_track_geometry or level.track_source != "procedural_pool":
+        raise ValueError(f"Level {level.level_id} does not permit a procedural TrackPool")
+    capacity = TrackCapacity(
+        max_track_points=config.track.representation.max_track_points,
+        max_checkpoints=config.track.representation.max_checkpoints,
+    )
+    if track_pool.capacity != capacity:
+        raise ValueError(
+            f"track_pool capacity {track_pool.capacity} does not match configured {capacity}"
+        )
+    if track_pool.benchmark_version != config.benchmark.version:
+        raise ValueError(
+            f"track_pool benchmark version {track_pool.benchmark_version!r} does not match "
+            f"configured {config.benchmark.version!r}"
+        )
+    if track_pool.generator_version != config.track.generator.generator_version:
+        raise ValueError(
+            f"track_pool generator version {track_pool.generator_version!r} does not match "
+            f"configured {config.track.generator.generator_version!r}"
+        )
+    widths = np.asarray(track_pool.batch.width_m, dtype=np.float32)
+    if not np.allclose(widths, level.track_width_m, rtol=0.0, atol=1.0e-6):
+        raise ValueError(
+            f"track_pool width does not match Level {level.level_id} width {level.track_width_m}"
+        )
+    return track_pool
+
+
 def _readonly_strings(values: Sequence[str]) -> np.ndarray:
     result = np.asarray(values, dtype=np.str_)
     result.setflags(write=False)
@@ -155,11 +198,7 @@ def _readonly_strings(values: Sequence[str]) -> np.ndarray:
 
 
 class VecCarRacingEnv(gym.vector.VectorEnv):
-    """The sole vectorized Challenge state machine for vehicle racing.
-
-    M4 receives already generated immutable tracks. Track-pool selection is intentionally deferred
-    to M5, so an automatic episode reset reuses the same Track in each world.
-    """
+    """The sole vectorized Challenge state machine for fixed Tracks or one TrackPool."""
 
     metadata: ClassVar[dict[str, Any]] = {
         "render_modes": [],
@@ -174,8 +213,9 @@ class VecCarRacingEnv(gym.vector.VectorEnv):
         num_envs: int,
         project_config: ProjectConfig,
         level_id: int,
-        tracks: Sequence[Track],
         backend: VehicleBackend,
+        tracks: Sequence[Track] | None = None,
+        track_pool: TrackPool | None = None,
         render_mode: str | None = None,
     ) -> None:
         super().__init__()
@@ -184,12 +224,33 @@ class VecCarRacingEnv(gym.vector.VectorEnv):
             raise TypeError("project_config must be a ProjectConfig")
         self.project_config = project_config
         self.level_id = _selected_level(project_config, level_id).level_id
-        self._tracks = _validated_tracks(
-            tracks,
-            num_envs=self.num_envs,
-            config=project_config,
-            level_id=self.level_id,
-        )
+        if (tracks is None) == (track_pool is None):
+            raise ValueError("provide exactly one of tracks or track_pool")
+        self._pool_mode = track_pool is not None
+        self._tracks: tuple[Track, ...] | None = None
+        self.track_pool: TrackPool | None = None
+        if track_pool is not None:
+            self.track_pool = _validated_track_pool(
+                track_pool,
+                config=project_config,
+                level_id=self.level_id,
+            )
+            self._pool_size = self.track_pool.size
+            self._pool_batch = jax.tree.map(jnp.asarray, self.track_pool.batch)
+            self._track_batch = gather_track_batch(
+                self._pool_batch,
+                jnp.zeros(self.num_envs, dtype=jnp.int32),
+            )
+        else:
+            self._tracks = _validated_tracks(
+                tracks,
+                num_envs=self.num_envs,
+                config=project_config,
+                level_id=self.level_id,
+            )
+            self._pool_size = self.num_envs
+            self._track_batch = _device_track_batch(self._tracks)
+            self._pool_batch = self._track_batch
         if render_mode is not None:
             raise ValueError("M4 supports only headless rendering with render_mode=None")
         self.render_mode = render_mode
@@ -200,8 +261,6 @@ class VecCarRacingEnv(gym.vector.VectorEnv):
         self.single_action_space = action_space(project_config)
         self.action_space = batched_action_space(project_config, self.num_envs)
 
-        self._track_batch = _device_track_batch(self._tracks)
-        self._start_pose = jnp.asarray(self._track_batch.start_pose, dtype=jnp.float32)
         self._race_config = race_core_config_from_project(project_config)
         self._vehicle_driver = create_vehicle_driver(
             backend,
@@ -226,6 +285,12 @@ class VecCarRacingEnv(gym.vector.VectorEnv):
         )
         self._encode_observation = jax.jit(encode_batched_observation)
         self._normalize_actions = jax.jit(_normalize_device_actions)
+        self._select_pool_tracks = jax.jit(
+            lambda pool, identity: gather_track_batch(
+                pool,
+                track_pool_indices(track_pool_seeds_device(identity), self._pool_size),
+            )
+        )
         self._read_vehicle_state = self._vehicle_driver.read_state
         self._planar_position = lambda view: jnp.asarray(
             view.position_world_m,
@@ -236,21 +301,54 @@ class VecCarRacingEnv(gym.vector.VectorEnv):
             self._read_vehicle_state = jax.jit(self._vehicle_driver.read_state)
             self._planar_position = jax.jit(lambda view: view.position_world_m[..., :2])
 
-            def finalize_gpu_step(track_batch, vehicle_state, race_step, identity, pending):
+            def finalize_gpu_step(
+                pool_batch,
+                track_batch,
+                vehicle_state,
+                race_step,
+                identity,
+                pending,
+            ):
                 next_identity = masked_next_episode_device(identity, pending)
+                next_track_batch = track_batch
+                if self._pool_mode:
+                    next_track_batch = jax.lax.cond(
+                        jnp.any(pending),
+                        lambda current: masked_replace_track_batch(
+                            current,
+                            gather_track_batch(
+                                pool_batch,
+                                track_pool_indices(
+                                    track_pool_seeds_device(next_identity),
+                                    self._pool_size,
+                                ),
+                            ),
+                            pending,
+                        ),
+                        lambda current: current,
+                        track_batch,
+                    )
                 next_vehicle = jax.lax.cond(
                     jnp.any(pending),
                     lambda current: self._vehicle_driver.masked_reset(
                         current,
                         pending,
-                        self._start_pose,
+                        next_track_batch.start_pose,
                     ),
                     lambda current: current,
                     vehicle_state,
                 )
-                next_race = _maybe_reset_race_state(track_batch, race_step.state, pending)
+                next_race = _maybe_reset_race_state(
+                    next_track_batch,
+                    race_step.state,
+                    pending,
+                )
                 vehicle_view = self._vehicle_driver.read_state(next_vehicle)
-                observation = encode_batched_observation(track_batch, next_race, vehicle_view)
+                observation = encode_batched_observation(
+                    next_track_batch,
+                    next_race,
+                    vehicle_view,
+                )
                 reward = jnp.where(pending, jnp.float32(0.0), race_step.reward).astype(jnp.float32)
                 terminated = jnp.where(pending, False, race_step.terminated).astype(bool)
                 truncated = jnp.where(pending, False, race_step.truncated).astype(bool)
@@ -267,6 +365,7 @@ class VecCarRacingEnv(gym.vector.VectorEnv):
                     jnp.float32(0.0),
                 )
                 return (
+                    next_track_batch,
                     next_vehicle,
                     next_race,
                     next_identity,
@@ -296,7 +395,6 @@ class VecCarRacingEnv(gym.vector.VectorEnv):
         self._identity: DeviceEpisodeIdentity | None = None
         self._pending_reset = jnp.zeros(self.num_envs, dtype=bool)
         self._zero_actions = jnp.zeros((self.num_envs, 2), dtype=jnp.float32)
-        self._track_ids = _readonly_strings([track_id_from_track(track) for track in self._tracks])
         self._benchmark_versions = _readonly_strings(
             [self.project_config.benchmark.version] * self.num_envs
         )
@@ -339,14 +437,16 @@ class VecCarRacingEnv(gym.vector.VectorEnv):
         seed: int | None = None,
         options: dict[str, Any] | None = None,
     ) -> tuple[dict[str, jax.Array], dict[str, Any]]:
-        """Reset every world to its injected Track start pose."""
+        """Reset every world and deterministically select initial pool Tracks when configured."""
 
         self._validate_options(options)
         root_seed = self._root_seed(seed)
         self._identity = episode_identity_to_device(
             initialize_episode_identities(root_seed, self.num_envs)
         )
-        self._vehicle_state = self._vehicle_driver.initial_state(self._start_pose)
+        if self._pool_mode:
+            self._track_batch = self._select_pool_tracks(self._pool_batch, self._identity)
+        self._vehicle_state = self._vehicle_driver.initial_state(self._track_batch.start_pose)
         self._race_state = self._reset_race(self._track_batch)
         self._pending_reset = jnp.zeros(self.num_envs, dtype=bool)
         self._last_race_step = None
@@ -371,7 +471,7 @@ class VecCarRacingEnv(gym.vector.VectorEnv):
         return {
             "episode_seed": self._identity.episode_seed,
             "controller_seed": self._identity.controller_seed,
-            "track_id": self._track_ids,
+            "track_id": jnp.asarray(self._track_batch.seed, dtype=jnp.uint32),
             "benchmark_version": self._benchmark_versions,
             "termination_reason": termination_reason,
             "lap_completed": lap_completed,
@@ -445,6 +545,7 @@ class VecCarRacingEnv(gym.vector.VectorEnv):
         if self.backend == "mjx_warp":
             assert self._finalize_gpu_step is not None
             (
+                self._track_batch,
                 self._vehicle_state,
                 self._race_state,
                 self._identity,
@@ -457,6 +558,7 @@ class VecCarRacingEnv(gym.vector.VectorEnv):
                 lap_completed,
                 lap_time_s,
             ) = self._finalize_gpu_step(
+                self._pool_batch,
                 self._track_batch,
                 vehicle_step.state,
                 race_step,
@@ -466,11 +568,18 @@ class VecCarRacingEnv(gym.vector.VectorEnv):
         else:
             self._identity = self._advance_identity(self._identity, pending)
             pending_host = np.asarray(pending, dtype=np.bool_)
+            if self._pool_mode:
+                replacement = self._select_pool_tracks(self._pool_batch, self._identity)
+                self._track_batch = masked_replace_track_batch(
+                    self._track_batch,
+                    replacement,
+                    pending,
+                )
             if np.any(pending_host):
                 self._vehicle_state = self._vehicle_driver.masked_reset(
                     vehicle_step.state,
                     pending_host,
-                    self._start_pose,
+                    self._track_batch.start_pose,
                 )
             else:
                 self._vehicle_state = vehicle_step.state

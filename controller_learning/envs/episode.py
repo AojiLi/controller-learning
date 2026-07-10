@@ -30,6 +30,7 @@ PUBLIC_INFO_KEYS = (
 _UINT32_MAX = int(np.iinfo(np.uint32).max)
 _EPISODE_DOMAIN = 0
 _CONTROLLER_DOMAIN = 1
+_TRACK_POOL_DOMAIN = 2
 _UINT32_INIT_A = 0x43B0D7E5
 _UINT32_MULT_A = 0x931E8875
 _UINT32_INIT_B = 0x8B51F9DD
@@ -290,6 +291,17 @@ def masked_next_episode_device(
     return jax.lax.cond(jnp.any(reset_mask), advance, lambda current: current, identity)
 
 
+def track_pool_seeds_device(identity: DeviceEpisodeIdentity) -> jax.Array:
+    """Derive independent per-episode Track-pool selection seeds on device."""
+
+    return _seed_sequence_batch_device(
+        identity.root_seed,
+        identity.world_index,
+        identity.episode_counter,
+        _TRACK_POOL_DOMAIN,
+    )
+
+
 def initialize_episode_identities(root_seed: int, num_envs: int) -> EpisodeIdentity:
     """Create counter-zero identities for every world from an explicit root seed."""
 
@@ -352,12 +364,37 @@ def masked_next_episode(current: EpisodeIdentity, mask: object) -> EpisodeIdenti
     )
 
 
-def track_id_from_track(track: Track) -> str:
-    """Return the stable M4 track identity derived from an injected host Track value."""
+def track_pool_seeds(identity: EpisodeIdentity) -> NDArray[np.uint32]:
+    """Derive immutable host Track-pool selection seeds for one identity snapshot."""
+
+    if not isinstance(identity, EpisodeIdentity):
+        raise TypeError("identity must be an EpisodeIdentity")
+    seeds = np.asarray(
+        [
+            _domain_seed(
+                identity.root_seed,
+                identity.world_index[index],
+                identity.episode_counter[index],
+                _TRACK_POOL_DOMAIN,
+            )
+            for index in range(identity.num_envs)
+        ],
+        dtype=np.uint32,
+    )
+    seeds.setflags(write=False)
+    return seeds
+
+
+def track_id_from_track(track: Track) -> np.uint32:
+    """Return the device-native public identity of one Track.
+
+    ``track_id`` is the generator seed within the published benchmark manifest.  Benchmark and
+    generator versions remain separate metadata instead of being encoded into a host string.
+    """
 
     if not isinstance(track, Track):
         raise TypeError("track must be a Track")
-    return f"{track.generator_version}:{track.seed}"
+    return np.uint32(track.seed)
 
 
 def _base_public_info(
@@ -377,7 +414,7 @@ def _base_public_info(
     if not benchmark_version:
         raise ValueError("benchmark_version cannot be empty")
 
-    track_ids = np.asarray([track_id_from_track(track) for track in tracks], dtype=np.str_)
+    track_ids = np.asarray([track_id_from_track(track) for track in tracks], dtype=np.uint32)
     benchmark_versions = np.asarray(
         [benchmark_version] * identity.num_envs,
         dtype=np.str_,
@@ -491,6 +528,7 @@ def _validate_public_info(info: Mapping[str, object]) -> int:
     expected_dtypes: dict[str, np.dtype] = {
         "episode_seed": np.dtype(np.uint32),
         "controller_seed": np.dtype(np.uint32),
+        "track_id": np.dtype(np.uint32),
         "termination_reason": np.dtype(np.int32),
         "lap_completed": np.dtype(np.bool_),
         "lap_time_s": np.dtype(np.float32),
@@ -507,9 +545,8 @@ def _validate_public_info(info: Mapping[str, object]) -> int:
             raise TypeError(
                 f"info[{key!r}] must have dtype {expected_dtypes[key]}, got {array.dtype}"
             )
-    for key in ("track_id", "benchmark_version"):
-        if arrays[key].dtype.kind != "U":
-            raise TypeError(f"info[{key!r}] must contain NumPy unicode strings")
+    if arrays["benchmark_version"].dtype.kind != "U":
+        raise TypeError("info['benchmark_version'] must contain NumPy unicode strings")
     return int(shape[0])
 
 
@@ -526,7 +563,7 @@ def unbatch_public_info(info: Mapping[str, object], index: int = 0) -> PublicSca
     return {
         "episode_seed": int(np.asarray(info["episode_seed"])[world_index]),
         "controller_seed": int(np.asarray(info["controller_seed"])[world_index]),
-        "track_id": str(np.asarray(info["track_id"])[world_index]),
+        "track_id": int(np.asarray(info["track_id"])[world_index]),
         "benchmark_version": str(np.asarray(info["benchmark_version"])[world_index]),
         "termination_reason": int(np.asarray(info["termination_reason"])[world_index]),
         "lap_completed": bool(np.asarray(info["lap_completed"])[world_index]),
@@ -547,5 +584,7 @@ __all__ = [
     "masked_next_episode",
     "masked_next_episode_device",
     "track_id_from_track",
+    "track_pool_seeds",
+    "track_pool_seeds_device",
     "unbatch_public_info",
 ]

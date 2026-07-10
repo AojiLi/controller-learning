@@ -9,9 +9,15 @@ import numpy as np
 import pytest
 
 from controller_learning.config import load_project_config
+from controller_learning.envs.episode import (
+    initialize_episode_identities,
+    masked_next_episode,
+    track_pool_seeds,
+)
 from controller_learning.envs.race_core import RaceTermination
 from controller_learning.envs.vector_racing import VecCarRacingEnv
 from controller_learning.tracks.generator import generate_track_candidate, pack_track
+from controller_learning.tracks.pool import TrackPool
 from controller_learning.tracks.specs import (
     generation_spec_from_project,
     track_capacity_from_project,
@@ -135,5 +141,64 @@ def test_warm_gpu_steps_disallow_all_host_device_transfers() -> None:
                 "lap_time_s",
             )
         )
+    finally:
+        env.close()
+
+
+def test_pool_autoreset_selects_and_replaces_tracks_without_transfers() -> None:
+    project = load_project_config(PROJECT_ROOT)
+    tracks = _tracks(project, 8)
+    pool = TrackPool.from_tracks(
+        tracks,
+        benchmark_version=project.benchmark.version,
+        split="train",
+    )
+    env = VecCarRacingEnv(
+        num_envs=4,
+        project_config=project,
+        level_id=1,
+        track_pool=pool,
+        backend="mjx_warp",
+    )
+    try:
+        identity = initialize_episode_identities(77, 4)
+        initial_indices = np.asarray(track_pool_seeds(identity) % pool.size, dtype=np.int32)
+        initial_observation, initial_info = env.reset(seed=77)
+        jax.block_until_ready((initial_observation, initial_info["track_id"]))
+        np.testing.assert_array_equal(initial_info["track_id"], pool.batch.seed[initial_indices])
+        initial_tracks = jax.tree.map(lambda value: np.array(value, copy=True), env._track_batch)
+
+        invalid = jax.numpy.zeros((4, 2), dtype=jax.numpy.float32).at[1, 0].set(jax.numpy.nan)
+        terminal = env.step(invalid)
+        jax.block_until_ready((terminal[:4], terminal[4]["track_id"]))
+        assert bool(terminal[2][1])
+        np.testing.assert_array_equal(terminal[4]["track_id"], initial_info["track_id"])
+
+        action = jax.numpy.zeros((4, 2), dtype=jax.numpy.float32)
+        with jax.transfer_guard("disallow"):
+            autoreset = env.step(action)
+            jax.block_until_ready((autoreset[:4], autoreset[4]["track_id"]))
+
+        next_identity = masked_next_episode(
+            identity,
+            np.asarray((False, True, False, False), dtype=np.bool_),
+        )
+        next_indices = np.asarray(track_pool_seeds(next_identity) % pool.size, dtype=np.int32)
+        expected_ids = np.array(pool.batch.seed[initial_indices], copy=True)
+        expected_ids[1] = pool.batch.seed[next_indices[1]]
+        np.testing.assert_array_equal(autoreset[4]["track_id"], expected_ids)
+        np.testing.assert_array_equal(
+            autoreset[0]["centerline"][1],
+            pool.batch.centerline_m[next_indices[1]],
+        )
+        for before, after in zip(
+            jax.tree.leaves(initial_tracks),
+            jax.tree.leaves(env._track_batch),
+            strict=True,
+        ):
+            np.testing.assert_array_equal(np.asarray(after)[[0, 2, 3]], before[[0, 2, 3]])
+        np.testing.assert_array_equal(autoreset[1][1], 0.0)
+        assert not bool(autoreset[2][1])
+        assert not bool(autoreset[3][1])
     finally:
         env.close()

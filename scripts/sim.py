@@ -200,7 +200,7 @@ def _episode_summary(
         "terminated": bool(result.terminated),
         "termination_reason": int(info["termination_reason"]),
         "total_reward": float(result.total_reward),
-        "track_id": str(info["track_id"]),
+        "track_id": int(info["track_id"]),
         "track_seed": options.track_seed,
         "truncated": bool(result.truncated),
     }

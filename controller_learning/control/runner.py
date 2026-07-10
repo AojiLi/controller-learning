@@ -93,7 +93,7 @@ def _public_info(value: object, *, source: str) -> Mapping[str, Any]:
     expected_types: dict[str, type] = {
         "episode_seed": int,
         "controller_seed": int,
-        "track_id": str,
+        "track_id": int,
         "benchmark_version": str,
         "termination_reason": int,
         "lap_completed": bool,

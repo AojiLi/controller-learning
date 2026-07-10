@@ -40,7 +40,7 @@ def _result() -> EpisodeRunResult:
             {
                 "episode_seed": 0,
                 "controller_seed": 17,
-                "track_id": "track-v0.1:42",
+                "track_id": 42,
                 "benchmark_version": "0.1",
                 "termination_reason": 1,
                 "lap_completed": True,
@@ -215,7 +215,7 @@ def test_success_returns_a_strict_json_safe_summary(monkeypatch, tmp_path: Path)
         "terminated": True,
         "termination_reason": 1,
         "total_reward": 1.25,
-        "track_id": "track-v0.1:42",
+        "track_id": 42,
         "track_seed": 42,
         "truncated": False,
     }
