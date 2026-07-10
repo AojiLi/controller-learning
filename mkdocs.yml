@@ -6,6 +6,7 @@ theme:
 nav:
   - Home: index.md
   - CPU Vehicle: vehicle.md
+  - GPU Vehicle: gpu.md
   - Development: development.md
 markdown_extensions:
   - admonition

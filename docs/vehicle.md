@@ -1,8 +1,8 @@
 # CPU Four-Wheel Vehicle
 
-M1 establishes the CPU MuJoCo reference plant used to debug the same MJCF that M2 will attempt to
-run through MJX-Warp. Passing M1 proves CPU behavior only; it does not prove GPU compatibility,
-throughput, or numerical agreement.
+M1 establishes the CPU MuJoCo reference plant for the same MJCF that M2 subsequently validated
+through MJX-Warp. The M1 evidence itself proves CPU behavior only; see
+[MJX-Warp GPU Vehicle](gpu.md) for GPU compatibility, throughput, and numerical agreement.
 
 ## Physical Contract
 

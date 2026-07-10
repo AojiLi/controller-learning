@@ -42,7 +42,20 @@ with a failure. See [CPU Vehicle](vehicle.md) for the physical contract and gate
 ```bash
 pixi install -e gpu
 pixi run -e gpu gpu-check
+pixi run -e gpu gpu-tests
 ```
 
 Installing the GPU environment only proves dependency and device availability. It is not evidence
-for simulator throughput or numerical stability; those measurements are produced by M2.
+for simulator throughput or numerical stability.
+
+Run the formal isolated M2 protocol only from a clean Git worktree:
+
+```bash
+pixi run -e gpu benchmark-gpu
+```
+
+The command launches a fresh process for every scale and writes
+`benchmarks/v0.1/gpu_report.json`. It exits unsuccessfully if the worktree or benchmark sources
+change during the run, any numerical or physical gate fails, memory does not stabilize, or the
+CPU/GPU comparison exceeds its tolerances. See [MJX-Warp GPU Vehicle](gpu.md) for the frozen protocol
+and reviewed measurements.
