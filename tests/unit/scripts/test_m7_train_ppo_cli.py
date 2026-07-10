@@ -527,3 +527,11 @@ def test_pixi_exposes_one_gpu_train_task_and_formal_project_config_is_level_one(
     assert config.environment.num_envs == 1024
     assert config.environment.backend == "mjx_warp"
     assert config.environment.train_cache.endswith("train_pool.npz")
+    manifest = train_ppo._official_train_manifest_path(
+        PROJECT_ROOT,
+        config.environment.benchmark_version,
+    )
+    assert manifest == PROJECT_ROOT / "controller_learning/assets/tracks/v0.1/train.json"
+    assert manifest.is_file()
+    with pytest.raises(ValueError, match="benchmark version"):
+        train_ppo._official_train_manifest_path(PROJECT_ROOT, "0.2")

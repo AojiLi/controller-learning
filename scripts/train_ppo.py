@@ -355,6 +355,16 @@ def _absolute_project_file(project_root: Path, path: Path, *, label: str) -> Pat
     return candidate
 
 
+def _official_train_manifest_path(project_root: Path, benchmark_version: str) -> Path:
+    """Return the repository path for the locked versioned Train manifest."""
+
+    if benchmark_version != "0.1":
+        raise ValueError("formal PPO training requires benchmark version '0.1'")
+    return (
+        project_root / "controller_learning/assets/tracks" / f"v{benchmark_version}" / "train.json"
+    )
+
+
 def build_run_identity(
     *,
     run_id: str,
@@ -1102,11 +1112,9 @@ def run_training(options: TrainingOptions, *, project_root: Path = PROJECT_ROOT)
     train_cache = root / config.environment.train_cache
     asset_guard = OfficialTrainAssetAccessGuard(
         official_track_root=root / "controller_learning/assets/tracks",
-        train_manifest=(
-            root
-            / "controller_learning/assets/tracks"
-            / config.environment.benchmark_version
-            / "train.json"
+        train_manifest=_official_train_manifest_path(
+            root,
+            config.environment.benchmark_version,
         ),
         track_cache_root=root / ".track-cache",
         train_cache=train_cache,
