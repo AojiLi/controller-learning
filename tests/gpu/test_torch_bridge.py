@@ -14,6 +14,9 @@ import pytest
 from controller_learning.config import load_project_config
 from controller_learning.envs.episode import PUBLIC_INFO_KEYS
 from controller_learning.envs.vector_racing import VecCarRacingEnv
+from controller_learning.rl.configuration import load_ppo_config
+from controller_learning.rl.features import LOCAL_TRACK_FEATURE_DIM, LocalTrackObservationVecEnv
+from controller_learning.rl.reward import PublicRewardShapingVecEnv
 from controller_learning.rl.torch_bridge import (
     JaxToTorchVecEnv,
     _jax_array_to_torch,
@@ -49,6 +52,18 @@ def _base_env(num_envs: int) -> VecCarRacingEnv:
         project_config=project,
         level_id=1,
         tracks=_tracks(project, num_envs),
+        backend="mjx_warp",
+    )
+
+
+def _repeated_track_env(num_envs: int) -> VecCarRacingEnv:
+    project = load_project_config(PROJECT_ROOT)
+    track = _tracks(project, 1)[0]
+    return VecCarRacingEnv(
+        num_envs=num_envs,
+        project_config=project,
+        level_id=1,
+        tracks=(track,) * num_envs,
         backend="mjx_warp",
     )
 
@@ -197,5 +212,48 @@ def test_bridge_rejects_wrong_public_benchmark_version_contents() -> None:
     try:
         with pytest.raises(ValueError, match="does not match the official environment"):
             env.reset(seed=89)
+    finally:
+        env.close()
+
+
+def test_formal_1024_world_public_wrapper_stack_bridges_only_compact_features() -> None:
+    torch = _torch()
+    config = load_ppo_config(PROJECT_ROOT / "configs" / "ppo.toml")
+    base = _repeated_track_env(config.environment.num_envs)
+    shaped = PublicRewardShapingVecEnv(base, config.reward)
+    featured = LocalTrackObservationVecEnv(shaped, config=config.observation)
+    env = JaxToTorchVecEnv(featured, device="cuda")
+    try:
+        observation, info = env.reset(seed=config.environment.environment_seed)
+        assert isinstance(observation, torch.Tensor)
+        assert observation.shape == (
+            config.environment.num_envs,
+            LOCAL_TRACK_FEATURE_DIM,
+        )
+        assert observation.dtype == torch.float32
+        assert observation.device == env.device
+        assert torch.all(torch.isfinite(observation))
+        assert tuple(info) == PUBLIC_INFO_KEYS
+
+        action = torch.zeros(
+            (config.environment.num_envs, 2),
+            dtype=torch.float32,
+            device=env.device,
+        )
+        # The first call compiles MJX-Warp and the two public wrappers. Transfer guarding applies
+        # to the steady-state path after all shape-specialized executables exist.
+        env.step(action)
+        torch.cuda.synchronize(env.device)
+        with jax.transfer_guard("disallow"):
+            next_observation, reward, terminated, truncated, step_info = env.step(action)
+        torch.cuda.synchronize(env.device)
+
+        assert next_observation.shape == observation.shape
+        assert reward.shape == terminated.shape == truncated.shape == (config.environment.num_envs,)
+        assert torch.all(torch.isfinite(next_observation))
+        assert torch.all(torch.isfinite(reward))
+        assert not torch.any(terminated)
+        assert not torch.any(truncated)
+        assert tuple(step_info) == PUBLIC_INFO_KEYS
     finally:
         env.close()

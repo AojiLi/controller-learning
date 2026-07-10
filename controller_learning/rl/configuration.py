@@ -17,6 +17,13 @@ PPO_FORMAL_LEVEL_ID = 1
 PPO_FORMAL_BACKEND = "mjx_warp"
 PPO_FORMAL_NUM_ENVS = 1024
 PPO_FORMAL_TRAIN_CACHE = ".track-cache/v0.1/train_pool.npz"
+PPO_FORMAL_PREVIEW_POINTS = 16
+PPO_FORMAL_MAX_SPEED_MPS = 15.0
+PPO_FORMAL_HIDDEN_SIZES = (128, 128)
+PPO_MIN_LOG_STD = -5.0
+PPO_MAX_LOG_STD = 2.0
+_FLOAT32_MAX = 3.4028234663852886e38
+_FLOAT32_MIN_NORMAL = 1.1754943508222875e-38
 
 
 def _positive_integer(value: object, *, field: str) -> int:
@@ -37,6 +44,10 @@ def _finite_positive(value: object, *, field: str) -> float:
     result = float(value)
     if not math.isfinite(result) or result <= 0.0:
         raise ConfigError(f"{field} must be finite and positive")
+    if result > _FLOAT32_MAX:
+        raise ConfigError(f"{field} must fit in float32")
+    if result < _FLOAT32_MIN_NORMAL:
+        raise ConfigError(f"{field} must remain positive in normal float32")
     return result
 
 
@@ -46,6 +57,23 @@ def _finite_nonnegative(value: object, *, field: str) -> float:
     result = float(value)
     if not math.isfinite(result) or result < 0.0:
         raise ConfigError(f"{field} must be finite and non-negative")
+    if result > _FLOAT32_MAX:
+        raise ConfigError(f"{field} must fit in float32")
+    if 0.0 < result < _FLOAT32_MIN_NORMAL:
+        raise ConfigError(f"{field} must remain positive in normal float32")
+    return result
+
+
+def _finite(value: object, *, field: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ConfigError(f"{field} must be a number")
+    result = float(value)
+    if not math.isfinite(result):
+        raise ConfigError(f"{field} must be finite")
+    if abs(result) > _FLOAT32_MAX:
+        raise ConfigError(f"{field} must fit in float32")
+    if 0.0 < abs(result) < _FLOAT32_MIN_NORMAL:
+        raise ConfigError(f"{field} must remain nonzero in normal float32")
     return result
 
 
@@ -142,6 +170,11 @@ class PpoObservationConfig:
         )
         if preview_points < 2:
             raise ConfigError("ppo.observation.preview_points must be at least two")
+        if preview_points != PPO_FORMAL_PREVIEW_POINTS:
+            raise ConfigError(
+                f"ppo.observation.preview_points must be {PPO_FORMAL_PREVIEW_POINTS} "
+                "for feature schema v1"
+            )
         object.__setattr__(self, "preview_points", preview_points)
         object.__setattr__(
             self,
@@ -151,13 +184,19 @@ class PpoObservationConfig:
                 field="ppo.observation.preview_distance_m",
             ),
         )
+        max_speed_mps = _finite_positive(
+            self.max_speed_mps,
+            field="ppo.observation.max_speed_mps",
+        )
+        if max_speed_mps != PPO_FORMAL_MAX_SPEED_MPS:
+            raise ConfigError(
+                f"ppo.observation.max_speed_mps must be {PPO_FORMAL_MAX_SPEED_MPS} "
+                "for the formal vehicle"
+            )
         object.__setattr__(
             self,
             "max_speed_mps",
-            _finite_positive(
-                self.max_speed_mps,
-                field="ppo.observation.max_speed_mps",
-            ),
+            max_speed_mps,
         )
 
 
@@ -167,14 +206,14 @@ class PpoRewardConfig:
 
     progress_scale: float
     success_bonus: float
-    failure_penalty: float
+    offtrack_invalid_penalty: float
     lateral_error_weight: float
     heading_error_weight: float
     reverse_speed_weight: float
     action_change_weight: float
 
     def __post_init__(self) -> None:
-        for field in ("progress_scale", "success_bonus", "failure_penalty"):
+        for field in ("progress_scale", "success_bonus", "offtrack_invalid_penalty"):
             object.__setattr__(
                 self,
                 field,
@@ -226,7 +265,9 @@ class PpoAlgorithmConfig:
     hidden_sizes: tuple[int, int]
     policy_seed: int
     minibatch_seed: int
+    initial_log_std: float
     learning_rate: float
+    adam_epsilon: float
     anneal_learning_rate: bool
     discount_factor: float
     gae_lambda: float
@@ -250,6 +291,10 @@ class PpoAlgorithmConfig:
             )
         ):
             raise ConfigError("ppo.ppo.hidden_sizes must contain exactly two positive integers")
+        if self.hidden_sizes != PPO_FORMAL_HIDDEN_SIZES:
+            raise ConfigError(
+                f"ppo.ppo.hidden_sizes must be {PPO_FORMAL_HIDDEN_SIZES} for policy schema v1"
+            )
         object.__setattr__(
             self,
             "policy_seed",
@@ -262,8 +307,22 @@ class PpoAlgorithmConfig:
         )
         object.__setattr__(
             self,
+            "initial_log_std",
+            _finite(self.initial_log_std, field="ppo.ppo.initial_log_std"),
+        )
+        if not PPO_MIN_LOG_STD <= self.initial_log_std <= PPO_MAX_LOG_STD:
+            raise ConfigError(
+                f"ppo.ppo.initial_log_std must be in [{PPO_MIN_LOG_STD}, {PPO_MAX_LOG_STD}]"
+            )
+        object.__setattr__(
+            self,
             "learning_rate",
             _finite_positive(self.learning_rate, field="ppo.ppo.learning_rate"),
+        )
+        object.__setattr__(
+            self,
+            "adam_epsilon",
+            _finite_positive(self.adam_epsilon, field="ppo.ppo.adam_epsilon"),
         )
         object.__setattr__(
             self,
@@ -590,7 +649,7 @@ def load_ppo_config(path: str | Path) -> PpoTrainingConfig:
         {
             "progress_scale",
             "success_bonus",
-            "failure_penalty",
+            "offtrack_invalid_penalty",
             "lateral_error_weight",
             "heading_error_weight",
             "reverse_speed_weight",
@@ -609,7 +668,9 @@ def load_ppo_config(path: str | Path) -> PpoTrainingConfig:
             "hidden_sizes",
             "policy_seed",
             "minibatch_seed",
+            "initial_log_std",
             "learning_rate",
+            "adam_epsilon",
             "anneal_learning_rate",
             "discount_factor",
             "gae_lambda",
@@ -657,7 +718,9 @@ def load_ppo_config(path: str | Path) -> PpoTrainingConfig:
             hidden_sizes=_hidden_sizes(algorithm["hidden_sizes"]),
             policy_seed=algorithm["policy_seed"],
             minibatch_seed=algorithm["minibatch_seed"],
+            initial_log_std=algorithm["initial_log_std"],
             learning_rate=algorithm["learning_rate"],
+            adam_epsilon=algorithm["adam_epsilon"],
             anneal_learning_rate=algorithm["anneal_learning_rate"],
             discount_factor=algorithm["discount_factor"],
             gae_lambda=algorithm["gae_lambda"],
@@ -678,7 +741,12 @@ def load_ppo_config(path: str | Path) -> PpoTrainingConfig:
 
 __all__ = [
     "PPO_CONFIG_SCHEMA_VERSION",
+    "PPO_FORMAL_HIDDEN_SIZES",
+    "PPO_FORMAL_MAX_SPEED_MPS",
+    "PPO_FORMAL_PREVIEW_POINTS",
     "PPO_FORMAL_TRAIN_CACHE",
+    "PPO_MAX_LOG_STD",
+    "PPO_MIN_LOG_STD",
     "PpoAlgorithmConfig",
     "PpoCheckpointConfig",
     "PpoEnvironmentConfig",

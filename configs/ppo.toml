@@ -17,10 +17,11 @@ preview_distance_m = 40.0
 max_speed_mps = 15.0
 
 [reward]
-# Shaping may use only public observations/actions. Formal ranking still ignores reward.
+# Shaping may use only public observations/actions. Error and action-change weights multiply
+# squared terms. Formal ranking still ignores reward.
 progress_scale = 100.0
 success_bonus = 1.0
-failure_penalty = 1.0
+offtrack_invalid_penalty = 1.0
 lateral_error_weight = 0.05
 heading_error_weight = 0.02
 reverse_speed_weight = 0.02
@@ -34,7 +35,9 @@ total_vector_steps = 10240
 hidden_sizes = [128, 128]
 policy_seed = 11
 minibatch_seed = 13
+initial_log_std = -0.5
 learning_rate = 0.0003
+adam_epsilon = 0.00001
 anneal_learning_rate = true
 discount_factor = 0.99
 gae_lambda = 0.95

@@ -35,12 +35,15 @@ def test_repository_ppo_config_is_strict_cross_validated_and_immutable() -> None
     assert config.environment.train_cache == ".track-cache/v0.1/train_pool.npz"
     assert config.observation.preview_points == 16
     assert config.observation.preview_distance_m == 40.0
+    assert config.observation.max_speed_mps == 15.0
     assert config.reward.progress_scale == 100.0
     assert config.rollout.steps_per_update == 128
     assert config.rollout.total_vector_steps == 10_240
     assert config.ppo.hidden_sizes == (128, 128)
     assert config.ppo.policy_seed == 11
     assert config.ppo.minibatch_seed == 13
+    assert config.ppo.initial_log_std == -0.5
+    assert config.ppo.adam_epsilon == 1.0e-5
     assert config.ppo.num_minibatches == 32
     assert config.ppo.update_epochs == 4
     assert config.update_count == 80
@@ -83,6 +86,26 @@ def test_repository_ppo_config_is_strict_cross_validated_and_immutable() -> None
             "finite and non-negative",
         ),
         (
+            "preview_points = 16",
+            "preview_points = 8",
+            "must be 16 for feature schema v1",
+        ),
+        (
+            "max_speed_mps = 15.0",
+            "max_speed_mps = 14.0",
+            "must be 15.0 for the formal vehicle",
+        ),
+        (
+            "hidden_sizes = [128, 128]",
+            "hidden_sizes = [64, 64]",
+            r"must be \(128, 128\) for policy schema v1",
+        ),
+        (
+            "initial_log_std = -0.5",
+            "initial_log_std = 3.0",
+            r"must be in \[-5.0, 2.0\]",
+        ),
+        (
             "num_envs = 1024",
             "num_envs = 256",
             "must be 1024",
@@ -96,6 +119,16 @@ def test_repository_ppo_config_is_strict_cross_validated_and_immutable() -> None
             "minibatch_seed = 13",
             "minibatch_seed = 11",
             "must be distinct RNG domains",
+        ),
+        (
+            "progress_scale = 100.0",
+            "progress_scale = 1e300",
+            "must fit in float32",
+        ),
+        (
+            "progress_scale = 100.0",
+            "progress_scale = 1e-300",
+            "must remain positive in normal float32",
         ),
     ),
 )
