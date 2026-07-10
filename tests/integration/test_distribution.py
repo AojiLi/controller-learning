@@ -15,6 +15,13 @@ REQUIRED_WHEEL_PATHS = (
     "controller_learning/physics/model.py",
     "controller_learning/physics/actuation.py",
     "controller_learning/physics/cpu_reference.py",
+    "controller_learning/tracks/types.py",
+    "controller_learning/tracks/generator.py",
+    "controller_learning/tracks/validator.py",
+    "controller_learning/tracks/specs.py",
+    "controller_learning/tracks/driveability.py",
+    "controller_learning/envs/race_core.py",
+    "controller_learning/envs/configuration.py",
 )
 
 
