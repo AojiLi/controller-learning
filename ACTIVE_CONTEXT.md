@@ -10,16 +10,17 @@ feature work remains gated on M2.
 
 ## M1 Handoff Evidence
 
-- Implementation commit: `237f5046dc369095e4247efefe80e2b728254044`.
+- Vehicle implementation commit: `237f5046dc369095e4247efefe80e2b728254044`; current-state
+  rear-axle semantics correction: `753fa0d39b9109db771a526e3092e309062f64e0`.
 - Reviewed report: `benchmarks/v0.1/m1_cpu_report.json`.
 - The report was generated from a clean worktree and records matching source, model, config, lock,
   protocol, and Git hashes.
 - 0.010 s failed the long stress penetration, vertical-motion, and convergence gates.
 - 0.005 s and 0.002 s passed; 0.005 s is the largest passing CPU candidate and M2 starting point.
-- At 0.005 s, the 60-second stress run had no warnings or unexpected contacts, 80.15% minimum
-  per-wheel substep contact participation, a 55 ms maximum contact gap, and 0.791 mm steady
+- At 0.005 s, the 60-second stress run had no warnings or unexpected contacts, 79.42% minimum
+  per-wheel substep contact participation, a 40 ms maximum contact gap, and 0.796 mm steady
   penetration P99.
-- Local CPU CI passed 44 tests with one GPU test deselected, strict docs, Actions lint, sdist-to-wheel
+- Local CPU CI passed 45 tests with one GPU test deselected, strict docs, Actions lint, sdist-to-wheel
   construction, installed-wheel asset loading, and metadata checks.
 
 These facts do not prove MJX-Warp compatibility, CPU/GPU agreement, 1024-world stability, or GPU

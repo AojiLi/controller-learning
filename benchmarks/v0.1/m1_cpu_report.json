@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-07-09T23:09:34.834523+00:00",
+  "generated_at_utc": "2026-07-10T07:44:08.658108+00:00",
   "milestone": "M1",
   "model": {
     "autoreset_disabled": true,
@@ -46,7 +46,7 @@
   },
   "provenance": {
     "benchmark_source_sha256": "c8ac9c7c458d823d5fe914defd36b8e016ae501ecdde0075cb77cb754dec91af",
-    "git_commit": "237f5046dc369095e4247efefe80e2b728254044",
+    "git_commit": "753fa0d39b9109db771a526e3092e309062f64e0",
     "git_dirty": false,
     "model_path": "controller_learning/assets/vehicle/car.xml",
     "model_sha256": "e473bc5848f4fc0247fff1678c1f5f4828e4ca7c766a212f2e76bdbf3abd16dc",
@@ -58,7 +58,7 @@
     {
       "absolute_checks_passed": false,
       "absolute_failures": [
-        "contact_stress.steady_penetration_p99_m",
+        "contact_stress.minimum_steady_wheel_contact_coverage",
         "contact_stress.steady_vertical_speed_p99_mps"
       ],
       "convergence_checks": [
@@ -95,196 +95,196 @@
           "limit": 0.05,
           "operator": "<=",
           "passed": true,
-          "value": 0.016334372039283174
+          "value": 0.015973760571229106
         },
         {
           "id": "convergence.straight.position_max_m",
           "limit": 0.15,
           "operator": "<=",
           "passed": true,
-          "value": 0.02310093868575258
+          "value": 0.022727856684053194
         },
         {
           "id": "convergence.straight.velocity_rmse_mps",
           "limit": 0.1,
           "operator": "<=",
           "passed": true,
-          "value": 0.010800817012465633
+          "value": 8.789493536272142e-05
         },
         {
           "id": "convergence.straight.velocity_max_mps",
           "limit": 0.3,
           "operator": "<=",
           "passed": true,
-          "value": 0.015399866077936447
+          "value": 0.00012608420969595358
         },
         {
           "id": "convergence.straight.yaw_final_rad",
           "limit": 0.01,
           "operator": "<=",
           "passed": true,
-          "value": 5.211503953905634e-16
+          "value": 5.339523879121911e-16
         },
         {
           "id": "convergence.steer_left.position_rmse_m",
           "limit": 0.1,
           "operator": "<=",
           "passed": true,
-          "value": 0.030433765614120818
+          "value": 0.0236465553768553
         },
         {
           "id": "convergence.steer_left.position_final_m",
           "limit": 0.25,
           "operator": "<=",
           "passed": true,
-          "value": 0.05742604622255432
+          "value": 0.030986462182159034
         },
         {
           "id": "convergence.steer_left.yaw_rmse_rad",
           "limit": 0.02,
           "operator": "<=",
           "passed": true,
-          "value": 0.004772710582109805
+          "value": 0.0054396948293055445
         },
         {
           "id": "convergence.steer_left.yaw_final_rad",
           "limit": 0.05,
           "operator": "<=",
           "passed": true,
-          "value": 0.018646988407039933
+          "value": 0.01867286335542917
         },
         {
           "id": "convergence.steer_left.velocity_rmse_mps",
           "limit": 0.2,
           "operator": "<=",
           "passed": true,
-          "value": 0.01442186286182212
+          "value": 0.011454872715393201
         },
         {
           "id": "convergence.steer_left.yaw_rate_rmse_rad_s",
           "limit": 0.05,
           "operator": "<=",
           "passed": true,
-          "value": 0.013197712763660822
+          "value": 0.013188806237270458
         },
         {
           "id": "convergence.steer_right.position_rmse_m",
           "limit": 0.1,
           "operator": "<=",
           "passed": true,
-          "value": 0.03043376561447891
+          "value": 0.023646555377779207
         },
         {
           "id": "convergence.steer_right.position_final_m",
           "limit": 0.25,
           "operator": "<=",
           "passed": true,
-          "value": 0.05742604622215572
+          "value": 0.03098646218270754
         },
         {
           "id": "convergence.steer_right.yaw_rmse_rad",
           "limit": 0.02,
           "operator": "<=",
           "passed": true,
-          "value": 0.00477271058210976
+          "value": 0.0054396948293055315
         },
         {
           "id": "convergence.steer_right.yaw_final_rad",
           "limit": 0.05,
           "operator": "<=",
           "passed": true,
-          "value": 0.01864698840703949
+          "value": 0.018672863355428837
         },
         {
           "id": "convergence.steer_right.velocity_rmse_mps",
           "limit": 0.2,
           "operator": "<=",
           "passed": true,
-          "value": 0.0144218628618212
+          "value": 0.011454872715391955
         },
         {
           "id": "convergence.steer_right.yaw_rate_rmse_rad_s",
           "limit": 0.05,
           "operator": "<=",
           "passed": true,
-          "value": 0.013197712763660871
+          "value": 0.013188806237270517
         },
         {
           "id": "convergence.brake.position_rmse_m",
           "limit": 0.05,
           "operator": "<=",
           "passed": true,
-          "value": 0.020827062347861393
+          "value": 0.016577977731604913
         },
         {
           "id": "convergence.brake.position_max_m",
           "limit": 0.15,
           "operator": "<=",
           "passed": true,
-          "value": 0.0649291844129749
+          "value": 0.03263999202250645
         },
         {
           "id": "convergence.brake.velocity_rmse_mps",
           "limit": 0.1,
           "operator": "<=",
           "passed": true,
-          "value": 0.028904338213823454
+          "value": 0.011355357194993063
         },
         {
           "id": "convergence.brake.velocity_max_mps",
           "limit": 0.3,
           "operator": "<=",
           "passed": true,
-          "value": 0.061571647879773664
+          "value": 0.030827392105678753
         },
         {
           "id": "convergence.contact_stress.wheel_contact_coverage_difference",
           "limit": 0.05,
           "operator": "<=",
           "passed": false,
-          "value": 0.056968670618121275
+          "value": 0.06858594411515828
         },
         {
           "id": "convergence.contact_stress.maximum_contact_gap_difference_s",
           "limit": 0.02,
           "operator": "<=",
           "passed": true,
-          "value": 0.0020000000000000018
+          "value": 0.018000000000000002
         },
         {
           "id": "convergence.contact_stress.steady_penetration_p99_difference_m",
           "limit": 0.001,
           "operator": "<=",
           "passed": false,
-          "value": 0.0018141454234105734
+          "value": 0.0015573022305774395
         },
         {
           "id": "convergence.contact_stress.vertical_speed_p99_difference_mps",
           "limit": 0.05,
           "operator": "<=",
           "passed": false,
-          "value": 0.06914647986330735
+          "value": 0.07354171588495859
         },
         {
           "id": "convergence.contact_stress.mean_speed_difference_mps",
           "limit": 0.1,
           "operator": "<=",
           "passed": true,
-          "value": 0.0022397761738375266
+          "value": 0.0008744816751500295
         },
         {
           "id": "convergence.contact_stress.path_length_difference_m",
           "limit": 1.0,
           "operator": "<=",
           "passed": true,
-          "value": 0.2747357533037871
+          "value": 0.07979988071542721
         },
         {
           "id": "convergence.contact_stress.steering_rms_difference_rad",
           "limit": 0.01,
           "operator": "<=",
           "passed": true,
-          "value": 0.004668276718678865
+          "value": 0.0028197582458071857
         }
       ],
       "convergence_failures": [
@@ -296,90 +296,90 @@
       "convergence_to_reference": {
         "brake": {
           "penetration_p99_difference_m": 0.0002667348013897809,
-          "position_final_m": 0.0649291844129749,
-          "position_max_m": 0.0649291844129749,
-          "position_rmse_m": 0.020827062347861393,
-          "steady_z_difference_m": 3.572908302551525e-09,
-          "velocity_max_mps": 0.061571647879773664,
-          "velocity_rmse_mps": 0.028904338213823454,
-          "yaw_final_rad": 2.942413057211638e-17,
-          "yaw_rate_rmse_rad_s": 3.6616388968082053e-16,
-          "yaw_rmse_rad": 1.198765209995844e-16
+          "position_final_m": 0.03263999202250645,
+          "position_max_m": 0.03263999202250645,
+          "position_rmse_m": 0.016577977731604913,
+          "steady_z_difference_m": 1.7889748571420228e-09,
+          "velocity_max_mps": 0.030827392105678753,
+          "velocity_rmse_mps": 0.011355357194993063,
+          "yaw_final_rad": 3.0803272410046196e-17,
+          "yaw_rate_rmse_rad_s": 3.620239144487984e-16,
+          "yaw_rmse_rad": 1.1996099959807904e-16
         },
         "contact_stress": {
-          "maximum_contact_gap_difference_s": 0.0020000000000000018,
-          "mean_speed_difference_mps": 0.0022397761738375266,
-          "path_length_difference_m": 0.2747357533037871,
-          "steady_penetration_p99_difference_m": 0.0018141454234105734,
-          "steering_rms_difference_rad": 0.004668276718678865,
-          "vertical_speed_p99_difference_mps": 0.06914647986330735,
-          "wheel_contact_coverage_difference": 0.056968670618121275
+          "maximum_contact_gap_difference_s": 0.018000000000000002,
+          "mean_speed_difference_mps": 0.0008744816751500295,
+          "path_length_difference_m": 0.07979988071542721,
+          "steady_penetration_p99_difference_m": 0.0015573022305774395,
+          "steering_rms_difference_rad": 0.0028197582458071857,
+          "vertical_speed_p99_difference_mps": 0.07354171588495859,
+          "wheel_contact_coverage_difference": 0.06858594411515828
         },
         "drop_settle": {
           "penetration_p99_difference_m": 0.0011081050359708633,
-          "position_final_m": 2.9704069951475356e-05,
-          "position_max_m": 0.0003105976081916586,
-          "position_rmse_m": 5.28797143406595e-05,
+          "position_final_m": 2.9704069951471887e-05,
+          "position_max_m": 0.000582323924604302,
+          "position_rmse_m": 7.777276575686539e-05,
           "steady_z_difference_m": 9.992007221626409e-16,
-          "velocity_max_mps": 0.0248148930575319,
-          "velocity_rmse_mps": 0.002929614347609978,
+          "velocity_max_mps": 0.030053351618766034,
+          "velocity_rmse_mps": 0.0032696049615333245,
           "yaw_final_rad": 4.2151943753328727e-19,
-          "yaw_rate_rmse_rad_s": 2.634336147211435e-18,
-          "yaw_rmse_rad": 4.1562561521981977e-19
+          "yaw_rate_rmse_rad_s": 5.987868840353415e-19,
+          "yaw_rmse_rad": 4.161489602474437e-19
         },
         "rest": {
           "penetration_p99_difference_m": 0.0001230454509417167,
-          "position_final_m": 1.1080888094645167e-12,
-          "position_max_m": 1.1080888094645167e-12,
-          "position_rmse_m": 1.1013740581065018e-12,
+          "position_final_m": 1.1080828328835283e-12,
+          "position_max_m": 1.1080828328835283e-12,
+          "position_rmse_m": 1.102013062723723e-12,
           "steady_z_difference_m": 2.220446049250313e-16,
-          "velocity_max_mps": 3.8600762704243894e-11,
-          "velocity_rmse_mps": 2.767481391966364e-12,
-          "yaw_final_rad": 9.01991665399832e-27,
-          "yaw_rate_rmse_rad_s": 4.974704359767855e-26,
-          "yaw_rmse_rad": 8.98312547938592e-27
+          "velocity_max_mps": 1.5934905348264452e-11,
+          "velocity_rmse_mps": 1.1938626795814291e-12,
+          "yaw_final_rad": 9.019917877653741e-27,
+          "yaw_rate_rmse_rad_s": 4.573855070085338e-26,
+          "yaw_rmse_rad": 9.0194796404959e-27
         },
         "steer_left": {
           "penetration_p99_difference_m": 0.0004442586263098573,
-          "position_final_m": 0.05742604622255432,
-          "position_max_m": 0.06733334951437683,
-          "position_rmse_m": 0.030433765614120818,
-          "steady_z_difference_m": 4.1215274526607004e-09,
-          "velocity_max_mps": 0.032413850066157476,
-          "velocity_rmse_mps": 0.01442186286182212,
-          "yaw_final_rad": 0.018646988407039933,
-          "yaw_rate_rmse_rad_s": 0.013197712763660822,
-          "yaw_rmse_rad": 0.004772710582109805
+          "position_final_m": 0.030986462182159034,
+          "position_max_m": 0.05545419511559852,
+          "position_rmse_m": 0.0236465553768553,
+          "steady_z_difference_m": 4.123333008365648e-09,
+          "velocity_max_mps": 0.02974958083214338,
+          "velocity_rmse_mps": 0.011454872715393201,
+          "yaw_final_rad": 0.01867286335542917,
+          "yaw_rate_rmse_rad_s": 0.013188806237270458,
+          "yaw_rmse_rad": 0.0054396948293055445
         },
         "steer_right": {
           "penetration_p99_difference_m": 0.000444258626309824,
-          "position_final_m": 0.05742604622215572,
-          "position_max_m": 0.06733334951513359,
-          "position_rmse_m": 0.03043376561447891,
-          "steady_z_difference_m": 4.121527508171852e-09,
-          "velocity_max_mps": 0.032413850066155055,
-          "velocity_rmse_mps": 0.0144218628618212,
-          "yaw_final_rad": 0.01864698840703949,
-          "yaw_rate_rmse_rad_s": 0.013197712763660871,
-          "yaw_rmse_rad": 0.00477271058210976
+          "position_final_m": 0.03098646218270754,
+          "position_max_m": 0.05545419511728094,
+          "position_rmse_m": 0.023646555377779207,
+          "steady_z_difference_m": 4.123333008365648e-09,
+          "velocity_max_mps": 0.02974958083214158,
+          "velocity_rmse_mps": 0.011454872715391955,
+          "yaw_final_rad": 0.018672863355428837,
+          "yaw_rate_rmse_rad_s": 0.013188806237270517,
+          "yaw_rmse_rad": 0.0054396948293055315
         },
         "straight": {
           "penetration_p99_difference_m": 0.0004506396844437532,
-          "position_final_m": 0.023096435797221204,
-          "position_max_m": 0.02310093868575258,
-          "position_rmse_m": 0.016334372039283174,
-          "steady_z_difference_m": 2.7280577796773287e-10,
-          "velocity_max_mps": 0.015399866077936447,
-          "velocity_rmse_mps": 0.010800817012465633,
-          "yaw_final_rad": 5.211503953905634e-16,
-          "yaw_rate_rmse_rad_s": 4.955373593105613e-16,
-          "yaw_rmse_rad": 1.3072466712910105e-16
+          "position_final_m": 0.022226319893523083,
+          "position_max_m": 0.022727856684053194,
+          "position_rmse_m": 0.015973760571229106,
+          "steady_z_difference_m": 2.874802063068671e-10,
+          "velocity_max_mps": 0.00012608420969595358,
+          "velocity_rmse_mps": 8.789493536272142e-05,
+          "yaw_final_rad": 5.339523879121911e-16,
+          "yaw_rate_rmse_rad_s": 4.921261942888789e-16,
+          "yaw_rmse_rad": 1.3250654767970595e-16
         }
       },
       "cpu_timing": {
         "physics_steps": 31500,
-        "physics_steps_per_second": 9191.486071763758,
-        "wall_time_s": 3.4270845600003668
+        "physics_steps_per_second": 6508.321420035292,
+        "wall_time_s": 4.839957642999934
       },
       "determinism": {
         "max_abs_state_delta": 0.0,
@@ -446,7 +446,7 @@
               "metric": "steady_penetration_p99_m",
               "operator": "<=",
               "passed": true,
-              "value": 0.000344136997840816
+              "value": 0.0003216238275426475
             },
             {
               "id": "action_limits.maximum_abs_roll_pitch_rad",
@@ -462,7 +462,7 @@
               "metric": "steady_chassis_z_peak_to_peak_m",
               "operator": "<=",
               "passed": true,
-              "value": 1.0459297028475589e-07
+              "value": 2.579284119619274e-08
             },
             {
               "id": "action_limits.steady_vertical_speed_p99_mps",
@@ -470,7 +470,7 @@
               "metric": "steady_vertical_speed_p99_mps",
               "operator": "<=",
               "passed": true,
-              "value": 3.540392325957241e-06
+              "value": 1.2941166048385403e-06
             },
             {
               "id": "action_limits.minimum_steady_mean_wheel_load_ratio",
@@ -478,7 +478,7 @@
               "metric": "minimum_steady_mean_wheel_load_ratio",
               "operator": ">=",
               "passed": true,
-              "value": 0.999853817807983
+              "value": 0.9999757691126925
             },
             {
               "id": "action_limits.steady_mean_total_normal_force_relative_error",
@@ -486,7 +486,7 @@
               "metric": "steady_mean_total_normal_force_relative_error",
               "operator": "<=",
               "passed": true,
-              "value": 6.109273872725312e-05
+              "value": 1.0870697255685183e-05
             },
             {
               "id": "action_limits.maximum_applied_steering_rad",
@@ -573,8 +573,8 @@
           "determinism_max_abs_delta": 0.0,
           "duration_s": 2.0,
           "metrics": {
-            "final_abs_longitudinal_velocity_mps": 0.0005695980047828492,
-            "final_longitudinal_velocity_mps": -0.0005695980047828492,
+            "final_abs_longitudinal_velocity_mps": 0.07577758471149085,
+            "final_longitudinal_velocity_mps": 0.07577758471149085,
             "finite": true,
             "max_unexpected_contact_count": 0,
             "max_warning_count": 0,
@@ -583,23 +583,23 @@
             "maximum_applied_steering_rad": 0.6,
             "maximum_contact_gap_s": 0.0,
             "maximum_penetration_m": 0.0022043061282849274,
-            "maximum_speed_mps": 1.5957397296349511,
+            "maximum_speed_mps": 1.6669754141298314,
             "maximum_steering_target_step_rad": 0.06000000000000005,
             "minimum_applied_acceleration_mps2": -8.0,
             "minimum_applied_steering_rad": -0.6,
             "minimum_saturation_count": 2,
-            "minimum_steady_mean_wheel_load_ratio": 0.999853817807983,
+            "minimum_steady_mean_wheel_load_ratio": 0.9999757691126925,
             "minimum_steady_wheel_contact_coverage": 1.0,
-            "penetration_p99_m": 0.001991418504585597,
-            "steady_chassis_z_peak_to_peak_m": 1.0459297028475589e-07,
-            "steady_mean_total_normal_force_relative_error": 6.109273872725312e-05,
-            "steady_penetration_p99_m": 0.000344136997840816,
-            "steady_vertical_speed_p99_mps": 3.540392325957241e-06
+            "penetration_p99_m": 0.001899166041826451,
+            "steady_chassis_z_peak_to_peak_m": 2.579284119619274e-08,
+            "steady_mean_total_normal_force_relative_error": 1.0870697255685183e-05,
+            "steady_penetration_p99_m": 0.0003216238275426475,
+            "steady_vertical_speed_p99_mps": 1.2941166048385403e-06
           },
           "telemetry_sha256": [
-            "55ac334a5f367aedfaccf19b970ca353fd3b28bf5d6dd2594fb0232bf9e603bd",
-            "55ac334a5f367aedfaccf19b970ca353fd3b28bf5d6dd2594fb0232bf9e603bd",
-            "55ac334a5f367aedfaccf19b970ca353fd3b28bf5d6dd2594fb0232bf9e603bd"
+            "cc1a02acf44940a006a55ef3e354d386449c9a2a6befe17e59782b098a3a8ad5",
+            "cc1a02acf44940a006a55ef3e354d386449c9a2a6befe17e59782b098a3a8ad5",
+            "cc1a02acf44940a006a55ef3e354d386449c9a2a6befe17e59782b098a3a8ad5"
           ]
         },
         "brake": {
@@ -674,7 +674,7 @@
               "metric": "steady_chassis_z_peak_to_peak_m",
               "operator": "<=",
               "passed": true,
-              "value": 6.236417551758189e-05
+              "value": 6.236585715041487e-05
             },
             {
               "id": "brake.steady_vertical_speed_p99_mps",
@@ -682,7 +682,7 @@
               "metric": "steady_vertical_speed_p99_mps",
               "operator": "<=",
               "passed": true,
-              "value": 0.000700441343569296
+              "value": 0.0006523823016598078
             },
             {
               "id": "brake.minimum_steady_mean_wheel_load_ratio",
@@ -690,7 +690,7 @@
               "metric": "minimum_steady_mean_wheel_load_ratio",
               "operator": ">=",
               "passed": true,
-              "value": 0.9998366157005316
+              "value": 0.9996083971150288
             },
             {
               "id": "brake.steady_mean_total_normal_force_relative_error",
@@ -706,7 +706,7 @@
               "metric": "speed_before_braking_mps",
               "operator": ">=",
               "passed": true,
-              "value": 7.598237078140864
+              "value": 7.617069590599979
             },
             {
               "id": "brake.final_abs_longitudinal_velocity_mps",
@@ -714,7 +714,7 @@
               "metric": "final_abs_longitudinal_velocity_mps",
               "operator": "<=",
               "passed": true,
-              "value": 0.027421047384398496
+              "value": 0.06570675992428365
             },
             {
               "id": "brake.maximum_abs_post_braking_velocity_mps",
@@ -722,7 +722,7 @@
               "metric": "maximum_abs_post_braking_velocity_mps",
               "operator": "<=",
               "passed": true,
-              "value": 0.027662543850806163
+              "value": 0.0661305499247264
             },
             {
               "id": "brake.minimum_braking_velocity_mps",
@@ -730,7 +730,7 @@
               "metric": "minimum_braking_velocity_mps",
               "operator": ">=",
               "passed": true,
-              "value": 0.027662543850806163
+              "value": 0.0661305499247264
             },
             {
               "id": "brake.braking_nonincrease_fraction",
@@ -746,30 +746,30 @@
           "duration_s": 8.0,
           "metrics": {
             "braking_nonincrease_fraction": 1.0,
-            "final_abs_longitudinal_velocity_mps": 0.027421047384398496,
-            "final_longitudinal_velocity_mps": 0.027421047384398496,
+            "final_abs_longitudinal_velocity_mps": 0.06570675992428365,
+            "final_longitudinal_velocity_mps": 0.06570675992428365,
             "finite": true,
             "max_unexpected_contact_count": 0,
             "max_warning_count": 0,
-            "maximum_abs_post_braking_velocity_mps": 0.027662543850806163,
+            "maximum_abs_post_braking_velocity_mps": 0.0661305499247264,
             "maximum_abs_roll_pitch_rad": 3.020610765551922e-05,
             "maximum_contact_gap_s": 0.0,
             "maximum_penetration_m": 0.0011925139012330943,
-            "maximum_speed_mps": 7.598237078140864,
-            "minimum_braking_velocity_mps": 0.027662543850806163,
-            "minimum_steady_mean_wheel_load_ratio": 0.9998366157005316,
+            "maximum_speed_mps": 7.617069590599979,
+            "minimum_braking_velocity_mps": 0.0661305499247264,
+            "minimum_steady_mean_wheel_load_ratio": 0.9996083971150288,
             "minimum_steady_wheel_contact_coverage": 1.0,
             "penetration_p99_m": 0.0006219201983187063,
-            "speed_before_braking_mps": 7.598237078140864,
-            "steady_chassis_z_peak_to_peak_m": 6.236417551758189e-05,
+            "speed_before_braking_mps": 7.617069590599979,
+            "steady_chassis_z_peak_to_peak_m": 6.236585715041487e-05,
             "steady_mean_total_normal_force_relative_error": 5.2536221305265985e-15,
             "steady_penetration_p99_m": 0.00035510676874278557,
-            "steady_vertical_speed_p99_mps": 0.000700441343569296
+            "steady_vertical_speed_p99_mps": 0.0006523823016598078
           },
           "telemetry_sha256": [
-            "d62ba1ac717d0b791d6a639686ba9c6ff1727e291f16415a5e03b0e355277bea",
-            "d62ba1ac717d0b791d6a639686ba9c6ff1727e291f16415a5e03b0e355277bea",
-            "d62ba1ac717d0b791d6a639686ba9c6ff1727e291f16415a5e03b0e355277bea"
+            "522efe9a118b056be036a825668d29a016a65c2592fecebd9057e950b3afa0a2",
+            "522efe9a118b056be036a825668d29a016a65c2592fecebd9057e950b3afa0a2",
+            "522efe9a118b056be036a825668d29a016a65c2592fecebd9057e950b3afa0a2"
           ]
         },
         "contact_stress": {
@@ -803,8 +803,8 @@
               "limit": 0.75,
               "metric": "minimum_steady_wheel_contact_coverage",
               "operator": ">=",
-              "passed": true,
-              "value": 0.7522438611346287
+              "passed": false,
+              "value": 0.7424216765452948
             },
             {
               "id": "contact_stress.maximum_contact_gap_s",
@@ -812,7 +812,7 @@
               "metric": "maximum_contact_gap_s",
               "operator": "<=",
               "passed": true,
-              "value": 0.04
+              "value": 0.05
             },
             {
               "id": "contact_stress.maximum_penetration_m",
@@ -820,15 +820,15 @@
               "metric": "maximum_penetration_m",
               "operator": "<=",
               "passed": true,
-              "value": 0.002213794473690245
+              "value": 0.0025545895013646125
             },
             {
               "id": "contact_stress.steady_penetration_p99_m",
               "limit": 0.002,
               "metric": "steady_penetration_p99_m",
               "operator": "<=",
-              "passed": false,
-              "value": 0.002213790444259489
+              "passed": true,
+              "value": 0.0019427825466961867
             },
             {
               "id": "contact_stress.maximum_abs_roll_pitch_rad",
@@ -836,7 +836,7 @@
               "metric": "maximum_abs_roll_pitch_rad",
               "operator": "<=",
               "passed": true,
-              "value": 0.001267072298952178
+              "value": 0.001348315813454845
             },
             {
               "id": "contact_stress.steady_chassis_z_peak_to_peak_m",
@@ -844,7 +844,7 @@
               "metric": "steady_chassis_z_peak_to_peak_m",
               "operator": "<=",
               "passed": true,
-              "value": 0.001607838000870665
+              "value": 0.0017426803282473147
             },
             {
               "id": "contact_stress.steady_vertical_speed_p99_mps",
@@ -852,7 +852,7 @@
               "metric": "steady_vertical_speed_p99_mps",
               "operator": "<=",
               "passed": false,
-              "value": 0.10325103960832874
+              "value": 0.10613364439924654
             },
             {
               "id": "contact_stress.minimum_steady_mean_wheel_load_ratio",
@@ -860,7 +860,7 @@
               "metric": "minimum_steady_mean_wheel_load_ratio",
               "operator": ">=",
               "passed": true,
-              "value": 0.996311036927147
+              "value": 0.9881295684880415
             },
             {
               "id": "contact_stress.steady_mean_total_normal_force_relative_error",
@@ -868,7 +868,7 @@
               "metric": "steady_mean_total_normal_force_relative_error",
               "operator": "<=",
               "passed": true,
-              "value": 8.382287108871417e-06
+              "value": 2.323592543315367e-05
             },
             {
               "id": "contact_stress.maximum_speed_mps",
@@ -876,7 +876,7 @@
               "metric": "maximum_speed_mps",
               "operator": "<=",
               "passed": true,
-              "value": 7.977244425097064
+              "value": 7.980306833203962
             },
             {
               "id": "contact_stress.mean_stress_speed_mps",
@@ -884,7 +884,7 @@
               "metric": "mean_stress_speed_mps",
               "operator": ">=",
               "passed": true,
-              "value": 7.93425083791931
+              "value": 7.935080863934394
             },
             {
               "id": "contact_stress.stress_path_length_m",
@@ -892,7 +892,7 @@
               "metric": "stress_path_length_m",
               "operator": ">=",
               "passed": true,
-              "value": 448.7016014516594
+              "value": 448.8838301782765
             },
             {
               "id": "contact_stress.stress_steering_rms_rad",
@@ -900,37 +900,37 @@
               "metric": "stress_steering_rms_rad",
               "operator": ">=",
               "passed": true,
-              "value": 0.13669470686551996
+              "value": 0.1352382965435097
             }
           ],
           "control_steps": 1200,
           "determinism_max_abs_delta": 0.0,
           "duration_s": 60.0,
           "metrics": {
-            "final_abs_longitudinal_velocity_mps": 7.9696392478771525,
-            "final_longitudinal_velocity_mps": 7.9696392478771525,
+            "final_abs_longitudinal_velocity_mps": 7.975330634517427,
+            "final_longitudinal_velocity_mps": 7.975330634517427,
             "finite": true,
             "max_unexpected_contact_count": 0,
             "max_warning_count": 0,
-            "maximum_abs_roll_pitch_rad": 0.001267072298952178,
-            "maximum_contact_gap_s": 0.04,
-            "maximum_penetration_m": 0.002213794473690245,
-            "maximum_speed_mps": 7.977244425097064,
-            "mean_stress_speed_mps": 7.93425083791931,
-            "minimum_steady_mean_wheel_load_ratio": 0.996311036927147,
-            "minimum_steady_wheel_contact_coverage": 0.7522438611346287,
-            "penetration_p99_m": 0.002213790444259456,
-            "steady_chassis_z_peak_to_peak_m": 0.001607838000870665,
-            "steady_mean_total_normal_force_relative_error": 8.382287108871417e-06,
-            "steady_penetration_p99_m": 0.002213790444259489,
-            "steady_vertical_speed_p99_mps": 0.10325103960832874,
-            "stress_path_length_m": 448.7016014516594,
-            "stress_steering_rms_rad": 0.13669470686551996
+            "maximum_abs_roll_pitch_rad": 0.001348315813454845,
+            "maximum_contact_gap_s": 0.05,
+            "maximum_penetration_m": 0.0025545895013646125,
+            "maximum_speed_mps": 7.980306833203962,
+            "mean_stress_speed_mps": 7.935080863934394,
+            "minimum_steady_mean_wheel_load_ratio": 0.9881295684880415,
+            "minimum_steady_wheel_contact_coverage": 0.7424216765452948,
+            "penetration_p99_m": 0.001942782546696109,
+            "steady_chassis_z_peak_to_peak_m": 0.0017426803282473147,
+            "steady_mean_total_normal_force_relative_error": 2.323592543315367e-05,
+            "steady_penetration_p99_m": 0.0019427825466961867,
+            "steady_vertical_speed_p99_mps": 0.10613364439924654,
+            "stress_path_length_m": 448.8838301782765,
+            "stress_steering_rms_rad": 0.1352382965435097
           },
           "telemetry_sha256": [
-            "a9927909b9b1a75e843a7c1d8adf6eade26b09d4e7f5d770cd8f8b1f2d158c34",
-            "a9927909b9b1a75e843a7c1d8adf6eade26b09d4e7f5d770cd8f8b1f2d158c34",
-            "a9927909b9b1a75e843a7c1d8adf6eade26b09d4e7f5d770cd8f8b1f2d158c34"
+            "0b99da544fb4c94c9f05ed87cad4dd3c1281ca84984392c005b4b7be7d886f3e",
+            "0b99da544fb4c94c9f05ed87cad4dd3c1281ca84984392c005b4b7be7d886f3e",
+            "0b99da544fb4c94c9f05ed87cad4dd3c1281ca84984392c005b4b7be7d886f3e"
           ]
         },
         "drop_settle": {
@@ -1005,7 +1005,7 @@
               "metric": "steady_chassis_z_peak_to_peak_m",
               "operator": "<=",
               "passed": true,
-              "value": 1.8884893648873913e-13
+              "value": 1.439959262938828e-13
             },
             {
               "id": "drop_settle.steady_vertical_speed_p99_mps",
@@ -1013,7 +1013,7 @@
               "metric": "steady_vertical_speed_p99_mps",
               "operator": "<=",
               "passed": true,
-              "value": 7.066054365032489e-12
+              "value": 5.388875440339855e-12
             },
             {
               "id": "drop_settle.minimum_steady_mean_wheel_load_ratio",
@@ -1037,7 +1037,7 @@
               "metric": "final_abs_roll_pitch_rad",
               "operator": "<=",
               "passed": true,
-              "value": 4.355506534811836e-17
+              "value": 4.3862647838643254e-17
             },
             {
               "id": "drop_settle.steady_chassis_z_peak_to_peak_m",
@@ -1045,35 +1045,35 @@
               "metric": "steady_chassis_z_peak_to_peak_m",
               "operator": "<=",
               "passed": true,
-              "value": 1.8884893648873913e-13
+              "value": 1.439959262938828e-13
             }
           ],
           "control_steps": 100,
           "determinism_max_abs_delta": 0.0,
           "duration_s": 5.0,
           "metrics": {
-            "final_abs_longitudinal_velocity_mps": 2.4537800221990668e-18,
-            "final_abs_roll_pitch_rad": 4.355506534811836e-17,
-            "final_longitudinal_velocity_mps": -2.4537800221990668e-18,
+            "final_abs_longitudinal_velocity_mps": 2.426270828687025e-18,
+            "final_abs_roll_pitch_rad": 4.3862647838643254e-17,
+            "final_longitudinal_velocity_mps": -2.426270828687025e-18,
             "finite": true,
             "max_unexpected_contact_count": 0,
             "max_warning_count": 0,
             "maximum_abs_roll_pitch_rad": 0.017453292519943295,
             "maximum_contact_gap_s": 0.0,
             "maximum_penetration_m": 0.007942790151633572,
-            "maximum_speed_mps": 0.06302421151035012,
+            "maximum_speed_mps": 0.10556128742328821,
             "minimum_steady_mean_wheel_load_ratio": 0.999999999999159,
             "minimum_steady_wheel_contact_coverage": 1.0,
             "penetration_p99_m": 0.007753337436808061,
-            "steady_chassis_z_peak_to_peak_m": 1.8884893648873913e-13,
+            "steady_chassis_z_peak_to_peak_m": 1.439959262938828e-13,
             "steady_mean_total_normal_force_relative_error": 4.37286783217361e-13,
             "steady_penetration_p99_m": 0.0003162240163939511,
-            "steady_vertical_speed_p99_mps": 7.066054365032489e-12
+            "steady_vertical_speed_p99_mps": 5.388875440339855e-12
           },
           "telemetry_sha256": [
-            "c9e73062fb216e4d89ea9368d33ccee2add801521b5ec0beba112f0e4cecf8f9",
-            "c9e73062fb216e4d89ea9368d33ccee2add801521b5ec0beba112f0e4cecf8f9",
-            "c9e73062fb216e4d89ea9368d33ccee2add801521b5ec0beba112f0e4cecf8f9"
+            "a19d269789954a3ae8d3d97653e3454dea5d7662ede2dbda6be2603b101d0dc4",
+            "a19d269789954a3ae8d3d97653e3454dea5d7662ede2dbda6be2603b101d0dc4",
+            "a19d269789954a3ae8d3d97653e3454dea5d7662ede2dbda6be2603b101d0dc4"
           ]
         },
         "rest": {
@@ -1148,7 +1148,7 @@
               "metric": "steady_chassis_z_peak_to_peak_m",
               "operator": "<=",
               "passed": true,
-              "value": 4.107825191113079e-15
+              "value": 3.1086244689504383e-15
             },
             {
               "id": "rest.steady_vertical_speed_p99_mps",
@@ -1156,7 +1156,7 @@
               "metric": "steady_vertical_speed_p99_mps",
               "operator": "<=",
               "passed": true,
-              "value": 4.130764198754492e-14
+              "value": 3.207695969454836e-14
             },
             {
               "id": "rest.minimum_steady_mean_wheel_load_ratio",
@@ -1180,7 +1180,7 @@
               "metric": "steady_xy_drift_m",
               "operator": "<=",
               "passed": true,
-              "value": 4.533363265523235e-15
+              "value": 4.53970205246873e-15
             },
             {
               "id": "rest.steady_yaw_drift_rad",
@@ -1188,7 +1188,7 @@
               "metric": "steady_yaw_drift_rad",
               "operator": "<=",
               "passed": true,
-              "value": 1.6286360174400396e-30
+              "value": 1.6286360174386047e-30
             },
             {
               "id": "rest.steady_speed_p99_mps",
@@ -1196,7 +1196,7 @@
               "metric": "steady_speed_p99_mps",
               "operator": "<=",
               "passed": true,
-              "value": 4.501883170506829e-16
+              "value": 4.512125989635356e-16
             },
             {
               "id": "rest.steady_yaw_rate_p99_rad_s",
@@ -1204,7 +1204,7 @@
               "metric": "steady_yaw_rate_p99_rad_s",
               "operator": "<=",
               "passed": true,
-              "value": 2.027073311949809e-29
+              "value": 1.229388021103821e-29
             },
             {
               "id": "rest.steady_chassis_z_peak_to_peak_m",
@@ -1212,7 +1212,7 @@
               "metric": "steady_chassis_z_peak_to_peak_m",
               "operator": "<=",
               "passed": true,
-              "value": 4.107825191113079e-15
+              "value": 3.1086244689504383e-15
             },
             {
               "id": "rest.steady_roll_pitch_p99_rad",
@@ -1220,7 +1220,7 @@
               "metric": "steady_roll_pitch_p99_rad",
               "operator": "<=",
               "passed": true,
-              "value": 5.85637776939703e-17
+              "value": 6.162800261478241e-17
             },
             {
               "id": "rest.steady_normal_force_relative_error",
@@ -1235,33 +1235,33 @@
           "determinism_max_abs_delta": 0.0,
           "duration_s": 10.0,
           "metrics": {
-            "final_abs_longitudinal_velocity_mps": 1.6442959870301566e-16,
-            "final_longitudinal_velocity_mps": 1.6442959870301566e-16,
+            "final_abs_longitudinal_velocity_mps": 1.6309189555798903e-16,
+            "final_longitudinal_velocity_mps": 1.6309189555798903e-16,
             "finite": true,
             "max_unexpected_contact_count": 0,
             "max_warning_count": 0,
             "maximum_abs_roll_pitch_rad": 1.3549019017437653e-12,
             "maximum_contact_gap_s": 0.0,
             "maximum_penetration_m": 0.0011925139012330943,
-            "maximum_speed_mps": 3.8600767422056213e-11,
+            "maximum_speed_mps": 1.5934908627131928e-11,
             "minimum_steady_mean_wheel_load_ratio": 0.9999999999999948,
             "minimum_steady_wheel_contact_coverage": 1.0,
             "penetration_p99_m": 0.00045403984866110303,
-            "steady_chassis_z_peak_to_peak_m": 4.107825191113079e-15,
+            "steady_chassis_z_peak_to_peak_m": 3.1086244689504383e-15,
             "steady_mean_total_normal_force_relative_error": 3.862957448916617e-15,
             "steady_normal_force_relative_error": 3.862957448916617e-15,
             "steady_penetration_p99_m": 0.00031622401586858253,
-            "steady_roll_pitch_p99_rad": 5.85637776939703e-17,
-            "steady_speed_p99_mps": 4.501883170506829e-16,
-            "steady_vertical_speed_p99_mps": 4.130764198754492e-14,
-            "steady_xy_drift_m": 4.533363265523235e-15,
-            "steady_yaw_drift_rad": 1.6286360174400396e-30,
-            "steady_yaw_rate_p99_rad_s": 2.027073311949809e-29
+            "steady_roll_pitch_p99_rad": 6.162800261478241e-17,
+            "steady_speed_p99_mps": 4.512125989635356e-16,
+            "steady_vertical_speed_p99_mps": 3.207695969454836e-14,
+            "steady_xy_drift_m": 4.53970205246873e-15,
+            "steady_yaw_drift_rad": 1.6286360174386047e-30,
+            "steady_yaw_rate_p99_rad_s": 1.229388021103821e-29
           },
           "telemetry_sha256": [
-            "901aee01fde75ee1eff905368c7acc6c4f3c9023a223ae84c29cd313e3124453",
-            "901aee01fde75ee1eff905368c7acc6c4f3c9023a223ae84c29cd313e3124453",
-            "901aee01fde75ee1eff905368c7acc6c4f3c9023a223ae84c29cd313e3124453"
+            "8c217f2c51f571f97074ecdf16abc53e9f9e416ec32fe643f9bba71b965e113a",
+            "8c217f2c51f571f97074ecdf16abc53e9f9e416ec32fe643f9bba71b965e113a",
+            "8c217f2c51f571f97074ecdf16abc53e9f9e416ec32fe643f9bba71b965e113a"
           ]
         },
         "steer_left": {
@@ -1336,7 +1336,7 @@
               "metric": "steady_chassis_z_peak_to_peak_m",
               "operator": "<=",
               "passed": true,
-              "value": 0.0013005145701167065
+              "value": 0.001127717905595238
             },
             {
               "id": "steer_left.steady_vertical_speed_p99_mps",
@@ -1344,7 +1344,7 @@
               "metric": "steady_vertical_speed_p99_mps",
               "operator": "<=",
               "passed": true,
-              "value": 0.09170802017315897
+              "value": 0.091708020173159
             },
             {
               "id": "steer_left.minimum_steady_mean_wheel_load_ratio",
@@ -1368,7 +1368,7 @@
               "metric": "final_lateral_displacement_m",
               "operator": ">=",
               "passed": true,
-              "value": 4.275529351649261
+              "value": 4.298022542431462
             },
             {
               "id": "steer_left.final_yaw_rad",
@@ -1376,7 +1376,7 @@
               "metric": "final_yaw_rad",
               "operator": ">=",
               "passed": true,
-              "value": 0.5964378200282294
+              "value": 0.5964285183252639
             },
             {
               "id": "steer_left.mean_commanded_steering_angle_rad",
@@ -1399,10 +1399,10 @@
           "determinism_max_abs_delta": 0.0,
           "duration_s": 7.0,
           "metrics": {
-            "final_abs_longitudinal_velocity_mps": 4.004688468868726,
-            "final_lateral_displacement_m": 4.275529351649261,
-            "final_longitudinal_velocity_mps": 4.004688468868726,
-            "final_yaw_rad": 0.5964378200282294,
+            "final_abs_longitudinal_velocity_mps": 4.004466033516361,
+            "final_lateral_displacement_m": 4.298022542431462,
+            "final_longitudinal_velocity_mps": 4.004466033516361,
+            "final_yaw_rad": 0.5964285183252639,
             "finite": true,
             "max_unexpected_contact_count": 0,
             "max_warning_count": 0,
@@ -1410,20 +1410,20 @@
             "maximum_commanded_steering_error_rad": 0.0047263477848704105,
             "maximum_contact_gap_s": 0.03,
             "maximum_penetration_m": 0.0015853833338738688,
-            "maximum_speed_mps": 4.293779875707932,
+            "maximum_speed_mps": 4.296474029860516,
             "mean_commanded_steering_angle_rad": 0.1963033527734481,
             "minimum_steady_mean_wheel_load_ratio": 0.9296219234656301,
             "minimum_steady_wheel_contact_coverage": 0.8842975206611559,
             "penetration_p99_m": 0.001221223339481958,
-            "steady_chassis_z_peak_to_peak_m": 0.0013005145701167065,
+            "steady_chassis_z_peak_to_peak_m": 0.001127717905595238,
             "steady_mean_total_normal_force_relative_error": 2.31313892041127e-13,
             "steady_penetration_p99_m": 0.0012228821362617157,
-            "steady_vertical_speed_p99_mps": 0.09170802017315897
+            "steady_vertical_speed_p99_mps": 0.091708020173159
           },
           "telemetry_sha256": [
-            "0c15a8897d96f614ccc8c13ae7bacdec43491e832a01f8afcba7cab7c390c5e0",
-            "0c15a8897d96f614ccc8c13ae7bacdec43491e832a01f8afcba7cab7c390c5e0",
-            "0c15a8897d96f614ccc8c13ae7bacdec43491e832a01f8afcba7cab7c390c5e0"
+            "97d2b799359e0abc008bb47cbad867b7df96f19f14b4fe4aa63ff7dfb085d531",
+            "97d2b799359e0abc008bb47cbad867b7df96f19f14b4fe4aa63ff7dfb085d531",
+            "97d2b799359e0abc008bb47cbad867b7df96f19f14b4fe4aa63ff7dfb085d531"
           ]
         },
         "steer_right": {
@@ -1498,7 +1498,7 @@
               "metric": "steady_chassis_z_peak_to_peak_m",
               "operator": "<=",
               "passed": true,
-              "value": 0.001300514570116651
+              "value": 0.001127717905595349
             },
             {
               "id": "steer_right.steady_vertical_speed_p99_mps",
@@ -1506,7 +1506,7 @@
               "metric": "steady_vertical_speed_p99_mps",
               "operator": "<=",
               "passed": true,
-              "value": 0.09170802017316049
+              "value": 0.0917080201731606
             },
             {
               "id": "steer_right.minimum_steady_mean_wheel_load_ratio",
@@ -1530,7 +1530,7 @@
               "metric": "final_lateral_displacement_m",
               "operator": "<=",
               "passed": true,
-              "value": -4.2755293516514765
+              "value": -4.298022542433678
             },
             {
               "id": "steer_right.final_yaw_rad",
@@ -1538,7 +1538,7 @@
               "metric": "final_yaw_rad",
               "operator": "<=",
               "passed": true,
-              "value": -0.5964378200282298
+              "value": -0.5964285183252641
             },
             {
               "id": "steer_right.mean_commanded_steering_angle_rad",
@@ -1561,10 +1561,10 @@
           "determinism_max_abs_delta": 0.0,
           "duration_s": 7.0,
           "metrics": {
-            "final_abs_longitudinal_velocity_mps": 4.004688468868727,
-            "final_lateral_displacement_m": -4.2755293516514765,
-            "final_longitudinal_velocity_mps": 4.004688468868727,
-            "final_yaw_rad": -0.5964378200282298,
+            "final_abs_longitudinal_velocity_mps": 4.004466033516362,
+            "final_lateral_displacement_m": -4.298022542433678,
+            "final_longitudinal_velocity_mps": 4.004466033516362,
+            "final_yaw_rad": -0.5964285183252641,
             "finite": true,
             "max_unexpected_contact_count": 0,
             "max_warning_count": 0,
@@ -1572,20 +1572,20 @@
             "maximum_commanded_steering_error_rad": 0.004726347784870438,
             "maximum_contact_gap_s": 0.03,
             "maximum_penetration_m": 0.0015853833338738132,
-            "maximum_speed_mps": 4.293779875707932,
+            "maximum_speed_mps": 4.296474029860516,
             "mean_commanded_steering_angle_rad": -0.19630335277344807,
             "minimum_steady_mean_wheel_load_ratio": 0.9296219234656348,
             "minimum_steady_wheel_contact_coverage": 0.8842975206611559,
             "penetration_p99_m": 0.001221223339481958,
-            "steady_chassis_z_peak_to_peak_m": 0.001300514570116651,
+            "steady_chassis_z_peak_to_peak_m": 0.001127717905595349,
             "steady_mean_total_normal_force_relative_error": 2.3115937374317034e-13,
             "steady_penetration_p99_m": 0.0012228821362617157,
-            "steady_vertical_speed_p99_mps": 0.09170802017316049
+            "steady_vertical_speed_p99_mps": 0.0917080201731606
           },
           "telemetry_sha256": [
-            "07487e39b61733ac43bbed113b9827599dd264a733cbd48dfa83356a0d5beaa0",
-            "07487e39b61733ac43bbed113b9827599dd264a733cbd48dfa83356a0d5beaa0",
-            "07487e39b61733ac43bbed113b9827599dd264a733cbd48dfa83356a0d5beaa0"
+            "c44f1c125589494dbe0554199f6e2accf6f326746802331697d06363548d6355",
+            "c44f1c125589494dbe0554199f6e2accf6f326746802331697d06363548d6355",
+            "c44f1c125589494dbe0554199f6e2accf6f326746802331697d06363548d6355"
           ]
         },
         "straight": {
@@ -1660,7 +1660,7 @@
               "metric": "steady_chassis_z_peak_to_peak_m",
               "operator": "<=",
               "passed": true,
-              "value": 2.002472733408922e-05
+              "value": 2.002524632904734e-05
             },
             {
               "id": "straight.steady_vertical_speed_p99_mps",
@@ -1668,7 +1668,7 @@
               "metric": "steady_vertical_speed_p99_mps",
               "operator": "<=",
               "passed": true,
-              "value": 0.0002642714554348358
+              "value": 0.00026427145543483585
             },
             {
               "id": "straight.minimum_steady_mean_wheel_load_ratio",
@@ -1692,7 +1692,7 @@
               "metric": "forward_displacement_m",
               "operator": ">=",
               "passed": true,
-              "value": 19.982355475775037
+              "value": 20.03900922777044
             },
             {
               "id": "straight.speed_at_acceleration_end_mps",
@@ -1700,7 +1700,7 @@
               "metric": "speed_at_acceleration_end_mps",
               "operator": ">=",
               "passed": true,
-              "value": 5.7096931460109985
+              "value": 5.728630560283986
             },
             {
               "id": "straight.speed_at_acceleration_end_mps",
@@ -1708,7 +1708,7 @@
               "metric": "speed_at_acceleration_end_mps",
               "operator": "<=",
               "passed": true,
-              "value": 5.7096931460109985
+              "value": 5.728630560283986
             },
             {
               "id": "straight.maximum_abs_lateral_displacement_m",
@@ -1716,7 +1716,7 @@
               "metric": "maximum_abs_lateral_displacement_m",
               "operator": "<=",
               "passed": true,
-              "value": 1.1103941560178846e-12
+              "value": 1.110429582491909e-12
             },
             {
               "id": "straight.maximum_abs_yaw_rad",
@@ -1724,38 +1724,38 @@
               "metric": "maximum_abs_yaw_rad",
               "operator": "<=",
               "passed": true,
-              "value": 5.991018394961253e-16
+              "value": 6.112374240701967e-16
             }
           ],
           "control_steps": 120,
           "determinism_max_abs_delta": 0.0,
           "duration_s": 6.0,
           "metrics": {
-            "final_abs_longitudinal_velocity_mps": 5.665689908970476,
-            "final_longitudinal_velocity_mps": 5.665689908970476,
+            "final_abs_longitudinal_velocity_mps": 5.665375199539905,
+            "final_longitudinal_velocity_mps": 5.665375199539905,
             "finite": true,
-            "forward_displacement_m": 19.982355475775037,
+            "forward_displacement_m": 20.03900922777044,
             "max_unexpected_contact_count": 0,
             "max_warning_count": 0,
-            "maximum_abs_lateral_displacement_m": 1.1103941560178846e-12,
+            "maximum_abs_lateral_displacement_m": 1.110429582491909e-12,
             "maximum_abs_roll_pitch_rad": 1.4930934824666603e-05,
-            "maximum_abs_yaw_rad": 5.991018394961253e-16,
+            "maximum_abs_yaw_rad": 6.112374240701967e-16,
             "maximum_contact_gap_s": 0.0,
             "maximum_penetration_m": 0.0011925139012330943,
-            "maximum_speed_mps": 5.727357259642542,
+            "maximum_speed_mps": 5.728630560283986,
             "minimum_steady_mean_wheel_load_ratio": 0.9528563887204947,
             "minimum_steady_wheel_contact_coverage": 1.0,
             "penetration_p99_m": 0.0007898005479763037,
-            "speed_at_acceleration_end_mps": 5.7096931460109985,
-            "steady_chassis_z_peak_to_peak_m": 2.002472733408922e-05,
+            "speed_at_acceleration_end_mps": 5.728630560283986,
+            "steady_chassis_z_peak_to_peak_m": 2.002524632904734e-05,
             "steady_mean_total_normal_force_relative_error": 3.569372682798954e-14,
             "steady_penetration_p99_m": 0.0003359156407483632,
-            "steady_vertical_speed_p99_mps": 0.0002642714554348358
+            "steady_vertical_speed_p99_mps": 0.00026427145543483585
           },
           "telemetry_sha256": [
-            "91a6f0971e41b322ac62e75e642357dc18a41522d0d69de6cd4fb0583579bbb8",
-            "91a6f0971e41b322ac62e75e642357dc18a41522d0d69de6cd4fb0583579bbb8",
-            "91a6f0971e41b322ac62e75e642357dc18a41522d0d69de6cd4fb0583579bbb8"
+            "3067e48785527a47a40428744da1ff68ad23883c7565b9ce76f9612cc3373d57",
+            "3067e48785527a47a40428744da1ff68ad23883c7565b9ce76f9612cc3373d57",
+            "3067e48785527a47a40428744da1ff68ad23883c7565b9ce76f9612cc3373d57"
           ]
         }
       },
@@ -1766,14 +1766,14 @@
           "limit": 0.1,
           "operator": "<=",
           "passed": true,
-          "value": 5.180918657186848e-13
+          "value": 5.155871415921051e-13
         },
         {
           "id": "steering.yaw_symmetry_relative_error",
           "limit": 0.1,
           "operator": "<=",
           "passed": true,
-          "value": 5.584268740231508e-16
+          "value": 3.722903887099822e-16
         }
       ]
     },
@@ -1814,196 +1814,196 @@
           "limit": 0.05,
           "operator": "<=",
           "passed": true,
-          "value": 0.006125446150852881
+          "value": 0.00599026836429599
         },
         {
           "id": "convergence.straight.position_max_m",
           "limit": 0.15,
           "operator": "<=",
           "passed": true,
-          "value": 0.008662932269489332
+          "value": 0.0085230995360277
         },
         {
           "id": "convergence.straight.velocity_rmse_mps",
           "limit": 0.1,
           "operator": "<=",
           "passed": true,
-          "value": 0.004050305645321918
+          "value": 3.2962450696578474e-05
         },
         {
           "id": "convergence.straight.velocity_max_mps",
           "limit": 0.3,
           "operator": "<=",
           "passed": true,
-          "value": 0.005774889500978875
+          "value": 4.7291860169274e-05
         },
         {
           "id": "convergence.straight.yaw_final_rad",
           "limit": 0.01,
           "operator": "<=",
           "passed": true,
-          "value": 5.102262797257522e-17
+          "value": 5.267954530454711e-17
         },
         {
           "id": "convergence.steer_left.position_rmse_m",
           "limit": 0.1,
           "operator": "<=",
           "passed": true,
-          "value": 0.012113399451387707
+          "value": 0.010059605361593232
         },
         {
           "id": "convergence.steer_left.position_final_m",
           "limit": 0.25,
           "operator": "<=",
           "passed": true,
-          "value": 0.025246855056702995
+          "value": 0.01796537640797116
         },
         {
           "id": "convergence.steer_left.yaw_rmse_rad",
           "limit": 0.02,
           "operator": "<=",
           "passed": true,
-          "value": 0.0011437793095215494
+          "value": 0.0015112134731339775
         },
         {
           "id": "convergence.steer_left.yaw_final_rad",
           "limit": 0.05,
           "operator": "<=",
           "passed": true,
-          "value": 0.0034235914194192807
+          "value": 0.0034095708549252146
         },
         {
           "id": "convergence.steer_left.velocity_rmse_mps",
           "limit": 0.2,
           "operator": "<=",
           "passed": true,
-          "value": 0.005785010100785536
+          "value": 0.005098569040632809
         },
         {
           "id": "convergence.steer_left.yaw_rate_rmse_rad_s",
           "limit": 0.05,
           "operator": "<=",
           "passed": true,
-          "value": 0.003602072080929267
+          "value": 0.004321464552466569
         },
         {
           "id": "convergence.steer_right.position_rmse_m",
           "limit": 0.1,
           "operator": "<=",
           "passed": true,
-          "value": 0.012113399451808247
+          "value": 0.01005960536244776
         },
         {
           "id": "convergence.steer_right.position_final_m",
           "limit": 0.25,
           "operator": "<=",
           "passed": true,
-          "value": 0.025246855056906405
+          "value": 0.01796537640897747
         },
         {
           "id": "convergence.steer_right.yaw_rmse_rad",
           "limit": 0.02,
           "operator": "<=",
           "passed": true,
-          "value": 0.0011437793095215724
+          "value": 0.0015112134731339701
         },
         {
           "id": "convergence.steer_right.yaw_final_rad",
           "limit": 0.05,
           "operator": "<=",
           "passed": true,
-          "value": 0.0034235914194197248
+          "value": 0.0034095708549255477
         },
         {
           "id": "convergence.steer_right.velocity_rmse_mps",
           "limit": 0.2,
           "operator": "<=",
           "passed": true,
-          "value": 0.0057850101007863065
+          "value": 0.005098569040633726
         },
         {
           "id": "convergence.steer_right.yaw_rate_rmse_rad_s",
           "limit": 0.05,
           "operator": "<=",
           "passed": true,
-          "value": 0.0036020720809294103
+          "value": 0.004321464552466666
         },
         {
           "id": "convergence.brake.position_rmse_m",
           "limit": 0.05,
           "operator": "<=",
           "passed": true,
-          "value": 0.007847420190791073
+          "value": 0.006216849225519685
         },
         {
           "id": "convergence.brake.position_max_m",
           "limit": 0.15,
           "operator": "<=",
           "passed": true,
-          "value": 0.024521063718186298
+          "value": 0.01224016496639635
         },
         {
           "id": "convergence.brake.velocity_rmse_mps",
           "limit": 0.1,
           "operator": "<=",
           "passed": true,
-          "value": 0.010833597060892724
+          "value": 0.004258199112529974
         },
         {
           "id": "convergence.brake.velocity_max_mps",
           "limit": 0.3,
           "operator": "<=",
           "passed": true,
-          "value": 0.023089148598394296
+          "value": 0.01155692063749307
         },
         {
           "id": "convergence.contact_stress.wheel_contact_coverage_difference",
           "limit": 0.05,
           "operator": "<=",
           "passed": true,
-          "value": 0.007688399661302414
+          "value": 0.016850127011005078
         },
         {
           "id": "convergence.contact_stress.maximum_contact_gap_difference_s",
           "limit": 0.02,
           "operator": "<=",
           "passed": true,
-          "value": 0.012999999999999998
+          "value": 0.008
         },
         {
           "id": "convergence.contact_stress.steady_penetration_p99_difference_m",
           "limit": 0.001,
           "operator": "<=",
           "passed": true,
-          "value": 0.00039131738189915945
+          "value": 0.00041032373560427897
         },
         {
           "id": "convergence.contact_stress.vertical_speed_p99_difference_mps",
           "limit": 0.05,
           "operator": "<=",
           "passed": true,
-          "value": 0.03244700983305029
+          "value": 0.02882484828104312
         },
         {
           "id": "convergence.contact_stress.mean_speed_difference_mps",
           "limit": 0.1,
           "operator": "<=",
           "passed": true,
-          "value": 0.00042729398041529976
+          "value": 0.00035734529368358636
         },
         {
           "id": "convergence.contact_stress.path_length_difference_m",
           "limit": 1.0,
           "operator": "<=",
           "passed": true,
-          "value": 0.0772476941530158
+          "value": 0.05245526271465906
         },
         {
           "id": "convergence.contact_stress.steering_rms_difference_rad",
           "limit": 0.01,
           "operator": "<=",
           "passed": true,
-          "value": 0.0011733591188682058
+          "value": 0.0011635686440955861
         }
       ],
       "convergence_failures": [],
@@ -2011,90 +2011,90 @@
       "convergence_to_reference": {
         "brake": {
           "penetration_p99_difference_m": 9.225250691569201e-05,
-          "position_final_m": 0.024521063718186298,
-          "position_max_m": 0.024521063718186298,
-          "position_rmse_m": 0.007847420190791073,
-          "steady_z_difference_m": 1.3404982679432464e-09,
-          "velocity_max_mps": 0.023089148598394296,
-          "velocity_rmse_mps": 0.010833597060892724,
-          "yaw_final_rad": 1.038565000781709e-16,
-          "yaw_rate_rmse_rad_s": 2.516230078848233e-16,
-          "yaw_rmse_rad": 8.107284668073516e-17
+          "position_final_m": 0.01224016496639635,
+          "position_max_m": 0.01224016496639635,
+          "position_rmse_m": 0.006216849225519685,
+          "steady_z_difference_m": 6.712216893411949e-10,
+          "velocity_max_mps": 0.01155692063749307,
+          "velocity_rmse_mps": 0.004258199112529974,
+          "yaw_final_rad": 1.0288427107697518e-16,
+          "yaw_rate_rmse_rad_s": 2.466871058311175e-16,
+          "yaw_rmse_rad": 8.099251872107144e-17
         },
         "contact_stress": {
-          "maximum_contact_gap_difference_s": 0.012999999999999998,
-          "mean_speed_difference_mps": 0.00042729398041529976,
-          "path_length_difference_m": 0.0772476941530158,
-          "steady_penetration_p99_difference_m": 0.00039131738189915945,
-          "steering_rms_difference_rad": 0.0011733591188682058,
-          "vertical_speed_p99_difference_mps": 0.03244700983305029,
-          "wheel_contact_coverage_difference": 0.007688399661302414
+          "maximum_contact_gap_difference_s": 0.008,
+          "mean_speed_difference_mps": 0.00035734529368358636,
+          "path_length_difference_m": 0.05245526271465906,
+          "steady_penetration_p99_difference_m": 0.00041032373560427897,
+          "steering_rms_difference_rad": 0.0011635686440955861,
+          "vertical_speed_p99_difference_mps": 0.02882484828104312,
+          "wheel_contact_coverage_difference": 0.016850127011005078
         },
         "drop_settle": {
           "penetration_p99_difference_m": 0.0004820215848470033,
           "position_final_m": 5.207494449639347e-06,
-          "position_max_m": 0.00011754421990302008,
-          "position_rmse_m": 1.763179207128301e-05,
+          "position_max_m": 0.00021037186409127856,
+          "position_rmse_m": 2.7796059726984127e-05,
           "steady_z_difference_m": 1.1102230246251565e-15,
-          "velocity_max_mps": 0.009062418318809676,
-          "velocity_rmse_mps": 0.001065282075410221,
+          "velocity_max_mps": 0.009638476782445459,
+          "velocity_rmse_mps": 0.0010747909993120326,
           "yaw_final_rad": 4.762440841028347e-20,
-          "yaw_rate_rmse_rad_s": 1.4609946076072987e-18,
-          "yaw_rmse_rad": 5.100146954493767e-20
+          "yaw_rate_rmse_rad_s": 1.6793907438416832e-18,
+          "yaw_rmse_rad": 4.858625831952071e-20
         },
         "rest": {
           "penetration_p99_difference_m": 4.453745677712728e-05,
-          "position_final_m": 2.9348157036059414e-12,
-          "position_max_m": 2.9348157036059414e-12,
-          "position_rmse_m": 2.2305923593825924e-12,
+          "position_final_m": 2.935656119115828e-12,
+          "position_max_m": 2.935656119115828e-12,
+          "position_rmse_m": 2.2316456358601475e-12,
           "steady_z_difference_m": 1.1102230246251565e-16,
-          "velocity_max_mps": 3.875813391833039e-11,
-          "velocity_rmse_mps": 2.7615637928749594e-12,
-          "yaw_final_rad": 2.057156737636091e-23,
-          "yaw_rate_rmse_rad_s": 4.525815227316182e-23,
-          "yaw_rmse_rad": 2.0563700286361855e-23
+          "velocity_max_mps": 2.6167365224310065e-11,
+          "velocity_rmse_mps": 1.878989428759036e-12,
+          "yaw_final_rad": 2.0571567347250725e-23,
+          "yaw_rate_rmse_rad_s": 2.8485895305297276e-23,
+          "yaw_rmse_rad": 2.0571681262461186e-23
         },
         "steer_left": {
           "penetration_p99_difference_m": 8.9896340887674e-05,
-          "position_final_m": 0.025246855056702995,
-          "position_max_m": 0.026073367509797354,
-          "position_rmse_m": 0.012113399451387707,
-          "steady_z_difference_m": 3.5036499812513e-09,
-          "velocity_max_mps": 0.015852205195688182,
-          "velocity_rmse_mps": 0.005785010100785536,
-          "yaw_final_rad": 0.0034235914194192807,
-          "yaw_rate_rmse_rad_s": 0.003602072080929267,
-          "yaw_rmse_rad": 0.0011437793095215494
+          "position_final_m": 0.01796537640797116,
+          "position_max_m": 0.021817844488627124,
+          "position_rmse_m": 0.010059605361593232,
+          "steady_z_difference_m": 3.488736743939569e-09,
+          "velocity_max_mps": 0.01422758804775903,
+          "velocity_rmse_mps": 0.005098569040632809,
+          "yaw_final_rad": 0.0034095708549252146,
+          "yaw_rate_rmse_rad_s": 0.004321464552466569,
+          "yaw_rmse_rad": 0.0015112134731339775
         },
         "steer_right": {
           "penetration_p99_difference_m": 8.989634088770728e-05,
-          "position_final_m": 0.025246855056906405,
-          "position_max_m": 0.02607336751043549,
-          "position_rmse_m": 0.012113399451808247,
-          "steady_z_difference_m": 3.5036500367624512e-09,
-          "velocity_max_mps": 0.01585220519568795,
-          "velocity_rmse_mps": 0.0057850101007863065,
-          "yaw_final_rad": 0.0034235914194197248,
-          "yaw_rate_rmse_rad_s": 0.0036020720809294103,
-          "yaw_rmse_rad": 0.0011437793095215724
+          "position_final_m": 0.01796537640897747,
+          "position_max_m": 0.021817844490088747,
+          "position_rmse_m": 0.01005960536244776,
+          "steady_z_difference_m": 3.4887368549618714e-09,
+          "velocity_max_mps": 0.014227588047761695,
+          "velocity_rmse_mps": 0.005098569040633726,
+          "yaw_final_rad": 0.0034095708549255477,
+          "yaw_rate_rmse_rad_s": 0.004321464552466666,
+          "yaw_rmse_rad": 0.0015112134731339701
         },
         "straight": {
           "penetration_p99_difference_m": 0.00018018308966016812,
-          "position_final_m": 0.008661243175186684,
-          "position_max_m": 0.008662932269489332,
-          "position_rmse_m": 0.006125446150852881,
-          "steady_z_difference_m": 1.023044426951003e-10,
-          "velocity_max_mps": 0.005774889500978875,
-          "velocity_rmse_mps": 0.004050305645321918,
-          "yaw_final_rad": 5.102262797257522e-17,
-          "yaw_rate_rmse_rad_s": 2.8249502249271355e-16,
-          "yaw_rmse_rad": 6.121505288253669e-17
+          "position_final_m": 0.008335020741260024,
+          "position_max_m": 0.0085230995360277,
+          "position_rmse_m": 0.00599026836429599,
+          "steady_z_difference_m": 1.0781037174112384e-10,
+          "velocity_max_mps": 4.7291860169274e-05,
+          "velocity_rmse_mps": 3.2962450696578474e-05,
+          "yaw_final_rad": 5.267954530454711e-17,
+          "yaw_rate_rmse_rad_s": 2.783996763470183e-16,
+          "yaw_rmse_rad": 6.119496690256103e-17
         }
       },
       "cpu_timing": {
         "physics_steps": 63000,
-        "physics_steps_per_second": 11963.642270098404,
-        "wall_time_s": 5.265954847000103
+        "physics_steps_per_second": 8219.929543539447,
+        "wall_time_s": 7.664299269999901
       },
       "determinism": {
         "max_abs_state_delta": 0.0,
@@ -2161,7 +2161,7 @@
               "metric": "steady_penetration_p99_m",
               "operator": "<=",
               "passed": true,
-              "value": 0.0003251636242863598
+              "value": 0.00032111124724596205
             },
             {
               "id": "action_limits.maximum_abs_roll_pitch_rad",
@@ -2177,7 +2177,7 @@
               "metric": "steady_chassis_z_peak_to_peak_m",
               "operator": "<=",
               "passed": true,
-              "value": 3.939779613659766e-08
+              "value": 1.0118793469793275e-08
             },
             {
               "id": "action_limits.steady_vertical_speed_p99_mps",
@@ -2185,7 +2185,7 @@
               "metric": "steady_vertical_speed_p99_mps",
               "operator": "<=",
               "passed": true,
-              "value": 9.870505051344199e-07
+              "value": 2.3804887967166123e-07
             },
             {
               "id": "action_limits.minimum_steady_mean_wheel_load_ratio",
@@ -2193,7 +2193,7 @@
               "metric": "minimum_steady_mean_wheel_load_ratio",
               "operator": ">=",
               "passed": true,
-              "value": 0.9999137865138465
+              "value": 0.9999260590748122
             },
             {
               "id": "action_limits.steady_mean_total_normal_force_relative_error",
@@ -2201,7 +2201,7 @@
               "metric": "steady_mean_total_normal_force_relative_error",
               "operator": "<=",
               "passed": true,
-              "value": 2.3896125739067866e-05
+              "value": 1.2457855082373012e-05
             },
             {
               "id": "action_limits.maximum_applied_steering_rad",
@@ -2288,8 +2288,8 @@
           "determinism_max_abs_delta": 0.0,
           "duration_s": 2.0,
           "metrics": {
-            "final_abs_longitudinal_velocity_mps": 0.0899072255463842,
-            "final_longitudinal_velocity_mps": 0.0899072255463842,
+            "final_abs_longitudinal_velocity_mps": 0.06920250541866334,
+            "final_longitudinal_velocity_mps": 0.06920250541866334,
             "finite": true,
             "max_unexpected_contact_count": 0,
             "max_warning_count": 0,
@@ -2298,23 +2298,23 @@
             "maximum_applied_steering_rad": 0.6,
             "maximum_contact_gap_s": 0.0,
             "maximum_penetration_m": 0.0011221098968883236,
-            "maximum_speed_mps": 1.6561821465691866,
+            "maximum_speed_mps": 1.6636873633718992,
             "maximum_steering_target_step_rad": 0.06000000000000005,
             "minimum_applied_acceleration_mps2": -8.0,
             "minimum_applied_steering_rad": -0.6,
             "minimum_saturation_count": 2,
-            "minimum_steady_mean_wheel_load_ratio": 0.9999137865138465,
+            "minimum_steady_mean_wheel_load_ratio": 0.9999260590748122,
             "minimum_steady_wheel_contact_coverage": 1.0,
             "penetration_p99_m": 0.0011050201163198992,
-            "steady_chassis_z_peak_to_peak_m": 3.939779613659766e-08,
-            "steady_mean_total_normal_force_relative_error": 2.3896125739067866e-05,
-            "steady_penetration_p99_m": 0.0003251636242863598,
-            "steady_vertical_speed_p99_mps": 9.870505051344199e-07
+            "steady_chassis_z_peak_to_peak_m": 1.0118793469793275e-08,
+            "steady_mean_total_normal_force_relative_error": 1.2457855082373012e-05,
+            "steady_penetration_p99_m": 0.00032111124724596205,
+            "steady_vertical_speed_p99_mps": 2.3804887967166123e-07
           },
           "telemetry_sha256": [
-            "18d9159beec24501ce8dd0395d7612837cbba64f06493aac43645c36e093487e",
-            "18d9159beec24501ce8dd0395d7612837cbba64f06493aac43645c36e093487e",
-            "18d9159beec24501ce8dd0395d7612837cbba64f06493aac43645c36e093487e"
+            "a6da343b9395a6cded5b3364541459e0c7d207980adaa79af06b2c002254b4ed",
+            "a6da343b9395a6cded5b3364541459e0c7d207980adaa79af06b2c002254b4ed",
+            "a6da343b9395a6cded5b3364541459e0c7d207980adaa79af06b2c002254b4ed"
           ]
         },
         "brake": {
@@ -2389,7 +2389,7 @@
               "metric": "steady_chassis_z_peak_to_peak_m",
               "operator": "<=",
               "passed": true,
-              "value": 6.241409345147941e-05
+              "value": 6.241346295188244e-05
             },
             {
               "id": "brake.steady_vertical_speed_p99_mps",
@@ -2397,7 +2397,7 @@
               "metric": "steady_vertical_speed_p99_mps",
               "operator": "<=",
               "passed": true,
-              "value": 0.0007047891705860444
+              "value": 0.0006753680598717968
             },
             {
               "id": "brake.minimum_steady_mean_wheel_load_ratio",
@@ -2405,7 +2405,7 @@
               "metric": "minimum_steady_mean_wheel_load_ratio",
               "operator": ">=",
               "passed": true,
-              "value": 0.9996084019052144
+              "value": 0.9994942957957206
             },
             {
               "id": "brake.steady_mean_total_normal_force_relative_error",
@@ -2421,7 +2421,7 @@
               "metric": "speed_before_braking_mps",
               "operator": ">=",
               "passed": true,
-              "value": 7.607756800055715
+              "value": 7.617173052879237
             },
             {
               "id": "brake.final_abs_longitudinal_velocity_mps",
@@ -2429,7 +2429,7 @@
               "metric": "final_abs_longitudinal_velocity_mps",
               "operator": "<=",
               "passed": true,
-              "value": 0.0657077915766231
+              "value": 0.084849050130876
             },
             {
               "id": "brake.maximum_abs_post_braking_velocity_mps",
@@ -2437,7 +2437,7 @@
               "metric": "maximum_abs_post_braking_velocity_mps",
               "operator": "<=",
               "passed": true,
-              "value": 0.06614504313218553
+              "value": 0.08537896331169126
             },
             {
               "id": "brake.minimum_braking_velocity_mps",
@@ -2445,7 +2445,7 @@
               "metric": "minimum_braking_velocity_mps",
               "operator": ">=",
               "passed": true,
-              "value": 0.06614504313218553
+              "value": 0.08537896331169126
             },
             {
               "id": "brake.braking_nonincrease_fraction",
@@ -2461,30 +2461,30 @@
           "duration_s": 8.0,
           "metrics": {
             "braking_nonincrease_fraction": 1.0,
-            "final_abs_longitudinal_velocity_mps": 0.0657077915766231,
-            "final_longitudinal_velocity_mps": 0.0657077915766231,
+            "final_abs_longitudinal_velocity_mps": 0.084849050130876,
+            "final_longitudinal_velocity_mps": 0.084849050130876,
             "finite": true,
             "max_unexpected_contact_count": 0,
             "max_warning_count": 0,
-            "maximum_abs_post_braking_velocity_mps": 0.06614504313218553,
+            "maximum_abs_post_braking_velocity_mps": 0.08537896331169126,
             "maximum_abs_roll_pitch_rad": 3.02299268611449e-05,
             "maximum_contact_gap_s": 0.0,
             "maximum_penetration_m": 0.000618046842619624,
-            "maximum_speed_mps": 7.607756800055715,
-            "minimum_braking_velocity_mps": 0.06614504313218553,
-            "minimum_steady_mean_wheel_load_ratio": 0.9996084019052144,
+            "maximum_speed_mps": 7.617173052879237,
+            "minimum_braking_velocity_mps": 0.08537896331169126,
+            "minimum_steady_mean_wheel_load_ratio": 0.9994942957957206,
             "minimum_steady_wheel_contact_coverage": 1.0,
             "penetration_p99_m": 0.0004474379038446174,
-            "speed_before_braking_mps": 7.607756800055715,
-            "steady_chassis_z_peak_to_peak_m": 6.241409345147941e-05,
+            "speed_before_braking_mps": 7.617173052879237,
+            "steady_chassis_z_peak_to_peak_m": 6.241346295188244e-05,
             "steady_mean_total_normal_force_relative_error": 0.0,
             "steady_penetration_p99_m": 0.000355140588706615,
-            "steady_vertical_speed_p99_mps": 0.0007047891705860444
+            "steady_vertical_speed_p99_mps": 0.0006753680598717968
           },
           "telemetry_sha256": [
-            "60cb6c803e0224d3ddf71d5e7d382ad71c2782756fe55152c385b87f5d3fdefa",
-            "60cb6c803e0224d3ddf71d5e7d382ad71c2782756fe55152c385b87f5d3fdefa",
-            "60cb6c803e0224d3ddf71d5e7d382ad71c2782756fe55152c385b87f5d3fdefa"
+            "805a36d07bd45cea511094890c1039e8d4d5d9e8542263fe4e7df912d512ce86",
+            "805a36d07bd45cea511094890c1039e8d4d5d9e8542263fe4e7df912d512ce86",
+            "805a36d07bd45cea511094890c1039e8d4d5d9e8542263fe4e7df912d512ce86"
           ]
         },
         "contact_stress": {
@@ -2519,7 +2519,7 @@
               "metric": "minimum_steady_wheel_contact_coverage",
               "operator": ">=",
               "passed": true,
-              "value": 0.8015241320914476
+              "value": 0.794157493649448
             },
             {
               "id": "contact_stress.maximum_contact_gap_s",
@@ -2527,7 +2527,7 @@
               "metric": "maximum_contact_gap_s",
               "operator": "<=",
               "passed": true,
-              "value": 0.055
+              "value": 0.04
             },
             {
               "id": "contact_stress.maximum_penetration_m",
@@ -2535,7 +2535,7 @@
               "metric": "maximum_penetration_m",
               "operator": "<=",
               "passed": true,
-              "value": 0.0010467986315614852
+              "value": 0.0010660281723911536
             },
             {
               "id": "contact_stress.steady_penetration_p99_m",
@@ -2543,7 +2543,7 @@
               "metric": "steady_penetration_p99_m",
               "operator": "<=",
               "passed": true,
-              "value": 0.0007909624027480752
+              "value": 0.0007958040517230261
             },
             {
               "id": "contact_stress.maximum_abs_roll_pitch_rad",
@@ -2551,7 +2551,7 @@
               "metric": "maximum_abs_roll_pitch_rad",
               "operator": "<=",
               "passed": true,
-              "value": 0.0005230432916083589
+              "value": 0.0006531461817740826
             },
             {
               "id": "contact_stress.steady_chassis_z_peak_to_peak_m",
@@ -2559,7 +2559,7 @@
               "metric": "steady_chassis_z_peak_to_peak_m",
               "operator": "<=",
               "passed": true,
-              "value": 0.0007099286651395254
+              "value": 0.0010277070011624478
             },
             {
               "id": "contact_stress.steady_vertical_speed_p99_mps",
@@ -2567,7 +2567,7 @@
               "metric": "steady_vertical_speed_p99_mps",
               "operator": "<=",
               "passed": true,
-              "value": 0.06655156957807166
+              "value": 0.06141677679533107
             },
             {
               "id": "contact_stress.minimum_steady_mean_wheel_load_ratio",
@@ -2575,7 +2575,7 @@
               "metric": "minimum_steady_mean_wheel_load_ratio",
               "operator": ">=",
               "passed": true,
-              "value": 0.9945259041405848
+              "value": 0.9967051274165265
             },
             {
               "id": "contact_stress.steady_mean_total_normal_force_relative_error",
@@ -2583,7 +2583,7 @@
               "metric": "steady_mean_total_normal_force_relative_error",
               "operator": "<=",
               "passed": true,
-              "value": 2.2601283317942346e-06
+              "value": 2.6210741752580043e-06
             },
             {
               "id": "contact_stress.maximum_speed_mps",
@@ -2591,7 +2591,7 @@
               "metric": "maximum_speed_mps",
               "operator": "<=",
               "passed": true,
-              "value": 7.9777477004272725
+              "value": 7.977143696990165
             },
             {
               "id": "contact_stress.mean_stress_speed_mps",
@@ -2599,7 +2599,7 @@
               "metric": "mean_stress_speed_mps",
               "operator": ">=",
               "passed": true,
-              "value": 7.936063320112733
+              "value": 7.935598000315861
             },
             {
               "id": "contact_stress.stress_path_length_m",
@@ -2607,7 +2607,7 @@
               "metric": "stress_path_length_m",
               "operator": ">=",
               "passed": true,
-              "value": 448.8990895108102
+              "value": 448.9111747962773
             },
             {
               "id": "contact_stress.stress_steering_rms_rad",
@@ -2615,37 +2615,37 @@
               "metric": "stress_steering_rms_rad",
               "operator": ">=",
               "passed": true,
-              "value": 0.1331997892657093
+              "value": 0.1335821069417981
             }
           ],
           "control_steps": 1200,
           "determinism_max_abs_delta": 0.0,
           "duration_s": 60.0,
           "metrics": {
-            "final_abs_longitudinal_velocity_mps": 7.973826319849869,
-            "final_longitudinal_velocity_mps": 7.973826319849869,
+            "final_abs_longitudinal_velocity_mps": 7.972491357661008,
+            "final_longitudinal_velocity_mps": 7.972491357661008,
             "finite": true,
             "max_unexpected_contact_count": 0,
             "max_warning_count": 0,
-            "maximum_abs_roll_pitch_rad": 0.0005230432916083589,
-            "maximum_contact_gap_s": 0.055,
-            "maximum_penetration_m": 0.0010467986315614852,
-            "maximum_speed_mps": 7.9777477004272725,
-            "mean_stress_speed_mps": 7.936063320112733,
-            "minimum_steady_mean_wheel_load_ratio": 0.9945259041405848,
-            "minimum_steady_wheel_contact_coverage": 0.8015241320914476,
-            "penetration_p99_m": 0.0007875172819609699,
-            "steady_chassis_z_peak_to_peak_m": 0.0007099286651395254,
-            "steady_mean_total_normal_force_relative_error": 2.2601283317942346e-06,
-            "steady_penetration_p99_m": 0.0007909624027480752,
-            "steady_vertical_speed_p99_mps": 0.06655156957807166,
-            "stress_path_length_m": 448.8990895108102,
-            "stress_steering_rms_rad": 0.1331997892657093
+            "maximum_abs_roll_pitch_rad": 0.0006531461817740826,
+            "maximum_contact_gap_s": 0.04,
+            "maximum_penetration_m": 0.0010660281723911536,
+            "maximum_speed_mps": 7.977143696990165,
+            "mean_stress_speed_mps": 7.935598000315861,
+            "minimum_steady_mean_wheel_load_ratio": 0.9967051274165265,
+            "minimum_steady_wheel_contact_coverage": 0.794157493649448,
+            "penetration_p99_m": 0.0007943881329430802,
+            "steady_chassis_z_peak_to_peak_m": 0.0010277070011624478,
+            "steady_mean_total_normal_force_relative_error": 2.6210741752580043e-06,
+            "steady_penetration_p99_m": 0.0007958040517230261,
+            "steady_vertical_speed_p99_mps": 0.06141677679533107,
+            "stress_path_length_m": 448.9111747962773,
+            "stress_steering_rms_rad": 0.1335821069417981
           },
           "telemetry_sha256": [
-            "3374cc6f7b7d7dbb5b29adc70958ddee280ae38fd4a213cd5d7efaf5090deb33",
-            "3374cc6f7b7d7dbb5b29adc70958ddee280ae38fd4a213cd5d7efaf5090deb33",
-            "3374cc6f7b7d7dbb5b29adc70958ddee280ae38fd4a213cd5d7efaf5090deb33"
+            "a378ac1a3f054a27fef4246b36f1cabde36e32a33015c021c679099d90e974b6",
+            "a378ac1a3f054a27fef4246b36f1cabde36e32a33015c021c679099d90e974b6",
+            "a378ac1a3f054a27fef4246b36f1cabde36e32a33015c021c679099d90e974b6"
           ]
         },
         "drop_settle": {
@@ -2728,7 +2728,7 @@
               "metric": "steady_vertical_speed_p99_mps",
               "operator": "<=",
               "passed": true,
-              "value": 1.8631938475115092e-14
+              "value": 1.5652663652847592e-14
             },
             {
               "id": "drop_settle.minimum_steady_mean_wheel_load_ratio",
@@ -2752,7 +2752,7 @@
               "metric": "final_abs_roll_pitch_rad",
               "operator": "<=",
               "passed": true,
-              "value": 5.373915223137077e-17
+              "value": 5.87215682311874e-17
             },
             {
               "id": "drop_settle.steady_chassis_z_peak_to_peak_m",
@@ -2767,28 +2767,28 @@
           "determinism_max_abs_delta": 0.0,
           "duration_s": 5.0,
           "metrics": {
-            "final_abs_longitudinal_velocity_mps": 5.649968130929975e-18,
-            "final_abs_roll_pitch_rad": 5.373915223137077e-17,
-            "final_longitudinal_velocity_mps": -5.649968130929975e-18,
+            "final_abs_longitudinal_velocity_mps": 3.168406947075134e-18,
+            "final_abs_roll_pitch_rad": 5.87215682311874e-17,
+            "final_longitudinal_velocity_mps": -3.168406947075134e-18,
             "finite": true,
             "max_unexpected_contact_count": 0,
             "max_warning_count": 0,
             "maximum_abs_roll_pitch_rad": 0.017453292519943295,
             "maximum_contact_gap_s": 0.0,
             "maximum_penetration_m": 0.008770352331668563,
-            "maximum_speed_mps": 0.07877668624907234,
+            "maximum_speed_mps": 0.09900914765704678,
             "minimum_steady_mean_wheel_load_ratio": 0.9999999999999964,
             "minimum_steady_wheel_contact_coverage": 1.0,
             "penetration_p99_m": 0.008379420887931921,
             "steady_chassis_z_peak_to_peak_m": 0.0,
             "steady_mean_total_normal_force_relative_error": 1.2361463836533174e-15,
             "steady_penetration_p99_m": 0.00031622401586887114,
-            "steady_vertical_speed_p99_mps": 1.8631938475115092e-14
+            "steady_vertical_speed_p99_mps": 1.5652663652847592e-14
           },
           "telemetry_sha256": [
-            "9c09fd1e07901d662f819774591bf53cc65dd166366e80627248003fd020bd62",
-            "9c09fd1e07901d662f819774591bf53cc65dd166366e80627248003fd020bd62",
-            "9c09fd1e07901d662f819774591bf53cc65dd166366e80627248003fd020bd62"
+            "56c7301bf6e2d48f8b31d0d337dd03eba06c12238c46d6363e1c44048333c199",
+            "56c7301bf6e2d48f8b31d0d337dd03eba06c12238c46d6363e1c44048333c199",
+            "56c7301bf6e2d48f8b31d0d337dd03eba06c12238c46d6363e1c44048333c199"
           ]
         },
         "rest": {
@@ -2895,7 +2895,7 @@
               "metric": "steady_xy_drift_m",
               "operator": "<=",
               "passed": true,
-              "value": 1.4668351084475467e-12
+              "value": 1.466835114912397e-12
             },
             {
               "id": "rest.steady_yaw_drift_rad",
@@ -2903,7 +2903,7 @@
               "metric": "steady_yaw_drift_rad",
               "operator": "<=",
               "passed": true,
-              "value": 2.6897019043044977e-25
+              "value": 2.6897022076429014e-25
             },
             {
               "id": "rest.steady_speed_p99_mps",
@@ -2911,7 +2911,7 @@
               "metric": "steady_speed_p99_mps",
               "operator": "<=",
               "passed": true,
-              "value": 1.6702070909353926e-13
+              "value": 1.6701865982277602e-13
             },
             {
               "id": "rest.steady_yaw_rate_p99_rad_s",
@@ -2919,7 +2919,7 @@
               "metric": "steady_yaw_rate_p99_rad_s",
               "operator": "<=",
               "passed": true,
-              "value": 9.969060313839568e-25
+              "value": 9.875228476396312e-25
             },
             {
               "id": "rest.steady_chassis_z_peak_to_peak_m",
@@ -2935,7 +2935,7 @@
               "metric": "steady_roll_pitch_p99_rad",
               "operator": "<=",
               "passed": true,
-              "value": 5.730214380962997e-17
+              "value": 5.751882568560956e-17
             },
             {
               "id": "rest.steady_normal_force_relative_error",
@@ -2950,15 +2950,15 @@
           "determinism_max_abs_delta": 0.0,
           "duration_s": 10.0,
           "metrics": {
-            "final_abs_longitudinal_velocity_mps": 1.5895564953081015e-13,
-            "final_longitudinal_velocity_mps": -1.5895564953081015e-13,
+            "final_abs_longitudinal_velocity_mps": 1.5895154217028988e-13,
+            "final_longitudinal_velocity_mps": -1.5895154217028988e-13,
             "finite": true,
             "max_unexpected_contact_count": 0,
             "max_warning_count": 0,
             "maximum_abs_roll_pitch_rad": 9.84930106836442e-13,
             "maximum_contact_gap_s": 0.0,
             "maximum_penetration_m": 0.000618046842619624,
-            "maximum_speed_mps": 3.875813610751764e-11,
+            "maximum_speed_mps": 2.6167367016920025e-11,
             "minimum_steady_mean_wheel_load_ratio": 0.9999999999999983,
             "minimum_steady_wheel_contact_coverage": 1.0,
             "penetration_p99_m": 0.0003755318544965136,
@@ -2966,17 +2966,17 @@
             "steady_mean_total_normal_force_relative_error": 1.5451829795666468e-16,
             "steady_normal_force_relative_error": 1.5451829795666468e-16,
             "steady_penetration_p99_m": 0.0003162240158675611,
-            "steady_roll_pitch_p99_rad": 5.730214380962997e-17,
-            "steady_speed_p99_mps": 1.6702070909353926e-13,
+            "steady_roll_pitch_p99_rad": 5.751882568560956e-17,
+            "steady_speed_p99_mps": 1.6701865982277602e-13,
             "steady_vertical_speed_p99_mps": 5.8261075690530434e-15,
-            "steady_xy_drift_m": 1.4668351084475467e-12,
-            "steady_yaw_drift_rad": 2.6897019043044977e-25,
-            "steady_yaw_rate_p99_rad_s": 9.969060313839568e-25
+            "steady_xy_drift_m": 1.466835114912397e-12,
+            "steady_yaw_drift_rad": 2.6897022076429014e-25,
+            "steady_yaw_rate_p99_rad_s": 9.875228476396312e-25
           },
           "telemetry_sha256": [
-            "e7dee09aa2023d084dec90d83a8bd65f213c7902429b16cfe7a8745fa7ea46e7",
-            "e7dee09aa2023d084dec90d83a8bd65f213c7902429b16cfe7a8745fa7ea46e7",
-            "e7dee09aa2023d084dec90d83a8bd65f213c7902429b16cfe7a8745fa7ea46e7"
+            "18f6b8577163fd60a263296f0ec3556717be82d86b412c81cc5515576f7c2463",
+            "18f6b8577163fd60a263296f0ec3556717be82d86b412c81cc5515576f7c2463",
+            "18f6b8577163fd60a263296f0ec3556717be82d86b412c81cc5515576f7c2463"
           ]
         },
         "steer_left": {
@@ -3051,7 +3051,7 @@
               "metric": "steady_chassis_z_peak_to_peak_m",
               "operator": "<=",
               "passed": true,
-              "value": 0.0005640353607641035
+              "value": 0.0005381960578487166
             },
             {
               "id": "steer_left.steady_vertical_speed_p99_mps",
@@ -3059,7 +3059,7 @@
               "metric": "steady_vertical_speed_p99_mps",
               "operator": "<=",
               "passed": true,
-              "value": 0.05008823968874433
+              "value": 0.050088239688744235
             },
             {
               "id": "steer_left.minimum_steady_mean_wheel_load_ratio",
@@ -3083,7 +3083,7 @@
               "metric": "final_lateral_displacement_m",
               "operator": ">=",
               "passed": true,
-              "value": 4.28819851224941
+              "value": 4.299733509555199
             },
             {
               "id": "steer_left.final_yaw_rad",
@@ -3091,7 +3091,7 @@
               "metric": "final_yaw_rad",
               "operator": ">=",
               "passed": true,
-              "value": 0.6116612170158501
+              "value": 0.6116918108257678
             },
             {
               "id": "steer_left.mean_commanded_steering_angle_rad",
@@ -3114,10 +3114,10 @@
           "determinism_max_abs_delta": 0.0,
           "duration_s": 7.0,
           "metrics": {
-            "final_abs_longitudinal_velocity_mps": 4.01802769208201,
-            "final_lateral_displacement_m": 4.28819851224941,
-            "final_longitudinal_velocity_mps": 4.01802769208201,
-            "final_yaw_rad": 0.6116612170158501,
+            "final_abs_longitudinal_velocity_mps": 4.017916427757317,
+            "final_lateral_displacement_m": 4.299733509555199,
+            "final_longitudinal_velocity_mps": 4.017916427757317,
+            "final_yaw_rad": 0.6116918108257678,
             "finite": true,
             "max_unexpected_contact_count": 0,
             "max_warning_count": 0,
@@ -3125,20 +3125,20 @@
             "maximum_commanded_steering_error_rad": 0.009083924162057055,
             "maximum_contact_gap_s": 0.025,
             "maximum_penetration_m": 0.0007417083873291208,
-            "maximum_speed_mps": 4.294825759688533,
+            "maximum_speed_mps": 4.296532416842178,
             "mean_commanded_steering_angle_rad": 0.19428867088454502,
             "minimum_steady_mean_wheel_load_ratio": 0.9189930187292533,
             "minimum_steady_wheel_contact_coverage": 0.9140495867768595,
             "penetration_p99_m": 0.0006870683722844267,
-            "steady_chassis_z_peak_to_peak_m": 0.0005640353607641035,
+            "steady_chassis_z_peak_to_peak_m": 0.0005381960578487166,
             "steady_mean_total_normal_force_relative_error": 4.4501269811519425e-14,
             "steady_penetration_p99_m": 0.0007040862153745215,
-            "steady_vertical_speed_p99_mps": 0.05008823968874433
+            "steady_vertical_speed_p99_mps": 0.050088239688744235
           },
           "telemetry_sha256": [
-            "cf7b2e29db5ae238f504d3af049d2d86f42e0182c0948423c205a13d1a33782c",
-            "cf7b2e29db5ae238f504d3af049d2d86f42e0182c0948423c205a13d1a33782c",
-            "cf7b2e29db5ae238f504d3af049d2d86f42e0182c0948423c205a13d1a33782c"
+            "04fa748c281bf8b9927b76016110f6f4cd15d5e78b6310603e756c7c94ca5117",
+            "04fa748c281bf8b9927b76016110f6f4cd15d5e78b6310603e756c7c94ca5117",
+            "04fa748c281bf8b9927b76016110f6f4cd15d5e78b6310603e756c7c94ca5117"
           ]
         },
         "steer_right": {
@@ -3213,7 +3213,7 @@
               "metric": "steady_chassis_z_peak_to_peak_m",
               "operator": "<=",
               "passed": true,
-              "value": 0.000564035360764048
+              "value": 0.0005381960578485501
             },
             {
               "id": "steer_right.steady_vertical_speed_p99_mps",
@@ -3221,7 +3221,7 @@
               "metric": "steady_vertical_speed_p99_mps",
               "operator": "<=",
               "passed": true,
-              "value": 0.05008823968874578
+              "value": 0.05008823968874569
             },
             {
               "id": "steer_right.minimum_steady_mean_wheel_load_ratio",
@@ -3245,7 +3245,7 @@
               "metric": "final_lateral_displacement_m",
               "operator": "<=",
               "passed": true,
-              "value": -4.288198512251296
+              "value": -4.299733509557084
             },
             {
               "id": "steer_right.final_yaw_rad",
@@ -3253,7 +3253,7 @@
               "metric": "final_yaw_rad",
               "operator": "<=",
               "passed": true,
-              "value": -0.6116612170158495
+              "value": -0.6116918108257674
             },
             {
               "id": "steer_right.mean_commanded_steering_angle_rad",
@@ -3276,10 +3276,10 @@
           "determinism_max_abs_delta": 0.0,
           "duration_s": 7.0,
           "metrics": {
-            "final_abs_longitudinal_velocity_mps": 4.018027692082002,
-            "final_lateral_displacement_m": -4.288198512251296,
-            "final_longitudinal_velocity_mps": 4.018027692082002,
-            "final_yaw_rad": -0.6116612170158495,
+            "final_abs_longitudinal_velocity_mps": 4.017916427757309,
+            "final_lateral_displacement_m": -4.299733509557084,
+            "final_longitudinal_velocity_mps": 4.017916427757309,
+            "final_yaw_rad": -0.6116918108257674,
             "finite": true,
             "max_unexpected_contact_count": 0,
             "max_warning_count": 0,
@@ -3287,20 +3287,20 @@
             "maximum_commanded_steering_error_rad": 0.009083924162057111,
             "maximum_contact_gap_s": 0.025,
             "maximum_penetration_m": 0.0007417083873291208,
-            "maximum_speed_mps": 4.294825759688533,
+            "maximum_speed_mps": 4.296532416842178,
             "mean_commanded_steering_angle_rad": -0.19428867088454502,
             "minimum_steady_mean_wheel_load_ratio": 0.9189930187292706,
             "minimum_steady_wheel_contact_coverage": 0.9140495867768595,
             "penetration_p99_m": 0.0006870683722844267,
-            "steady_chassis_z_peak_to_peak_m": 0.000564035360764048,
+            "steady_chassis_z_peak_to_peak_m": 0.0005381960578485501,
             "steady_mean_total_normal_force_relative_error": 4.419223321560609e-14,
             "steady_penetration_p99_m": 0.0007040862153745215,
-            "steady_vertical_speed_p99_mps": 0.05008823968874578
+            "steady_vertical_speed_p99_mps": 0.05008823968874569
           },
           "telemetry_sha256": [
-            "17b5f78cb9f6c52a3ff7ffea235a9f908dd1b9ca2d2bcb111aa0fcde0bf314cd",
-            "17b5f78cb9f6c52a3ff7ffea235a9f908dd1b9ca2d2bcb111aa0fcde0bf314cd",
-            "17b5f78cb9f6c52a3ff7ffea235a9f908dd1b9ca2d2bcb111aa0fcde0bf314cd"
+            "d5256464e310e9e697a6590768ebeb5f44bccd95e9c43a892b81964739515a35",
+            "d5256464e310e9e697a6590768ebeb5f44bccd95e9c43a892b81964739515a35",
+            "d5256464e310e9e697a6590768ebeb5f44bccd95e9c43a892b81964739515a35"
           ]
         },
         "straight": {
@@ -3375,7 +3375,7 @@
               "metric": "steady_chassis_z_peak_to_peak_m",
               "operator": "<=",
               "passed": true,
-              "value": 2.0041009514915054e-05
+              "value": 2.004101457675489e-05
             },
             {
               "id": "straight.steady_vertical_speed_p99_mps",
@@ -3383,7 +3383,7 @@
               "metric": "steady_vertical_speed_p99_mps",
               "operator": "<=",
               "passed": true,
-              "value": 0.00024045089317231496
+              "value": 0.00024045089317231423
             },
             {
               "id": "straight.minimum_steady_mean_wheel_load_ratio",
@@ -3407,7 +3407,7 @@
               "metric": "forward_displacement_m",
               "operator": ">=",
               "passed": true,
-              "value": 19.99679066839707
+              "value": 20.025117928618176
             },
             {
               "id": "straight.speed_at_acceleration_end_mps",
@@ -3415,7 +3415,7 @@
               "metric": "speed_at_acceleration_end_mps",
               "operator": ">=",
               "passed": true,
-              "value": 5.719239703889152
+              "value": 5.728708408328011
             },
             {
               "id": "straight.speed_at_acceleration_end_mps",
@@ -3423,7 +3423,7 @@
               "metric": "speed_at_acceleration_end_mps",
               "operator": "<=",
               "passed": true,
-              "value": 5.719239703889152
+              "value": 5.728708408328011
             },
             {
               "id": "straight.maximum_abs_lateral_displacement_m",
@@ -3431,7 +3431,7 @@
               "metric": "maximum_abs_lateral_displacement_m",
               "operator": "<=",
               "passed": true,
-              "value": 9.46600360106283e-13
+              "value": 9.466019549120232e-13
             },
             {
               "id": "straight.maximum_abs_yaw_rad",
@@ -3439,38 +3439,38 @@
               "metric": "maximum_abs_yaw_rad",
               "operator": "<=",
               "passed": true,
-              "value": 1.5189268338317958e-16
+              "value": 1.5098606553960687e-16
             }
           ],
           "control_steps": 120,
           "determinism_max_abs_delta": 0.0,
           "duration_s": 6.0,
           "metrics": {
-            "final_abs_longitudinal_velocity_mps": 5.665609401062258,
-            "final_longitudinal_velocity_mps": 5.665609401062258,
+            "final_abs_longitudinal_velocity_mps": 5.66545204422146,
+            "final_longitudinal_velocity_mps": 5.66545204422146,
             "finite": true,
-            "forward_displacement_m": 19.99679066839707,
+            "forward_displacement_m": 20.025117928618176,
             "max_unexpected_contact_count": 0,
             "max_warning_count": 0,
-            "maximum_abs_lateral_displacement_m": 9.46600360106283e-13,
+            "maximum_abs_lateral_displacement_m": 9.466019549120232e-13,
             "maximum_abs_roll_pitch_rad": 1.4942769401840325e-05,
-            "maximum_abs_yaw_rad": 1.5189268338317958e-16,
+            "maximum_abs_yaw_rad": 1.5098606553960687e-16,
             "maximum_contact_gap_s": 0.0,
             "maximum_penetration_m": 0.000618046842619624,
-            "maximum_speed_mps": 5.727277503152511,
+            "maximum_speed_mps": 5.728708408328011,
             "minimum_steady_mean_wheel_load_ratio": 0.9528557486422022,
             "minimum_steady_wheel_contact_coverage": 1.0,
             "penetration_p99_m": 0.0005193439531927186,
-            "speed_at_acceleration_end_mps": 5.719239703889152,
-            "steady_chassis_z_peak_to_peak_m": 2.0041009514915054e-05,
+            "speed_at_acceleration_end_mps": 5.728708408328011,
+            "steady_chassis_z_peak_to_peak_m": 2.004101457675489e-05,
             "steady_mean_total_normal_force_relative_error": 2.7967811930156306e-14,
             "steady_penetration_p99_m": 0.0003359314412569314,
-            "steady_vertical_speed_p99_mps": 0.00024045089317231496
+            "steady_vertical_speed_p99_mps": 0.00024045089317231423
           },
           "telemetry_sha256": [
-            "51e8192be285a02ef5471f48e868a62a17b0d1fb2642bb877da10b6f66f0b6ac",
-            "51e8192be285a02ef5471f48e868a62a17b0d1fb2642bb877da10b6f66f0b6ac",
-            "51e8192be285a02ef5471f48e868a62a17b0d1fb2642bb877da10b6f66f0b6ac"
+            "d5a482fd857aa71155f605cd1140401337e139e26f28e980d29033082819ec78",
+            "d5a482fd857aa71155f605cd1140401337e139e26f28e980d29033082819ec78",
+            "d5a482fd857aa71155f605cd1140401337e139e26f28e980d29033082819ec78"
           ]
         }
       },
@@ -3481,14 +3481,14 @@
           "limit": 0.1,
           "operator": "<=",
           "passed": true,
-          "value": 4.397190987395376e-13
+          "value": 4.385394538596886e-13
         },
         {
           "id": "steering.yaw_symmetry_relative_error",
           "limit": 0.1,
           "operator": "<=",
           "passed": true,
-          "value": 9.075473429896955e-16
+          "value": 7.260015615552444e-16
         }
       ]
     },
@@ -3808,8 +3808,8 @@
       },
       "cpu_timing": {
         "physics_steps": 157500,
-        "physics_steps_per_second": 14851.920163426696,
-        "wall_time_s": 10.60468937800033
+        "physics_steps_per_second": 9869.429213589008,
+        "wall_time_s": 15.958369687999948
       },
       "determinism": {
         "max_abs_state_delta": 0.0,
@@ -3868,7 +3868,7 @@
               "metric": "maximum_penetration_m",
               "operator": "<=",
               "passed": true,
-              "value": 0.0010457843947467294
+              "value": 0.0010355365749742385
             },
             {
               "id": "action_limits.steady_penetration_p99_m",
@@ -3876,7 +3876,7 @@
               "metric": "steady_penetration_p99_m",
               "operator": "<=",
               "passed": true,
-              "value": 0.00032334537275176213
+              "value": 0.0003212528914967794
             },
             {
               "id": "action_limits.maximum_abs_roll_pitch_rad",
@@ -3892,7 +3892,7 @@
               "metric": "steady_chassis_z_peak_to_peak_m",
               "operator": "<=",
               "passed": true,
-              "value": 3.927811131898551e-08
+              "value": 4.049639085179635e-08
             },
             {
               "id": "action_limits.steady_vertical_speed_p99_mps",
@@ -3900,7 +3900,7 @@
               "metric": "steady_vertical_speed_p99_mps",
               "operator": "<=",
               "passed": true,
-              "value": 1.1502012918259242e-06
+              "value": 8.047440558603351e-06
             },
             {
               "id": "action_limits.minimum_steady_mean_wheel_load_ratio",
@@ -3908,7 +3908,7 @@
               "metric": "minimum_steady_mean_wheel_load_ratio",
               "operator": ">=",
               "passed": true,
-              "value": 0.9997912522869791
+              "value": 0.9998024311452913
             },
             {
               "id": "action_limits.steady_mean_total_normal_force_relative_error",
@@ -3916,7 +3916,7 @@
               "metric": "steady_mean_total_normal_force_relative_error",
               "operator": "<=",
               "passed": true,
-              "value": 2.6145742961943898e-05
+              "value": 1.7175238086473423e-05
             },
             {
               "id": "action_limits.maximum_applied_steering_rad",
@@ -4003,8 +4003,8 @@
           "determinism_max_abs_delta": 0.0,
           "duration_s": 2.0,
           "metrics": {
-            "final_abs_longitudinal_velocity_mps": 0.09015177467261373,
-            "final_longitudinal_velocity_mps": 0.09015177467261373,
+            "final_abs_longitudinal_velocity_mps": 0.08981749900676166,
+            "final_longitudinal_velocity_mps": 0.08981749900676166,
             "finite": true,
             "max_unexpected_contact_count": 0,
             "max_warning_count": 0,
@@ -4012,24 +4012,24 @@
             "maximum_applied_acceleration_mps2": 4.0,
             "maximum_applied_steering_rad": 0.6,
             "maximum_contact_gap_s": 0.0,
-            "maximum_penetration_m": 0.0010457843947467294,
-            "maximum_speed_mps": 1.6608162301746103,
+            "maximum_penetration_m": 0.0010355365749742385,
+            "maximum_speed_mps": 1.664076528131181,
             "maximum_steering_target_step_rad": 0.06000000000000005,
             "minimum_applied_acceleration_mps2": -8.0,
             "minimum_applied_steering_rad": -0.6,
             "minimum_saturation_count": 2,
-            "minimum_steady_mean_wheel_load_ratio": 0.9997912522869791,
+            "minimum_steady_mean_wheel_load_ratio": 0.9998024311452913,
             "minimum_steady_wheel_contact_coverage": 1.0,
-            "penetration_p99_m": 0.0010361969247832615,
-            "steady_chassis_z_peak_to_peak_m": 3.927811131898551e-08,
-            "steady_mean_total_normal_force_relative_error": 2.6145742961943898e-05,
-            "steady_penetration_p99_m": 0.00032334537275176213,
-            "steady_vertical_speed_p99_mps": 1.1502012918259242e-06
+            "penetration_p99_m": 0.0010167634717069387,
+            "steady_chassis_z_peak_to_peak_m": 4.049639085179635e-08,
+            "steady_mean_total_normal_force_relative_error": 1.7175238086473423e-05,
+            "steady_penetration_p99_m": 0.0003212528914967794,
+            "steady_vertical_speed_p99_mps": 8.047440558603351e-06
           },
           "telemetry_sha256": [
-            "7910b6e573f0fd9339ac156f1a89ca09042593ef7063da2d0b426d86910bca64",
-            "7910b6e573f0fd9339ac156f1a89ca09042593ef7063da2d0b426d86910bca64",
-            "7910b6e573f0fd9339ac156f1a89ca09042593ef7063da2d0b426d86910bca64"
+            "2043a2ba571cb749d5fd16e3515dcc89fbd93bd4d49cb47b74d18b23b86566b9",
+            "2043a2ba571cb749d5fd16e3515dcc89fbd93bd4d49cb47b74d18b23b86566b9",
+            "2043a2ba571cb749d5fd16e3515dcc89fbd93bd4d49cb47b74d18b23b86566b9"
           ]
         },
         "brake": {
@@ -4104,7 +4104,7 @@
               "metric": "steady_chassis_z_peak_to_peak_m",
               "operator": "<=",
               "passed": true,
-              "value": 6.24564487746726e-05
+              "value": 6.245591049403032e-05
             },
             {
               "id": "brake.steady_vertical_speed_p99_mps",
@@ -4112,7 +4112,7 @@
               "metric": "steady_vertical_speed_p99_mps",
               "operator": "<=",
               "passed": true,
-              "value": 0.000707331154410584
+              "value": 0.0006966746107728976
             },
             {
               "id": "brake.minimum_steady_mean_wheel_load_ratio",
@@ -4120,7 +4120,7 @@
               "metric": "minimum_steady_mean_wheel_load_ratio",
               "operator": ">=",
               "passed": true,
-              "value": 0.9994714766964322
+              "value": 0.9994258350166162
             },
             {
               "id": "brake.steady_mean_total_normal_force_relative_error",
@@ -4136,7 +4136,7 @@
               "metric": "speed_before_braking_mps",
               "operator": ">=",
               "passed": true,
-              "value": 7.613468632212841
+              "value": 7.617235132524772
             },
             {
               "id": "brake.final_abs_longitudinal_velocity_mps",
@@ -4144,7 +4144,7 @@
               "metric": "final_abs_longitudinal_velocity_mps",
               "operator": "<=",
               "passed": true,
-              "value": 0.08867830226622872
+              "value": 0.09633442224191448
             },
             {
               "id": "brake.maximum_abs_post_braking_velocity_mps",
@@ -4152,7 +4152,7 @@
               "metric": "maximum_abs_post_braking_velocity_mps",
               "operator": "<=",
               "passed": true,
-              "value": 0.08923419173057982
+              "value": 0.09692765443604456
             },
             {
               "id": "brake.minimum_braking_velocity_mps",
@@ -4160,7 +4160,7 @@
               "metric": "minimum_braking_velocity_mps",
               "operator": ">=",
               "passed": true,
-              "value": 0.08923419173057982
+              "value": 0.09692765443604456
             },
             {
               "id": "brake.braking_nonincrease_fraction",
@@ -4176,30 +4176,30 @@
           "duration_s": 8.0,
           "metrics": {
             "braking_nonincrease_fraction": 1.0,
-            "final_abs_longitudinal_velocity_mps": 0.08867830226622872,
-            "final_longitudinal_velocity_mps": 0.08867830226622872,
+            "final_abs_longitudinal_velocity_mps": 0.09633442224191448,
+            "final_longitudinal_velocity_mps": 0.09633442224191448,
             "finite": true,
             "max_unexpected_contact_count": 0,
             "max_warning_count": 0,
-            "maximum_abs_post_braking_velocity_mps": 0.08923419173057982,
+            "maximum_abs_post_braking_velocity_mps": 0.09692765443604456,
             "maximum_abs_roll_pitch_rad": 3.025014313601174e-05,
             "maximum_contact_gap_s": 0.0,
             "maximum_penetration_m": 0.0003552002993205683,
-            "maximum_speed_mps": 7.613468632212841,
-            "minimum_braking_velocity_mps": 0.08923419173057982,
-            "minimum_steady_mean_wheel_load_ratio": 0.9994714766964322,
+            "maximum_speed_mps": 7.617235132524772,
+            "minimum_braking_velocity_mps": 0.09692765443604456,
+            "minimum_steady_mean_wheel_load_ratio": 0.9994258350166162,
             "minimum_steady_wheel_contact_coverage": 1.0,
             "penetration_p99_m": 0.0003551853969289254,
-            "speed_before_braking_mps": 7.613468632212841,
-            "steady_chassis_z_peak_to_peak_m": 6.24564487746726e-05,
+            "speed_before_braking_mps": 7.617235132524772,
+            "steady_chassis_z_peak_to_peak_m": 6.245591049403032e-05,
             "steady_mean_total_normal_force_relative_error": 1.5451829795666468e-16,
             "steady_penetration_p99_m": 0.00035518992506099466,
-            "steady_vertical_speed_p99_mps": 0.000707331154410584
+            "steady_vertical_speed_p99_mps": 0.0006966746107728976
           },
           "telemetry_sha256": [
-            "2f5a5304a8a543a9ca39e4543056e1694382d8abca6debcda13b0f785cf6602a",
-            "2f5a5304a8a543a9ca39e4543056e1694382d8abca6debcda13b0f785cf6602a",
-            "2f5a5304a8a543a9ca39e4543056e1694382d8abca6debcda13b0f785cf6602a"
+            "c7bed95da4b3dc1c121887f3694d2f4924900318851b61e90f6498c28dcc1eda",
+            "c7bed95da4b3dc1c121887f3694d2f4924900318851b61e90f6498c28dcc1eda",
+            "c7bed95da4b3dc1c121887f3694d2f4924900318851b61e90f6498c28dcc1eda"
           ]
         },
         "contact_stress": {
@@ -4234,7 +4234,7 @@
               "metric": "minimum_steady_wheel_contact_coverage",
               "operator": ">=",
               "passed": true,
-              "value": 0.80921253175275
+              "value": 0.8110076206604531
             },
             {
               "id": "contact_stress.maximum_contact_gap_s",
@@ -4242,7 +4242,7 @@
               "metric": "maximum_contact_gap_s",
               "operator": "<=",
               "passed": true,
-              "value": 0.042
+              "value": 0.032
             },
             {
               "id": "contact_stress.maximum_penetration_m",
@@ -4250,7 +4250,7 @@
               "metric": "maximum_penetration_m",
               "operator": "<=",
               "passed": true,
-              "value": 0.0005487973731084783
+              "value": 0.000448575647685856
             },
             {
               "id": "contact_stress.steady_penetration_p99_m",
@@ -4258,7 +4258,7 @@
               "metric": "steady_penetration_p99_m",
               "operator": "<=",
               "passed": true,
-              "value": 0.00039964502084891576
+              "value": 0.0003854803161187472
             },
             {
               "id": "contact_stress.maximum_abs_roll_pitch_rad",
@@ -4266,7 +4266,7 @@
               "metric": "maximum_abs_roll_pitch_rad",
               "operator": "<=",
               "passed": true,
-              "value": 0.0003153165549823101
+              "value": 0.0002303764889910391
             },
             {
               "id": "contact_stress.steady_chassis_z_peak_to_peak_m",
@@ -4274,7 +4274,7 @@
               "metric": "steady_chassis_z_peak_to_peak_m",
               "operator": "<=",
               "passed": true,
-              "value": 0.0004501716366480668
+              "value": 0.00042803102054167486
             },
             {
               "id": "contact_stress.steady_vertical_speed_p99_mps",
@@ -4282,7 +4282,7 @@
               "metric": "steady_vertical_speed_p99_mps",
               "operator": "<=",
               "passed": true,
-              "value": 0.03410455974502138
+              "value": 0.03259192851428795
             },
             {
               "id": "contact_stress.minimum_steady_mean_wheel_load_ratio",
@@ -4290,7 +4290,7 @@
               "metric": "minimum_steady_mean_wheel_load_ratio",
               "operator": ">=",
               "passed": true,
-              "value": 0.9949112424962403
+              "value": 0.9943577535330039
             },
             {
               "id": "contact_stress.steady_mean_total_normal_force_relative_error",
@@ -4298,7 +4298,7 @@
               "metric": "steady_mean_total_normal_force_relative_error",
               "operator": "<=",
               "passed": true,
-              "value": 1.7197809368325484e-06
+              "value": 2.0846695870844416e-06
             },
             {
               "id": "contact_stress.maximum_speed_mps",
@@ -4306,7 +4306,7 @@
               "metric": "maximum_speed_mps",
               "operator": "<=",
               "passed": true,
-              "value": 7.977849956074391
+              "value": 7.976811236619731
             },
             {
               "id": "contact_stress.mean_stress_speed_mps",
@@ -4314,7 +4314,7 @@
               "metric": "mean_stress_speed_mps",
               "operator": ">=",
               "passed": true,
-              "value": 7.936490614093148
+              "value": 7.935955345609544
             },
             {
               "id": "contact_stress.stress_path_length_m",
@@ -4322,7 +4322,7 @@
               "metric": "stress_path_length_m",
               "operator": ">=",
               "passed": true,
-              "value": 448.9763372049632
+              "value": 448.96363005899195
             },
             {
               "id": "contact_stress.stress_steering_rms_rad",
@@ -4330,37 +4330,37 @@
               "metric": "stress_steering_rms_rad",
               "operator": ">=",
               "passed": true,
-              "value": 0.1320264301468411
+              "value": 0.1324185382977025
             }
           ],
           "control_steps": 1200,
           "determinism_max_abs_delta": 0.0,
           "duration_s": 60.0,
           "metrics": {
-            "final_abs_longitudinal_velocity_mps": 7.973084240245248,
-            "final_longitudinal_velocity_mps": 7.973084240245248,
+            "final_abs_longitudinal_velocity_mps": 7.972260761114476,
+            "final_longitudinal_velocity_mps": 7.972260761114476,
             "finite": true,
             "max_unexpected_contact_count": 0,
             "max_warning_count": 0,
-            "maximum_abs_roll_pitch_rad": 0.0003153165549823101,
-            "maximum_contact_gap_s": 0.042,
-            "maximum_penetration_m": 0.0005487973731084783,
-            "maximum_speed_mps": 7.977849956074391,
-            "mean_stress_speed_mps": 7.936490614093148,
-            "minimum_steady_mean_wheel_load_ratio": 0.9949112424962403,
-            "minimum_steady_wheel_contact_coverage": 0.80921253175275,
-            "penetration_p99_m": 0.0003984539645353058,
-            "steady_chassis_z_peak_to_peak_m": 0.0004501716366480668,
-            "steady_mean_total_normal_force_relative_error": 1.7197809368325484e-06,
-            "steady_penetration_p99_m": 0.00039964502084891576,
-            "steady_vertical_speed_p99_mps": 0.03410455974502138,
-            "stress_path_length_m": 448.9763372049632,
-            "stress_steering_rms_rad": 0.1320264301468411
+            "maximum_abs_roll_pitch_rad": 0.0002303764889910391,
+            "maximum_contact_gap_s": 0.032,
+            "maximum_penetration_m": 0.000448575647685856,
+            "maximum_speed_mps": 7.976811236619731,
+            "mean_stress_speed_mps": 7.935955345609544,
+            "minimum_steady_mean_wheel_load_ratio": 0.9943577535330039,
+            "minimum_steady_wheel_contact_coverage": 0.8110076206604531,
+            "penetration_p99_m": 0.00038482044047954966,
+            "steady_chassis_z_peak_to_peak_m": 0.00042803102054167486,
+            "steady_mean_total_normal_force_relative_error": 2.0846695870844416e-06,
+            "steady_penetration_p99_m": 0.0003854803161187472,
+            "steady_vertical_speed_p99_mps": 0.03259192851428795,
+            "stress_path_length_m": 448.96363005899195,
+            "stress_steering_rms_rad": 0.1324185382977025
           },
           "telemetry_sha256": [
-            "e47600a8f1b67704a359852973833c69f318a831abc4149acfee6f3bc9eaaa39",
-            "e47600a8f1b67704a359852973833c69f318a831abc4149acfee6f3bc9eaaa39",
-            "e47600a8f1b67704a359852973833c69f318a831abc4149acfee6f3bc9eaaa39"
+            "8d25ec3996a967a34b431bfee0bc5382d51d0cb6a00bdac26f0973d259f19a32",
+            "8d25ec3996a967a34b431bfee0bc5382d51d0cb6a00bdac26f0973d259f19a32",
+            "8d25ec3996a967a34b431bfee0bc5382d51d0cb6a00bdac26f0973d259f19a32"
           ]
         },
         "drop_settle": {
@@ -4443,7 +4443,7 @@
               "metric": "steady_vertical_speed_p99_mps",
               "operator": "<=",
               "passed": true,
-              "value": 1.881919870571565e-14
+              "value": 1.8582451170442258e-14
             },
             {
               "id": "drop_settle.minimum_steady_mean_wheel_load_ratio",
@@ -4467,7 +4467,7 @@
               "metric": "final_abs_roll_pitch_rad",
               "operator": "<=",
               "passed": true,
-              "value": 5.168522993570554e-17
+              "value": 5.356512822387592e-17
             },
             {
               "id": "drop_settle.steady_chassis_z_peak_to_peak_m",
@@ -4482,28 +4482,28 @@
           "determinism_max_abs_delta": 0.0,
           "duration_s": 5.0,
           "metrics": {
-            "final_abs_longitudinal_velocity_mps": 1.742190867858934e-18,
-            "final_abs_roll_pitch_rad": 5.168522993570554e-17,
-            "final_longitudinal_velocity_mps": -1.742190867858934e-18,
+            "final_abs_longitudinal_velocity_mps": 1.7389122664780874e-18,
+            "final_abs_roll_pitch_rad": 5.356512822387592e-17,
+            "final_longitudinal_velocity_mps": -1.7389122664780874e-18,
             "finite": true,
             "max_unexpected_contact_count": 0,
             "max_warning_count": 0,
             "maximum_abs_roll_pitch_rad": 0.017453292519943295,
             "maximum_contact_gap_s": 0.0,
             "maximum_penetration_m": 0.009419210810650724,
-            "maximum_speed_mps": 0.08783910456788202,
+            "maximum_speed_mps": 0.09498826467399492,
             "minimum_steady_mean_wheel_load_ratio": 0.9999999999999981,
             "minimum_steady_wheel_contact_coverage": 1.0,
             "penetration_p99_m": 0.008861442472778924,
             "steady_chassis_z_peak_to_peak_m": 0.0,
             "steady_mean_total_normal_force_relative_error": 4.63554893869994e-16,
             "steady_penetration_p99_m": 0.0003162240158667173,
-            "steady_vertical_speed_p99_mps": 1.881919870571565e-14
+            "steady_vertical_speed_p99_mps": 1.8582451170442258e-14
           },
           "telemetry_sha256": [
-            "38a8ab93c3f8d7f256631b40c3840a73b13e6a03176543a5520bb0c75decd7df",
-            "38a8ab93c3f8d7f256631b40c3840a73b13e6a03176543a5520bb0c75decd7df",
-            "38a8ab93c3f8d7f256631b40c3840a73b13e6a03176543a5520bb0c75decd7df"
+            "7482ef5f0ee6bf764039e978095149f125018acb8b8d4a8b8d398c691f1b8567",
+            "7482ef5f0ee6bf764039e978095149f125018acb8b8d4a8b8d398c691f1b8567",
+            "7482ef5f0ee6bf764039e978095149f125018acb8b8d4a8b8d398c691f1b8567"
           ]
         },
         "rest": {
@@ -4610,7 +4610,7 @@
               "metric": "steady_xy_drift_m",
               "operator": "<=",
               "passed": true,
-              "value": 5.104837182948811e-15
+              "value": 5.104625181410113e-15
             },
             {
               "id": "rest.steady_yaw_drift_rad",
@@ -4618,7 +4618,7 @@
               "metric": "steady_yaw_drift_rad",
               "operator": "<=",
               "passed": true,
-              "value": 1.5799690670392864e-30
+              "value": 1.581192722462834e-30
             },
             {
               "id": "rest.steady_speed_p99_mps",
@@ -4626,7 +4626,7 @@
               "metric": "steady_speed_p99_mps",
               "operator": "<=",
               "passed": true,
-              "value": 3.776426443278083e-16
+              "value": 3.8314538250848185e-16
             },
             {
               "id": "rest.steady_yaw_rate_p99_rad_s",
@@ -4634,7 +4634,7 @@
               "metric": "steady_yaw_rate_p99_rad_s",
               "operator": "<=",
               "passed": true,
-              "value": 6.893288382448101e-31
+              "value": 7.07134986532444e-31
             },
             {
               "id": "rest.steady_chassis_z_peak_to_peak_m",
@@ -4650,7 +4650,7 @@
               "metric": "steady_roll_pitch_p99_rad",
               "operator": "<=",
               "passed": true,
-              "value": 5.5022613435779756e-17
+              "value": 5.5229073376031225e-17
             },
             {
               "id": "rest.steady_normal_force_relative_error",
@@ -4665,15 +4665,15 @@
           "determinism_max_abs_delta": 0.0,
           "duration_s": 10.0,
           "metrics": {
-            "final_abs_longitudinal_velocity_mps": 3.486986100374281e-19,
-            "final_longitudinal_velocity_mps": -3.486986100374281e-19,
+            "final_abs_longitudinal_velocity_mps": 1.2896401295007274e-19,
+            "final_longitudinal_velocity_mps": -1.2896401295007274e-19,
             "finite": true,
             "max_unexpected_contact_count": 0,
             "max_warning_count": 0,
             "maximum_abs_roll_pitch_rad": 5.835323198107523e-17,
             "maximum_contact_gap_s": 0.0,
             "maximum_penetration_m": 0.00034406320250363054,
-            "maximum_speed_mps": 3.815616300599824e-16,
+            "maximum_speed_mps": 3.8637332304310297e-16,
             "minimum_steady_mean_wheel_load_ratio": 0.9999999999999989,
             "minimum_steady_wheel_contact_coverage": 1.0,
             "penetration_p99_m": 0.0003309943977193863,
@@ -4681,17 +4681,17 @@
             "steady_mean_total_normal_force_relative_error": 1.5451829795666468e-16,
             "steady_normal_force_relative_error": 1.5451829795666468e-16,
             "steady_penetration_p99_m": 0.0003162240158676721,
-            "steady_roll_pitch_p99_rad": 5.5022613435779756e-17,
-            "steady_speed_p99_mps": 3.776426443278083e-16,
+            "steady_roll_pitch_p99_rad": 5.5229073376031225e-17,
+            "steady_speed_p99_mps": 3.8314538250848185e-16,
             "steady_vertical_speed_p99_mps": 8.006158370877337e-15,
-            "steady_xy_drift_m": 5.104837182948811e-15,
-            "steady_yaw_drift_rad": 1.5799690670392864e-30,
-            "steady_yaw_rate_p99_rad_s": 6.893288382448101e-31
+            "steady_xy_drift_m": 5.104625181410113e-15,
+            "steady_yaw_drift_rad": 1.581192722462834e-30,
+            "steady_yaw_rate_p99_rad_s": 7.07134986532444e-31
           },
           "telemetry_sha256": [
-            "d5961c7f664c39d6e476de6e0e5246cd5d25ea35cb28d6769beb05efd88cfca0",
-            "d5961c7f664c39d6e476de6e0e5246cd5d25ea35cb28d6769beb05efd88cfca0",
-            "d5961c7f664c39d6e476de6e0e5246cd5d25ea35cb28d6769beb05efd88cfca0"
+            "36109b9ab2a646eb4e5a64298f470adc4b2154efd82cdc98440e031c18b0114c",
+            "36109b9ab2a646eb4e5a64298f470adc4b2154efd82cdc98440e031c18b0114c",
+            "36109b9ab2a646eb4e5a64298f470adc4b2154efd82cdc98440e031c18b0114c"
           ]
         },
         "steer_left": {
@@ -4766,7 +4766,7 @@
               "metric": "steady_chassis_z_peak_to_peak_m",
               "operator": "<=",
               "passed": true,
-              "value": 0.00034176852408485114
+              "value": 0.0003354211214414704
             },
             {
               "id": "steer_left.steady_vertical_speed_p99_mps",
@@ -4774,7 +4774,7 @@
               "metric": "steady_vertical_speed_p99_mps",
               "operator": "<=",
               "passed": true,
-              "value": 0.018608446186876286
+              "value": 0.01860844618687633
             },
             {
               "id": "steer_left.minimum_steady_mean_wheel_load_ratio",
@@ -4798,7 +4798,7 @@
               "metric": "final_lateral_displacement_m",
               "operator": ">=",
               "passed": true,
-              "value": 4.285574566553858
+              "value": 4.290221061688562
             },
             {
               "id": "steer_left.final_yaw_rad",
@@ -4806,7 +4806,7 @@
               "metric": "final_yaw_rad",
               "operator": ">=",
               "passed": true,
-              "value": 0.6150848084352694
+              "value": 0.6151013816806931
             },
             {
               "id": "steer_left.mean_commanded_steering_angle_rad",
@@ -4829,10 +4829,10 @@
           "determinism_max_abs_delta": 0.0,
           "duration_s": 7.0,
           "metrics": {
-            "final_abs_longitudinal_velocity_mps": 4.02689847058789,
-            "final_lateral_displacement_m": 4.285574566553858,
-            "final_longitudinal_velocity_mps": 4.02689847058789,
-            "final_yaw_rad": 0.6150848084352694,
+            "final_abs_longitudinal_velocity_mps": 4.0268534497305986,
+            "final_lateral_displacement_m": 4.290221061688562,
+            "final_longitudinal_velocity_mps": 4.0268534497305986,
+            "final_yaw_rad": 0.6151013816806931,
             "finite": true,
             "max_unexpected_contact_count": 0,
             "max_warning_count": 0,
@@ -4840,20 +4840,20 @@
             "maximum_commanded_steering_error_rad": 0.00704397666263995,
             "maximum_contact_gap_s": 0.016,
             "maximum_penetration_m": 0.0008324123270580519,
-            "maximum_speed_mps": 4.294575711092062,
+            "maximum_speed_mps": 4.296567450418377,
             "mean_commanded_steering_angle_rad": 0.19367775480553165,
             "minimum_steady_mean_wheel_load_ratio": 0.9212180019745178,
             "minimum_steady_wheel_contact_coverage": 0.9160330578512397,
             "penetration_p99_m": 0.0007769647131721007,
-            "steady_chassis_z_peak_to_peak_m": 0.00034176852408485114,
+            "steady_chassis_z_peak_to_peak_m": 0.0003354211214414704,
             "steady_mean_total_normal_force_relative_error": 4.712808087678273e-13,
             "steady_penetration_p99_m": 0.0007998185864246274,
-            "steady_vertical_speed_p99_mps": 0.018608446186876286
+            "steady_vertical_speed_p99_mps": 0.01860844618687633
           },
           "telemetry_sha256": [
-            "a3e07a62b4a8f6c54869b9de0e4af16ec04536cefa9b1c7e4250935c4d50156e",
-            "a3e07a62b4a8f6c54869b9de0e4af16ec04536cefa9b1c7e4250935c4d50156e",
-            "a3e07a62b4a8f6c54869b9de0e4af16ec04536cefa9b1c7e4250935c4d50156e"
+            "bd3180a4411b2687764677dcbbe83837c1e99917b9d264196bc5b93cde11eba8",
+            "bd3180a4411b2687764677dcbbe83837c1e99917b9d264196bc5b93cde11eba8",
+            "bd3180a4411b2687764677dcbbe83837c1e99917b9d264196bc5b93cde11eba8"
           ]
         },
         "steer_right": {
@@ -4928,7 +4928,7 @@
               "metric": "steady_chassis_z_peak_to_peak_m",
               "operator": "<=",
               "passed": true,
-              "value": 0.00034176852408485114
+              "value": 0.0003354211214415259
             },
             {
               "id": "steer_right.steady_vertical_speed_p99_mps",
@@ -4936,7 +4936,7 @@
               "metric": "steady_vertical_speed_p99_mps",
               "operator": "<=",
               "passed": true,
-              "value": 0.018608446186874846
+              "value": 0.018608446186874895
             },
             {
               "id": "steer_right.minimum_steady_mean_wheel_load_ratio",
@@ -4960,7 +4960,7 @@
               "metric": "final_lateral_displacement_m",
               "operator": "<=",
               "passed": true,
-              "value": -4.285574566553854
+              "value": -4.290221061688558
             },
             {
               "id": "steer_right.final_yaw_rad",
@@ -4968,7 +4968,7 @@
               "metric": "final_yaw_rad",
               "operator": "<=",
               "passed": true,
-              "value": -0.6150848084352692
+              "value": -0.615101381680693
             },
             {
               "id": "steer_right.mean_commanded_steering_angle_rad",
@@ -4991,10 +4991,10 @@
           "determinism_max_abs_delta": 0.0,
           "duration_s": 7.0,
           "metrics": {
-            "final_abs_longitudinal_velocity_mps": 4.026898470587888,
-            "final_lateral_displacement_m": -4.285574566553854,
-            "final_longitudinal_velocity_mps": 4.026898470587888,
-            "final_yaw_rad": -0.6150848084352692,
+            "final_abs_longitudinal_velocity_mps": 4.026853449730597,
+            "final_lateral_displacement_m": -4.290221061688558,
+            "final_longitudinal_velocity_mps": 4.026853449730597,
+            "final_yaw_rad": -0.615101381680693,
             "finite": true,
             "max_unexpected_contact_count": 0,
             "max_warning_count": 0,
@@ -5002,20 +5002,20 @@
             "maximum_commanded_steering_error_rad": 0.007043976662639895,
             "maximum_contact_gap_s": 0.016,
             "maximum_penetration_m": 0.0008324123270581074,
-            "maximum_speed_mps": 4.294575711092062,
+            "maximum_speed_mps": 4.296567450418377,
             "mean_commanded_steering_angle_rad": -0.19367775480553157,
             "minimum_steady_mean_wheel_load_ratio": 0.9212180019745179,
             "minimum_steady_wheel_contact_coverage": 0.9160330578512397,
             "penetration_p99_m": 0.000776964713172134,
-            "steady_chassis_z_peak_to_peak_m": 0.00034176852408485114,
+            "steady_chassis_z_peak_to_peak_m": 0.0003354211214415259,
             "steady_mean_total_normal_force_relative_error": 4.712808087678273e-13,
             "steady_penetration_p99_m": 0.0007998185864246717,
-            "steady_vertical_speed_p99_mps": 0.018608446186874846
+            "steady_vertical_speed_p99_mps": 0.018608446186874895
           },
           "telemetry_sha256": [
-            "7374b84f657475fe5f372d0b973e8ff0fa36b3d1e98a6a8bfa04fc553426f90b",
-            "7374b84f657475fe5f372d0b973e8ff0fa36b3d1e98a6a8bfa04fc553426f90b",
-            "7374b84f657475fe5f372d0b973e8ff0fa36b3d1e98a6a8bfa04fc553426f90b"
+            "b91308d2a84d410dd60ef735705a1a82a15ee48a1403e0db1fa8e812a68f97a2",
+            "b91308d2a84d410dd60ef735705a1a82a15ee48a1403e0db1fa8e812a68f97a2",
+            "b91308d2a84d410dd60ef735705a1a82a15ee48a1403e0db1fa8e812a68f97a2"
           ]
         },
         "straight": {
@@ -5090,7 +5090,7 @@
               "metric": "steady_chassis_z_peak_to_peak_m",
               "operator": "<=",
               "passed": true,
-              "value": 2.0058012913604095e-05
+              "value": 2.0057771041026573e-05
             },
             {
               "id": "straight.steady_vertical_speed_p99_mps",
@@ -5098,7 +5098,7 @@
               "metric": "steady_vertical_speed_p99_mps",
               "operator": "<=",
               "passed": true,
-              "value": 0.0002329504534121984
+              "value": 0.00023295045341219873
             },
             {
               "id": "straight.minimum_steady_mean_wheel_load_ratio",
@@ -5122,7 +5122,7 @@
               "metric": "forward_displacement_m",
               "operator": ">=",
               "passed": true,
-              "value": 20.00545191157226
+              "value": 20.016782907876916
             },
             {
               "id": "straight.speed_at_acceleration_end_mps",
@@ -5130,7 +5130,7 @@
               "metric": "speed_at_acceleration_end_mps",
               "operator": ">=",
               "passed": true,
-              "value": 5.724967637862057
+              "value": 5.72875511899014
             },
             {
               "id": "straight.speed_at_acceleration_end_mps",
@@ -5138,7 +5138,7 @@
               "metric": "speed_at_acceleration_end_mps",
               "operator": "<=",
               "passed": true,
-              "value": 5.724967637862057
+              "value": 5.72875511899014
             },
             {
               "id": "straight.maximum_abs_lateral_displacement_m",
@@ -5146,7 +5146,7 @@
               "metric": "maximum_abs_lateral_displacement_m",
               "operator": "<=",
               "passed": true,
-              "value": 8.927018668423678e-16
+              "value": 8.937716938232128e-16
             },
             {
               "id": "straight.maximum_abs_yaw_rad",
@@ -5154,38 +5154,38 @@
               "metric": "maximum_abs_yaw_rad",
               "operator": "<=",
               "passed": true,
-              "value": 1.5696456337339347e-16
+              "value": 1.5690555771748501e-16
             }
           ],
           "control_steps": 120,
           "determinism_max_abs_delta": 0.0,
           "duration_s": 6.0,
           "metrics": {
-            "final_abs_longitudinal_velocity_mps": 5.665561095573218,
-            "final_longitudinal_velocity_mps": 5.665561095573218,
+            "final_abs_longitudinal_velocity_mps": 5.665498152326762,
+            "final_longitudinal_velocity_mps": 5.665498152326762,
             "finite": true,
-            "forward_displacement_m": 20.00545191157226,
+            "forward_displacement_m": 20.016782907876916,
             "max_unexpected_contact_count": 0,
             "max_warning_count": 0,
-            "maximum_abs_lateral_displacement_m": 8.927018668423678e-16,
+            "maximum_abs_lateral_displacement_m": 8.937716938232128e-16,
             "maximum_abs_roll_pitch_rad": 1.4953294297284864e-05,
-            "maximum_abs_yaw_rad": 1.5696456337339347e-16,
+            "maximum_abs_yaw_rad": 1.5690555771748501e-16,
             "maximum_contact_gap_s": 0.0,
             "maximum_penetration_m": 0.00034406320250363054,
-            "maximum_speed_mps": 5.727229744711391,
+            "maximum_speed_mps": 5.72875511899014,
             "minimum_steady_mean_wheel_load_ratio": 0.9528553645842504,
             "minimum_steady_wheel_contact_coverage": 1.0,
             "penetration_p99_m": 0.00033916086353255045,
-            "speed_at_acceleration_end_mps": 5.724967637862057,
-            "steady_chassis_z_peak_to_peak_m": 2.0058012913604095e-05,
+            "speed_at_acceleration_end_mps": 5.72875511899014,
+            "steady_chassis_z_peak_to_peak_m": 2.0057771041026573e-05,
             "steady_mean_total_normal_force_relative_error": 2.8585885121982966e-14,
             "steady_penetration_p99_m": 0.00033594715844842415,
-            "steady_vertical_speed_p99_mps": 0.0002329504534121984
+            "steady_vertical_speed_p99_mps": 0.00023295045341219873
           },
           "telemetry_sha256": [
-            "1ea72b28dc880128c1aa5377ab1768b486ce8a475702e29fba02911a2de5bafb",
-            "1ea72b28dc880128c1aa5377ab1768b486ce8a475702e29fba02911a2de5bafb",
-            "1ea72b28dc880128c1aa5377ab1768b486ce8a475702e29fba02911a2de5bafb"
+            "7d915eca96d7d87c2b5fda8465741918176f9088b5a6d535860c451a9ce87f0c",
+            "7d915eca96d7d87c2b5fda8465741918176f9088b5a6d535860c451a9ce87f0c",
+            "7d915eca96d7d87c2b5fda8465741918176f9088b5a6d535860c451a9ce87f0c"
           ]
         }
       },
@@ -5196,14 +5196,14 @@
           "limit": 0.1,
           "operator": "<=",
           "passed": true,
-          "value": 8.289935511861437e-16
+          "value": 8.280957152828414e-16
         },
         {
           "id": "steering.yaw_symmetry_relative_error",
           "limit": 0.1,
           "operator": "<=",
           "passed": true,
-          "value": 1.804991782270615e-16
+          "value": 1.8049431487076182e-16
         }
       ]
     }
@@ -5215,7 +5215,7 @@
     "mujoco_version": "3.10.0",
     "numpy_version": "2.4.6",
     "os": "Linux-6.17.0-22-generic-x86_64-with-glibc2.39",
-    "process_id": 71198,
+    "process_id": 20533,
     "python_version": "3.11.15"
   },
   "schema_version": 1,

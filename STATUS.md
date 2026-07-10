@@ -23,14 +23,16 @@ measure native 1/64/256/1024-world GPU stability before building tracks or Contr
   `237f5046dc369095e4247efefe80e2b728254044`: one rigid 6-DoF chassis, four physical rotating
   wheels, two front steering joints, four-wheel drive/brake mapping, rear-axle state extraction,
   substep contact diagnostics, CPU viewer, installed-wheel asset validation, and formal benchmark.
-- Local M1 CPU CI passed 44 tests with one GPU test deselected, strict docs, Actions lint,
+- Corrected public state extraction in `753fa0d39b9109db771a526e3092e309062f64e0` so rear-axle
+  pose and velocity come from the current integrated `qpos/qvel`, then regenerated M1 evidence.
+- Local M1 CPU CI passed 45 tests with one GPU test deselected, strict docs, Actions lint,
   sdist-to-wheel construction, installed-wheel MJCF loading, and package metadata checks.
 - Generated the clean, hash-backed `benchmarks/v0.1/m1_cpu_report.json`:
   - 0.010 s failed long-stress penetration, vertical-motion, and convergence gates;
   - 0.005 s and 0.002 s passed, so 0.005 s is the largest passing CPU candidate;
   - the selected 0.005 s stress run completed 60 seconds with no warnings or unexpected contacts,
-    80.15% minimum per-wheel substep contact participation, a 55 ms maximum continuous contact gap,
-    and 0.791 mm steady penetration P99;
+    79.42% minimum per-wheel substep contact participation, a 40 ms maximum continuous contact gap,
+    and 0.796 mm steady penetration P99;
   - rest, straight, mirrored steering, braking, action clipping/rate limiting, determinism, symmetry,
     and convergence checks all passed.
 
