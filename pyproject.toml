@@ -71,6 +71,8 @@ format-check = { cmd = "ruff format --check .", description = "Check Python form
 lint = { cmd = "ruff check .", description = "Run Python lint checks" }
 tests = { cmd = "pytest", description = "Run CPU tests" }
 sim = { cmd = "python scripts/sim.py", description = "Run one M4 Controller episode on one generated Level 1 track" }
+verify-track-assets = { cmd = "python scripts/verify_track_assets.py", description = "Verify official manifests and fixed Track assets" }
+materialize-track-pool = { cmd = "python scripts/materialize_track_pool.py", description = "Reproduce the verified local Level 1 training pool cache" }
 docs = { cmd = "mkdocs build --strict", description = "Build documentation" }
 actions-lint = { cmd = "actionlint", description = "Validate GitHub Actions workflows" }
 package = { cmd = "python -m build --no-isolation --outdir dist", description = "Build an sdist, then build the wheel from that sdist" }
@@ -78,7 +80,7 @@ package-check = { cmd = "twine check dist/*", depends-on = ["package"], descript
 benchmark-cpu-vehicle = { cmd = "python scripts/benchmark_cpu_vehicle.py", description = "Run the formal M1 CPU vehicle benchmark" }
 benchmark-track-capacity = { cmd = "python scripts/benchmark_track_capacity.py", description = "Run the formal M3 Track capacity benchmark" }
 view-cpu-vehicle = { cmd = "python scripts/view_cpu_vehicle.py", description = "Open the CPU MuJoCo vehicle viewer" }
-ci = { depends-on = ["format-check", "lint", "tests", "docs", "actions-lint", "package-check"], description = "Run CPU CI checks" }
+ci = { depends-on = ["format-check", "lint", "tests", "verify-track-assets", "docs", "actions-lint", "package-check"], description = "Run CPU CI checks" }
 
 [tool.pixi.feature.gpu.tasks]
 gpu-check = { cmd = "python scripts/check_gpu_environment.py", description = "Verify GPU dependencies and one MJX-Warp step" }
@@ -86,6 +88,8 @@ gpu-tests = { cmd = "pytest -m gpu tests/gpu", description = "Run GPU tests" }
 benchmark-gpu = { cmd = "python scripts/benchmark_gpu.py", description = "Run the formal isolated M2 GPU benchmark" }
 benchmark-racing-env = { cmd = "python scripts/benchmark_racing_env.py", description = "Run the formal 1024-world M4 environment benchmark" }
 validate-track-driveability = { cmd = "python scripts/validate_track_driveability.py --output benchmarks/v0.1/track_driveability_report.json", description = "Validate M3 generated tracks on the formal four-wheel GPU backend" }
+build-track-assets = { cmd = "python scripts/build_track_assets.py", description = "Run formal M5 GPU admission and build official Track assets" }
+benchmark-track-pool = { cmd = "python scripts/benchmark_track_pool.py", description = "Run the formal 1024-world M5 TrackPool benchmark" }
 
 [tool.pixi.environments]
 default = { features = ["cpu", "dev"], solve-group = "cpu" }
