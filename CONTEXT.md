@@ -96,6 +96,16 @@ The reference project's useful pattern is its Challenge layering, not its drone 
   candidates in v0.1. Race Core owns ordered checkpoint progress, effective boundary, reward,
   timeout, termination priority, and per-world masked reset independently from the physics backend.
 - Training uses a large pre-generated pool; validation and test geometry are fixed, public, versioned, and disjoint.
+- Benchmark `0.1` fixes one Level 0 Track plus 10,000 Train, 100 Validation, and 20 Test Level 1
+  Tracks. Level 1 seed namespaces are `[0, 1_000_000)`, `[1_000_000, 2_000_000)`, and
+  `[2_000_000, 3_000_000)` respectively; manifest seeds are strictly increasing and packed geometry
+  hashes are globally disjoint.
+- Level 0 is the deterministic ellipse with reserved Track seed/ID `UINT32_MAX`. Level 0,
+  Validation, and Test NPZ assets ship in the package. The 272,800,000-byte Train NPZ is regenerated
+  from its committed seed/hash manifest into `.track-cache/v0.1/` and is never committed.
+- Official admission is first-N ascending-seed selection after generation, geometry validation,
+  packing, geometry-hash isolation, and conservative four-wheel driveability. Infrastructure-level
+  numerical/contact faults invalidate the whole run rather than becoming per-Track rejections.
 - Published benchmark geometry and protocol are immutable within a benchmark version.
 
 ### Environment and API
@@ -107,11 +117,18 @@ The reference project's useful pattern is its Challenge layering, not its drone 
 - `VecCarRacingEnv` uses a leading `num_envs` dimension and Gymnasium NEXT_STEP masked autoreset.
 - `VecCarRacingEnv` is the sole Challenge state machine. `CarRacingEnv` is a host/NumPy batch-one
   adapter and requires an explicit reset after termination.
+- `VecCarRacingEnv` accepts exactly one fixed Track sequence or one immutable `TrackPool`. Pool
+  selection is device-native, deterministic sampling with replacement from SeedSequence domain 2.
+  It atomically replaces Track, vehicle, Race Core, observation, and numeric Track ID on NEXT_STEP
+  reset without creating a training-only environment.
 - Single-environment and batch-size-one behavior is tested for consistency. Warm MJX-Warp active
   and mixed-autoreset steps must pass JAX transfer guards with no host/device transfer.
 - Reset and step info use the fixed public whitelist: episode seed, Controller seed, Track ID,
   benchmark version, termination reason, lap-completed flag, and lap time. Neutral terminal values
   keep the vector schema fixed.
+- Public `track_id` is uint32 `Track.seed`; its stable identity is
+  `(benchmark_version, level_id, track_id)`. A terminal transition reports the old Track, and only
+  the following NEXT_STEP reset reports the newly selected Track.
 - The CPU backend is restricted to one world and remains a development/reference path. Formal
   vector training and evaluation use explicit `backend="mjx_warp"`; there is no silent fallback.
 
@@ -185,6 +202,8 @@ pixi run ci
 pixi run benchmark-cpu-vehicle
 pixi run benchmark-track-capacity
 pixi run sim
+pixi run verify-track-assets
+pixi run materialize-track-pool
 pixi run view-cpu-vehicle -- --scenario demo --duration 12
 
 pixi install -e gpu
@@ -192,6 +211,8 @@ pixi run -e gpu gpu-tests
 pixi run -e gpu benchmark-gpu
 pixi run -e gpu benchmark-racing-env
 pixi run -e gpu validate-track-driveability
+pixi run -e gpu build-track-assets
+pixi run -e gpu benchmark-track-pool
 ```
 
 `train-ppo` is a confirmed future task name and must be added in M7. CPU CI currently checks
@@ -222,6 +243,20 @@ transitions/s, passed active and mixed-autoreset no-transfer guards, observed ti
 autoreset in all worlds, recorded no non-finite public value, and used 556 MiB peak sampled process
 VRAM with 10 MiB steady growth against a 64 MiB gate.
 
+Reviewed M5 admission evidence is stored at `benchmarks/v0.1/m5_track_admission_report.json`. It
+binds every official manifest and asset hash to clean revision `9d9d178`, records all attempted seed
+outcomes, and verifies the written artifacts. Train selected 10,000 Tracks from 11,306 attempts
+after 42 geometry and 1,220 physical rejections. The fixed-shape 1,024-world admission executed
+54,161,408 transitions at 48,523 transitions/s; every selected official Track passed.
+
+Reviewed M5 runtime evidence is stored at `benchmarks/v0.1/m5_track_pool_report.json`. Its v2
+protocol keeps the complete 272,800,000-byte Train pool on GPU, verifies exact domain-2 selection,
+transfer-free active/mixed reset, 65,536 reset-heavy events, all-world timeout/autoreset, numerical
+health, JIT-cache stability, source/privacy, and a post-stabilization allocator plateau. The headline
+1,024-world × 10,000-step epoch measured 210,372 transitions/s, 0.958 of the matched fixed baseline.
+Peak sampled process VRAM was 1,334 MiB; after the disclosed one-time allocator expansion, process,
+pool, and peak growth were zero through three distinct-seed 10,000-step epochs.
+
 ## Experimental Decisions
 
 M1 fixed the physics timestep at 0.005 seconds and proved the standardized actuator mapping on CPU;
@@ -231,7 +266,9 @@ validation ranges, and the 4/12 local projection window from measured evidence. 
 single/vector Gymnasium schema, NEXT_STEP autoreset, restricted Controller boundary, domain-separated
 device-native episode identities, and transfer-free MJX-Warp hot path. PPO hyperparameters, MPC
 horizon/weights, and later Controller-specific tuning remain experimental decisions for their
-implementation milestones.
+implementation milestones. M5 fixed the official split quotas/namespaces/assets, canonical geometry
+hashes and manifests, domain-2 TrackPool selection, numeric Track ID contract, local Train cache,
+bounded physical admission, and v2 full-pool memory/performance protocol.
 
 ## External Reference
 

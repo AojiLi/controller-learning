@@ -2,61 +2,59 @@
 
 Last updated: 2026-07-10
 
-**Status:** M4 is complete. M5 Level assets and Track pools are active.
+**Status:** M5 is complete. M6 PID and MPC are active.
 
 ## Main Line
 
-Turn the proven M4 Gymnasium/Controller path into a versioned Level 0/1 benchmark by adding fixed
-assets, deterministic train/validation/test splits, and device-native pool reselection. PID/MPC and
-PPO remain gated on M5.
+Use the published Level 0/1 benchmark to implement and explain two classical Controller examples:
+an interpretable PID baseline and a constrained CasADi/IPOPT MPC. PPO remains gated on M6.
 
 ## Completed Evidence
 
-- M0 established the Linux/Pixi package, typed configuration, tests, docs, and private GitHub CPU CI.
-- M1 selected the stable 0.005 s CPU MuJoCo physics timestep and validated the four-wheel vehicle.
-- M2 established native MJX-Warp batching through 1,024 worlds × 10,000 steps at 77,751
-  transitions/s without numerical, capacity, or memory-growth failure.
-- M3 locked deterministic 1.0 m Track sampling, 640 points, 48 checkpoints, batched Race Core,
-  1,024-world isolation, and conservative four-wheel driveability.
-- M4 added the registered `ControllerLearning/CarRacing-v0` single environment and the native
-  `VecCarRacingEnv` without a second Challenge implementation.
-- Observation/action, restricted info, invalid-action, terminal, batch-one, and strict NEXT_STEP
-  autoreset semantics pass CPU and GPU tests.
-- Device episode identities reproduce the NumPy `SeedSequence` contract, and warm active/mixed-reset
-  GPU steps pass transfer guards with no host/device transfer.
-- Trusted Controller plugins load in isolated packages, receive immutable public config/info, and
-  start from a fresh instance every episode. The renderer receives only public observations and
-  write-only `DebugDraw` commands.
-- `pixi run sim` completes the neutral template episode on CPU and MJX-Warp; this is an interface
-  test, not a driving baseline.
-- The reviewed `benchmarks/v0.1/m4_environment_report.json` passed all formal gates. It used 1,024
-  distinct valid Tracks for 10,000 steps, measured 165,633 transitions/s, observed independent
-  timeout/autoreset in all worlds, recorded zero non-finite public values, and sampled 556 MiB peak
-  process VRAM with 10 MiB steady growth.
-- Current local validation passes 298 CPU/default tests and all 21 GPU tests.
+- M0 established the private Linux/Pixi repository, package, typed config, CPU CI, and docs.
+- M1 selected the stable 0.005 s CPU MuJoCo timestep for the physical four-wheel vehicle.
+- M2 proved native MJX-Warp batching through 1,024 worlds × 10,000 steps.
+- M3 locked deterministic Track generation, 640/48 fixed capacity, Race Core, and initial physical
+  driveability.
+- M4 added the registered single environment, native vector Challenge, trusted Controller plugins,
+  renderer, and template simulation CLI.
+- M5 published fixed Level 0 plus disjoint 10,000/100/20 Level 1 train/validation/test manifests.
+  Fixed assets are packaged; the 260.162 MiB Train arrays are reproducibly materialized into an
+  ignored local cache and verified against the committed manifest.
+- Formal M5 admission selected every official Track only after geometry and four-wheel driveability.
+  Train required 11,306 attempts: 42 geometry and 1,220 driveability rejections were retained in the
+  report. All artifact hashes, official paths, split isolation, readback, source, and runtime gates
+  passed.
+- The M5 GPU report passed all 62 gates with the full 10,000-Track pool resident. Its headline
+  10,240,000-transition epoch measured 210,372 transitions/s, 0.958 of the matched fixed-track
+  baseline. Exact domain-2 reset selection, no-transfer active/mixed steps, 65,536 reset-heavy
+  events, and all-world timeout/autoreset passed.
+- The strengthened E0–E3 memory protocol showed a post-stabilization plateau: 1,334 MiB peak process
+  VRAM, zero process/pool/peak growth after E0, bounded live-buffer variation, stable host RSS, and
+  no JIT recompilation.
+- Current local validation passes 404 CPU/default tests, all 22 GPU tests, strict documentation,
+  official-asset verification, Actions linting, and release-package checks.
 
-M4 therefore clears the public environment, native GPU hot path, Controller isolation, rendering,
-and simulation CLI gates. It does not claim that any driving Controller succeeds.
+M5 therefore clears Level assets, versioned manifests, physical admission, reproducible Train cache,
+device-native pool autoreset, and full-pool GPU performance. It makes no PID/MPC/PPO success claim.
 
-## Current Thinking
+## Current Work
 
-M5 should extend Track ownership rather than environment architecture. A pool-aware Track source
-must feed the same fixed-shape `VecCarRacingEnv`, select replacement geometry on device during
-masked reset, and preserve deterministic episode/Controller seed domains. Fixed validation/test
-geometry and hashes should be committed and immutable, while the roughly 260 MiB training pool
-needs a reproducible materialization/cache strategy instead of an unreviewed large Git artifact.
+- observation-only geometry and speed-planning helpers;
+- PID Controller, config, tests, DebugDraw, Level 0 completion, and Level 1 portability;
+- CasADi/IPOPT dependency integration and warm-started constrained MPC;
+- fixed-validation success and Controller deadline evidence;
+- English PID/MPC tutorials.
 
 ## Next Step
 
-Lock the M5 manifest and split schema, public device-native Track ID, per-world pool RNG rule, and
-Level 0 asset before generating the formal 10,000-Track pool.
+Implement and validate shared public geometry helpers and the PID Controller on the fixed Level 0
+asset, then use that tested path as the reference for MPC integration.
 
 ## Risks and Blockers
 
-- The M4 string Track ID is constant for injected Tracks; dynamic pool selection needs a numerical
-  device representation without breaking the public single-environment API.
-- A convenient host-side pool sampler would reintroduce the transfer bottleneck removed in M4.
-- Committing the full training arrays would create an unsuitable repository artifact; regenerating
-  without hashes would weaken reproducibility.
-- Physical admission of roughly 10,000 Tracks must be batched and bounded so it remains practical
-  while still rejecting undriveable geometry.
+- Controller utilities must not expose Race Core projection/checkpoint internals as shortcuts.
+- PID parameters must not be retuned per Track; validation must use the published fixed split.
+- Nonlinear MPC may exceed the soft 50 ms compute deadline; horizon/warm-start tradeoffs require
+  measurement before considering the planned linearized fallback.
+- M5 evidence files are large but reviewed; the 272.8 MB Train NPZ remains local and ignored.
