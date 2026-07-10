@@ -31,5 +31,6 @@ pixi run -e gpu benchmark-track-pool
 `verify-track-assets`, followed by `materialize-track-pool` when the Train cache is needed. Reviewed
 evidence is in the
 [M5 admission report](../benchmarks/v0.1/m5_track_admission_report.json) and
-[M5 TrackPool report](../benchmarks/v0.1/m5_track_pool_report.json). M5 is complete; M6 PID and MPC
-Controller work is active and must consume these published values rather than override them.
+[M5 TrackPool report](../benchmarks/v0.1/m5_track_pool_report.json). M6 PID and MPC are also
+complete and use these published values through the public Challenge. M7 PPO training is active;
+its Controller and training configuration must not override Challenge, Level, or benchmark values.

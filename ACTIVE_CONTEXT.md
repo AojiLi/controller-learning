@@ -4,82 +4,90 @@ Last updated: 2026-07-10
 
 ## Current Direction
 
-Execute M6: add the educational PID and CasADi/IPOPT MPC Controller examples on top of the now
-published Level 0/1 benchmark. M0 through M5 are complete. Do not start PPO until PID/MPC, their
-public geometry utilities, documentation, timing evidence, and M6 success gates are complete.
+Execute M7: train one PyTorch PPO directly against the official GPU-batched
+`VecCarRacingEnv`, export the selected checkpoint as a normal single-environment Controller, and
+produce reproducible training, comparison, and replay evidence. M0 through M6 are complete. Do not
+touch the Test split or start M8 publication work until the M7 training and Controller gates pass.
 
-## M5 Handoff Evidence
+## M6 Handoff Evidence
 
-- Level 0 is one fixed smooth ellipse with reserved numeric Track ID `UINT32_MAX`. Level 1 uses
-  versioned train/validation/test manifests with 10,000 / 100 / 20 Tracks in disjoint seed
-  namespaces. All selected IDs and packed-geometry hashes are disjoint.
-- Validation/test/Level 0 assets are committed and packaged. The 272,800,000-byte training pool is
-  reconstructed from the committed seed/hash manifest into `.track-cache/v0.1/train_pool.npz`; it
-  is verified but never committed.
-- Formal admission scanned seeds in ascending order without retry. It selected 10,000 Train Tracks
-  from 11,306 attempts after 42 geometry and 1,220 physical rejections. Every selected official
-  Track passed geometry and conservative four-wheel MJX-Warp driveability.
-- `VecCarRacingEnv` remains the only Challenge state machine. It accepts either fixed injected
-  Tracks or a `TrackPool`, derives pool selection from SeedSequence domain 2, and atomically replaces
-  Track/vehicle/Race/observation state during NEXT_STEP reset.
-- Public `track_id` is the device-native uint32 generator seed. Its stable namespace is
-  `(benchmark_version, level_id, track_id)`. Terminal steps expose the old ID; the following reset
-  step exposes the deterministically selected new ID.
-- The formal M5 pool report passed 62 gates. The headline 1,024-world × 10,000-step epoch measured
-  210,372 transitions/s; fixed-track baseline was 219,605 transitions/s, ratio 0.958. Active and
-  mixed-reset transfer guards, exact domain-2 selection, all-world timeout/autoreset, JIT-cache
-  stability, and numerical checks passed.
-- The v2 memory protocol ran E0 plus three distinct-seed 10,000-step epochs on one environment.
-  After the disclosed one-time 524 MiB allocator expansion, process VRAM and allocator pool/peak
-  growth were zero through E3; live JAX growth stayed below 4.94 MB and host RSS drift was 0.027 MiB.
-  Peak sampled process VRAM was 1,334 MiB.
+- PID and MPC are ordinary directory plugins that consume only the public observation, restricted
+  info, immutable config, callbacks, and write-only `DebugDraw`. Shared geometry and speed-planning
+  utilities derive every control quantity from the public observation.
+- The physical four-wheel MJX-Warp car remains simulation truth. MPC uses a three-state Frenet
+  kinematic model only inside its prediction problem and applies public action, rate, speed, and
+  effective-track constraints.
+- `benchmarks/v0.1/m6_controller_report.json` passed 34/34 gates at clean revision `add0a9a`.
+  PID completed Level 0 and 10/10 Validation-prefix Tracks. MPC completed Level 0 and 95/100 full
+  Validation Tracks; all five failures were timeouts.
+- Combined MPC compute timing was 32.373/39.892/44.347 ms at P50/P95/P99 with a 0.0967% miss rate
+  against the 50 ms soft deadline. PID P99 was 0.401 ms with no misses. Both passed the diagnostic
+  real-time qualification; this is measured local evidence, not a platform support claim.
+- Formal M6 used four batch-one MJX-Warp backends and 112 fresh Controller instances. All 234,358
+  public transitions were finite, invalid-action count was zero, peak sampled process VRAM was
+  396 MiB, and JAX live bytes returned to zero after each group.
+- Validation rows were selected explicitly from verified pools while preserving row-index reset
+  seeds. The report loaded only Level 0 and Validation; Test was not accessed.
+- Environment teardown now severs instance-owned JIT, driver, and device-state references without
+  process-global cache clearing. Public evaluation retains its original per-Track environment path
+  when no reusable pool is supplied.
+- Current local validation passes 547 CPU/default tests, all 23 GPU tests, strict documentation,
+  official-asset verification, Actions linting, and release-package checks.
 
-M5 proves benchmark assets, physical admission, reproducible local materialization, device-native
-pool sampling, and large-pool GPU execution. It does not claim that a public Controller can drive.
+M6 proves that public classical Controllers can solve the Challenge and that the same evaluator can
+produce fixed-order, source-bound timing and success evidence. It does not prove PPO learning.
 
 ## Current Narrow Focus
 
-1. Add public, observation-only geometry helpers needed by both classical Controllers without
-   exposing Race Core or simulator internals.
-2. Implement the longitudinal curvature-speed planner and anti-windup speed PID.
-3. Implement the lateral cascade/PD PID with one parameter set that completes Level 0 and runs on
-   Level 1 without per-track tuning.
-4. Add CasADi + IPOPT through the existing Pixi lock, then implement a warm-started kinematic-car
-   MPC with action, speed, and effective-track constraints.
-5. Add Controller configs, DebugDraw, tutorials, timing/deadline measurements, deterministic
-   evaluation scripts, and focused tests.
-6. Demonstrate PID and MPC Level 0 completion, then tune MPC toward approximately 80% success on the
-   fixed 100-Track Level 1 validation set without touching test geometry.
+1. Add one strict PPO configuration and split-specific asset loaders. Training may read only the
+   verified 10,000-Track Train cache; checkpoint selection may read Validation in a separate phase.
+2. Build public observation/reward wrappers and a narrow JAX-to-Torch DLPack bridge. Preserve the
+   public string `benchmark_version` info field instead of passing it to DLPack.
+3. Implement a CleanRL-style actor/critic and NEXT_STEP-aware rollout/GAE logic. Reset-only world
+   slots after terminal transitions must be excluded from learning and must break advantage
+   recursion.
+4. Train through one long-lived 1,024-world official `VecCarRacingEnv`, with local CSV/TensorBoard
+   logging, atomic checkpoints, memory/timing/numerical evidence, and deterministic seeds.
+5. Select a checkpoint on Validation without further gradient updates, compare it with a seeded
+   random policy, and export a small inference-only checkpoint as `controllers/ppo`.
+6. Run the exported plugin through the existing batch-one Evaluator, generate the required replay
+   and manifest, document the method in English, and persist a strict M7 report.
 
 ## Scope Boundaries
 
 In scope:
 
-- PID longitudinal/lateral loops, curvature speed planning, anti-windup, and interpretable config;
-- CasADi/IPOPT kinematic-car MPC, warm start, constraints, and bounded fallback behavior;
-- public geometry helpers derived only from observations;
-- Level 0/validation evaluation and Controller compute-time/deadline evidence;
-- English tutorials and DebugDraw examples.
+- one PyTorch PPO with an MLP policy/value network and state/local-track observation;
+- public reward shaping and observation compression layered over the official Challenge;
+- numeric JAX/Torch DLPack exchange without a second environment implementation;
+- Train-only optimization, Validation-only selection, and comparison with random actions;
+- 1,024-world smoke/full training, local artifacts, checkpoint Controller, replay, and evidence.
 
 Out of scope:
 
-- PPO, reward shaping, or training code (M7);
-- MPCC, acados, perception, multi-car racing, sim-to-real, or alternative simulation truth;
-- tuning on the fixed Test split or changing any M5 manifest/asset/protocol;
-- claims of macOS, Windows, WSL2, or real-time support without evidence.
+- Test access or final Test evaluation before M8;
+- a simplified PPO physics/Challenge path, CPU multiprocessing, or one Controller per GPU world;
+- private Race Core indices, TrackPool rows, MJX state, or simulator objects as policy features;
+- SAC/TD3, MPCC, perception, multi-car racing, sim-to-real, or broader backend abstractions;
+- macOS, Windows, WSL2, multi-GPU, or public-release claims without later evidence.
 
 ## Confirmed Judgments
 
-- The four-wheel simulator remains truth; MPC may use a kinematic car only as its internal model.
-- Controllers consume only observation/info/public config and do not receive Environment, TrackPool,
-  Race Core, MJX, or hidden projection state.
-- Level 0 completion is required for both PID and MPC. The approximately 80% Level 1 validation
-  target belongs to MPC and must be measured over the fixed 100-Track validation manifest.
-- If nonlinear MPC misses the soft 50 ms deadline, first shorten the horizon and improve warm start;
-  then evaluate linearized MPC + OSQP. Do not silently introduce a second Challenge path.
-- Test Tracks stay untouched until M8 formal evaluation.
+- PPO trains the exact `VecCarRacingEnv` used by formal evaluation, with only public observation and
+  reward wrappers. There is no training-only transition function.
+- Gymnasium's stock `JaxToTorch` conversion cannot handle the public NumPy string
+  `benchmark_version`; M7 needs a small compatible wrapper that converts numeric leaves by DLPack
+  and preserves the whitelisted string field.
+- With Gymnasium NEXT_STEP autoreset, the call after a terminal transition is a reset-only slot for
+  that world. PPO must mask it from rewards, GAE, advantage normalization, losses, and valid-sample
+  counts while other worlds continue normally.
+- The general all-split verifier is not a training loader because it reads Test. Train and
+  Validation loaders must be explicit and guarded independently.
+- PPO hyperparameters, feature/reward weights, and the formal training budget must first be
+  measured on Train-only smoke runs and frozen before formal Validation selection.
+- Test Tracks remain untouched until M8 formal evaluation.
 
 ## Next Step
 
-Inspect the existing public observation/controller boundary and implement the smallest shared
-geometry/speed-planning utilities plus a tested PID Controller before adding CasADi or MPC.
+Implement and test the strict PPO configuration plus a Train-only verified pool loader before
+adding Torch wrappers or the optimization loop.

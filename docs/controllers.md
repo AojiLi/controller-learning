@@ -264,6 +264,30 @@ formal evidence only when the report exists, its top-level `status` is `pass`, a
 asset, protocol, runtime, privacy, and recomputation checks pass. The implementation or one local
 episode is not a substitute for that evidence.
 
+## Measured M6 Controller result
+
+The reviewed M6 report passed all 34 gates on the formal MJX-Warp backend. PID completed Level 0
+and all 10 fixed Validation-prefix Tracks. MPC completed Level 0 and 95 of the 100 fixed Validation
+Tracks; all five unsuccessful MPC episodes ended by timeout, with no off-track or invalid-action
+termination.
+
+| Controller | Level 0 | Validation | Compute P50 | Compute P95 | Compute P99 | Deadline miss rate |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| PID | 1 / 1 | 10 / 10 | 0.287 ms | 0.352 ms | 0.401 ms | 0% |
+| MPC | 1 / 1 | 95 / 100 | 32.373 ms | 39.892 ms | 44.347 ms | 0.0967% |
+
+The complete run used four batch-one environment backends and constructed 112 fresh Controller
+instances. It checked 234,358 public transitions, corresponding to 2,343,580 physics substeps,
+without a non-finite public value or invalid action. Peak sampled process VRAM was 396 MiB; JAX
+live bytes returned to zero after every controller/split group. The report loaded only Level 0 and
+Validation assets, never the Test split. These numbers measure sequential closed-loop Controller
+evaluation with host synchronization, not native batched GPU physics throughput.
+
+See the
+[M6 Controller report](https://github.com/AojiLi/controller-learning/blob/main/benchmarks/v0.1/m6_controller_report.json)
+for per-Track outcomes, timing samples, runtime versions, source and asset hashes, memory phases,
+and recomputable gates.
+
 ## Dependency licenses
 
 The repository's MIT license covers Controller Learning's own source. It does not replace the

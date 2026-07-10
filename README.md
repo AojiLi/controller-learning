@@ -5,12 +5,12 @@ pluggable controllers, and reproducible evaluation.**
 
 Controller Learning is a benchmark and teaching platform for developing and comparing race-car
 controllers under one environment, vehicle, task, and evaluation protocol. PID and MPC are
-implemented as educational examples, while PPO remains planned; the reusable Challenge and
+implemented as educational examples, while PPO is the active milestone; the reusable Challenge and
 Controller interface are the core product.
 
-> **Project status:** M5 is complete. Fixed Level 0/1 assets, versioned Track manifests, reproducible
-> training-pool materialization, and the 10,000-Track GPU pool have passed their formal gates. M6
-> PID/MPC implementation, documentation, and formal Controller evidence are now active.
+> **Project status:** M6 is complete. PID and MPC now run through the same public Controller and
+> formal MJX-Warp evaluation path; MPC completed 95 of 100 fixed Validation Tracks. M7 PPO training
+> on the official vector environment is active.
 
 Reviewed machine-readable evidence is available in the
 [M1 CPU report](benchmarks/v0.1/m1_cpu_report.json) and
@@ -20,7 +20,8 @@ Reviewed machine-readable evidence is available in the
 environment path is measured in the
 [M4 environment report](benchmarks/v0.1/m4_environment_report.json). M5 evidence is in the
 [Track admission report](benchmarks/v0.1/m5_track_admission_report.json) and
-[TrackPool GPU report](benchmarks/v0.1/m5_track_pool_report.json).
+[TrackPool GPU report](benchmarks/v0.1/m5_track_pool_report.json). Classical Controller evidence is
+in the [M6 Controller report](benchmarks/v0.1/m6_controller_report.json).
 
 ## Why This Project Exists
 
@@ -100,8 +101,8 @@ no long-window process-VRAM growth. All states remained finite, all four wheel c
 within the physical gates, and no buffer overflow, unexpected contact, or runtime warning occurred.
 
 This is the M2 physics-layer result. M3 subsequently validated track geometry and independent Race
-Core state, and M4 exposed them through Gymnasium. PPO remains a later milestone and is not implied
-by these results.
+Core state, and M4 exposed them through Gymnasium. PPO training belongs to M7 and is not implied by
+the M2 result.
 
 ## Verified M3 Track and Race Core Result
 
@@ -170,6 +171,26 @@ zero through E3. Peak sampled process VRAM was 1,334 MiB. Health, reset-heavy, t
 source, and privacy gates also passed. These are environment and asset results, not Controller
 success claims. See [Tracks and Race Core](docs/tracks.md) for the asset and sampling contracts.
 
+## Verified M6 PID and MPC Result
+
+M6 adds observation-only geometry and speed-planning utilities, an interpretable cascaded PID, and
+a constrained CasADi/IPOPT nonlinear MPC. Both are ordinary Controller directory plugins and use
+the same public observation, action, config, callback, and `DebugDraw` interfaces available to a
+new user Controller. The four-wheel MJX-Warp vehicle remains the simulation truth; MPC's Frenet
+kinematic model exists only inside that Controller.
+
+The formal report passed all 34 gates. PID completed Level 0 and all 10 fixed Validation-prefix
+Tracks. MPC completed Level 0 and 95 of all 100 fixed Validation Tracks; the five failures were
+timeouts, with no off-track or invalid-action termination. MPC compute time over Level 0 plus
+Validation measured 32.373 ms P50, 39.892 ms P95, and 44.347 ms P99, with a 0.0967% miss rate
+against the 50 ms soft deadline. PID P99 was 0.401 ms with no misses.
+
+The sequential closed-loop run checked 234,358 public transitions and 2,343,580 physics substeps
+without a non-finite public value or invalid action. Four batch-one environment backends served 112
+fresh Controller instances. Peak sampled process VRAM was 396 MiB, and JAX live bytes returned to
+zero after each controller/split group. Only Level 0 and Validation assets were loaded; Test was not
+accessed. See [Classical Controllers](docs/controllers.md) for the designs and measurement scope.
+
 ## Roadmap
 
 The implementation follows strict milestone gates:
@@ -180,8 +201,8 @@ The implementation follows strict milestone gates:
 - M3: batched tracks and Race Core — complete
 - M4: Gymnasium environments and Controller platform — complete
 - M5: Level 0/1 and versioned track pools — complete
-- M6: PID and MPC — active
-- M7: PPO on the official vector environment
+- M6: PID and MPC — complete
+- M7: PPO on the official vector environment — active
 - M8: evaluation, documentation, and public v0.1 release
 
 The detailed confirmed design is recorded in [PROJECT_PLAN.md](PROJECT_PLAN.md).

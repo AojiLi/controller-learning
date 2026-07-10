@@ -213,6 +213,7 @@ pixi run -e gpu benchmark-racing-env
 pixi run -e gpu validate-track-driveability
 pixi run -e gpu build-track-assets
 pixi run -e gpu benchmark-track-pool
+pixi run -e gpu benchmark-controllers
 ```
 
 `train-ppo` is a confirmed future task name and must be added in M7. CPU CI currently checks
@@ -257,6 +258,15 @@ health, JIT-cache stability, source/privacy, and a post-stabilization allocator 
 Peak sampled process VRAM was 1,334 MiB; after the disclosed one-time allocator expansion, process,
 pool, and peak growth were zero through three distinct-seed 10,000-step epochs.
 
+Reviewed M6 Controller evidence is stored at `benchmarks/v0.1/m6_controller_report.json`. Its
+locked formal run used four batch-one MJX-Warp environment backends and 112 fresh Controller
+instances. PID completed Level 0 and 10/10 fixed Validation-prefix Tracks. MPC completed Level 0
+and 95/100 fixed Validation Tracks; all five failures were timeouts. Combined MPC compute timing
+was 32.373/39.892/44.347 ms at P50/P95/P99 with a 0.0967% soft-deadline miss rate. All 234,358
+public transitions were finite, invalid-action count was zero, peak sampled process VRAM was
+396 MiB, and post-group JAX live bytes were zero. The report passed 34/34 gates, loaded only Level 0
+and Validation, and did not access Test.
+
 ## Experimental Decisions
 
 M1 fixed the physics timestep at 0.005 seconds and proved the standardized actuator mapping on CPU;
@@ -264,11 +274,14 @@ M2 retained that timestep on MJX-Warp and locked the reviewed flat-ground contac
 capacities. M3 fixed 1.0 m Track sampling, 640 points, 48 checkpoints, the current generator and
 validation ranges, and the 4/12 local projection window from measured evidence. M4 fixed the
 single/vector Gymnasium schema, NEXT_STEP autoreset, restricted Controller boundary, domain-separated
-device-native episode identities, and transfer-free MJX-Warp hot path. PPO hyperparameters, MPC
-horizon/weights, and later Controller-specific tuning remain experimental decisions for their
-implementation milestones. M5 fixed the official split quotas/namespaces/assets, canonical geometry
-hashes and manifests, domain-2 TrackPool selection, numeric Track ID contract, local Train cache,
-bounded physical admission, and v2 full-pool memory/performance protocol.
+device-native episode identities, and transfer-free MJX-Warp hot path. M5 fixed the official split
+quotas/namespaces/assets, canonical geometry hashes and manifests, domain-2 TrackPool selection,
+numeric Track ID contract, local Train cache, bounded physical admission, and v2 full-pool
+memory/performance protocol. M6 fixed the public-only classical-Controller examples, shared
+geometry/speed-planning utilities, bounded-iteration CasADi/IPOPT MPC configuration, reusable
+batch-one formal evaluator semantics, and the reviewed Level 0/Validation timing protocol. PPO
+hyperparameters remain experimental and must be locked from Train-only evidence before formal
+Validation selection.
 
 ## External Reference
 
