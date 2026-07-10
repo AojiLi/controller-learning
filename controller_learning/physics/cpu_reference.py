@@ -174,41 +174,41 @@ class CpuVehicle:
         )
         return state
 
-    def _rear_axle_velocity(self) -> NDArray[np.float64]:
-        velocity = np.empty(6, dtype=np.float64)
-        mujoco.mj_objectVelocity(
-            self.model,
-            self.data,
-            mujoco.mjtObj.mjOBJ_SITE,
-            self.indices.rear_axle_site,
-            velocity,
-            1,
-        )
-        return velocity
+    def _current_chassis_rotation(self) -> NDArray[np.float64]:
+        """Return the current body-to-world rotation directly from free-joint qpos."""
+
+        rotation = np.empty(9, dtype=np.float64)
+        mujoco.mju_quat2Mat(rotation, self.data.qpos[3:7])
+        return rotation.reshape(3, 3)
 
     def state(self) -> VehicleState:
         """Read state using the project +x-forward, +y-left, yaw-CCW convention."""
 
-        chassis_rotation = self.data.xmat[self.indices.chassis_body].reshape(3, 3)
+        chassis_rotation = self._current_chassis_rotation()
         roll = atan2(chassis_rotation[2, 1], chassis_rotation[2, 2])
         pitch = atan2(
             -chassis_rotation[2, 0],
             hypot(chassis_rotation[0, 0], chassis_rotation[1, 0]),
         )
         yaw = atan2(chassis_rotation[1, 0], chassis_rotation[0, 0])
-        spatial_velocity = self._rear_axle_velocity()
+        rear_axle_offset_body = self.model.site_pos[self.indices.rear_axle_site]
+        rear_axle_position_world = self.data.qpos[:3] + chassis_rotation @ rear_axle_offset_body
+        angular_velocity_body = self.data.qvel[3:6]
+        rear_axle_velocity_body = chassis_rotation.T @ self.data.qvel[:3] + np.cross(
+            angular_velocity_body, rear_axle_offset_body
+        )
         steering = self.data.qpos[list(self.indices.steering_qpos)]
         wheel_velocity = self.data.qvel[list(self.indices.wheel_dofs)]
         return VehicleState(
             time_s=float(self.data.time),
-            position_world_m=_tuple(self.data.site_xpos[self.indices.rear_axle_site]),
-            chassis_position_world_m=_tuple(self.data.xpos[self.indices.chassis_body]),
-            quaternion_wxyz=_tuple(self.data.xquat[self.indices.chassis_body]),
+            position_world_m=_tuple(rear_axle_position_world),
+            chassis_position_world_m=_tuple(self.data.qpos[:3]),
+            quaternion_wxyz=_tuple(self.data.qpos[3:7]),
             roll_rad=roll,
             pitch_rad=pitch,
             yaw_rad=yaw,
-            velocity_body_mps=_tuple(spatial_velocity[3:]),
-            angular_velocity_body_rad_s=_tuple(spatial_velocity[:3]),
+            velocity_body_mps=_tuple(rear_axle_velocity_body),
+            angular_velocity_body_rad_s=_tuple(angular_velocity_body),
             steering_angle_rad=float(np.mean(steering)),
             front_steering_angles_rad=(float(steering[0]), float(steering[1])),
             wheel_angular_velocity_rad_s=(

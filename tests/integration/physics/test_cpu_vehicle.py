@@ -85,3 +85,24 @@ def test_body_velocity_is_expressed_in_the_rotated_vehicle_frame(vehicle_config)
 
     assert state.yaw_rad == pytest.approx(yaw)
     assert state.velocity_body_mps == pytest.approx((3.0, 0.0, 0.0), abs=1e-12)
+
+
+def test_state_uses_current_integrated_qpos_and_qvel(vehicle_config) -> None:
+    vehicle = CpuVehicle(vehicle_config)
+    for _ in range(20):
+        state = vehicle.step((0.15, 1.5))
+
+    rotation = np.empty(9, dtype=np.float64)
+    mujoco.mju_quat2Mat(rotation, vehicle.data.qpos[3:7])
+    rotation = rotation.reshape(3, 3)
+    rear_offset = vehicle.model.site_pos[vehicle.indices.rear_axle_site]
+    expected_position = vehicle.data.qpos[:3] + rotation @ rear_offset
+    expected_velocity = rotation.T @ vehicle.data.qvel[:3] + np.cross(
+        vehicle.data.qvel[3:6], rear_offset
+    )
+
+    assert state.chassis_position_world_m == pytest.approx(vehicle.data.qpos[:3], abs=1e-12)
+    assert state.quaternion_wxyz == pytest.approx(vehicle.data.qpos[3:7], abs=1e-12)
+    assert state.position_world_m == pytest.approx(expected_position, abs=1e-12)
+    assert state.velocity_body_mps == pytest.approx(expected_velocity, abs=1e-12)
+    assert state.angular_velocity_body_rad_s == pytest.approx(vehicle.data.qvel[3:6], abs=1e-12)

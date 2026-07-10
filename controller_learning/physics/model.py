@@ -124,11 +124,20 @@ def validate_vehicle_model(
     """Check MJCF structure and physical constants against typed configuration."""
 
     resolved = indices or vehicle_model_indices(model)
-    free_joint_count = int(np.count_nonzero(model.jnt_type == mujoco.mjtJoint.mjJNT_FREE))
-    if free_joint_count != 1:
+    free_joint_ids = np.flatnonzero(model.jnt_type == mujoco.mjtJoint.mjJNT_FREE)
+    if free_joint_ids.size != 1:
         raise VehicleModelError(
-            f"vehicle must contain exactly one free joint, got {free_joint_count}"
+            f"vehicle must contain exactly one free joint, got {free_joint_ids.size}"
         )
+    free_joint_id = int(free_joint_ids[0])
+    if not (
+        int(model.jnt_bodyid[free_joint_id]) == resolved.chassis_body
+        and int(model.jnt_qposadr[free_joint_id]) == 0
+        and int(model.jnt_dofadr[free_joint_id]) == 0
+    ):
+        raise VehicleModelError("the chassis free joint must own the leading qpos and qvel fields")
+    if int(model.site_bodyid[resolved.rear_axle_site]) != resolved.chassis_body:
+        raise VehicleModelError("the rear-axle reference site must be attached to the chassis")
     if model.njnt != 7:
         raise VehicleModelError(
             f"vehicle must contain one free and six hinge joints, got {model.njnt}"
