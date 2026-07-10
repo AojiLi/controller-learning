@@ -1,0 +1,33 @@
+schema_version = 1
+
+[protocol]
+benchmark_version = "0.1"
+level_id = 1
+backend = "mjx_warp"
+num_envs = 100
+validation_track_count = 100
+validation_reset_seed = 7
+max_vector_steps = 4000
+
+[training_run]
+run_id = "m7-formal-v0-1-001"
+run_directory = "runs/ppo/m7-formal-v0-1-001"
+training_config = "configs/ppo.toml"
+checkpoint_directory = "checkpoints"
+candidate_updates = [10, 20, 30, 40, 50, 60, 70, 80]
+
+[random_baseline]
+seed = 17
+distribution = "uniform_action_bounds"
+
+[selection]
+ranking = "success_count_desc_mean_successful_lap_time_asc_update_asc"
+minimum_success_rate_margin = 0.10
+require_strict_success_count_improvement = true
+
+[artifacts]
+report_path = "benchmarks/v0.1/m7_ppo_selection_report.json"
+training_curve_path = "benchmarks/v0.1/m7_training_curve.png"
+training_curve_width_px = 1200
+training_curve_height_px = 800
+training_curve_dpi = 100
