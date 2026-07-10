@@ -81,6 +81,7 @@ ci = { depends-on = ["format-check", "lint", "tests", "docs", "actions-lint", "p
 [tool.pixi.feature.gpu.tasks]
 gpu-check = { cmd = "python scripts/check_gpu_environment.py", description = "Verify GPU dependencies and one MJX-Warp step" }
 gpu-tests = { cmd = "pytest -m gpu tests/gpu", description = "Run GPU tests" }
+benchmark-gpu = { cmd = "python scripts/benchmark_gpu.py", description = "Run the formal isolated M2 GPU benchmark" }
 
 [tool.pixi.environments]
 default = { features = ["cpu", "dev"], solve-group = "cpu" }
