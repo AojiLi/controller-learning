@@ -70,7 +70,7 @@ format = { cmd = "ruff format .", description = "Format Python files" }
 format-check = { cmd = "ruff format --check .", description = "Check Python formatting" }
 lint = { cmd = "ruff check .", description = "Run Python lint checks" }
 tests = { cmd = "pytest", description = "Run CPU tests" }
-sim = { cmd = "python scripts/sim.py", description = "Run one M4 Controller episode on one generated Level 1 track" }
+sim = { cmd = "python scripts/sim.py", description = "Run one Controller episode on a fixed Level 0 or generated Level 1 Track" }
 verify-track-assets = { cmd = "python scripts/verify_track_assets.py", description = "Verify official manifests and fixed Track assets" }
 materialize-track-pool = { cmd = "python scripts/materialize_track_pool.py", description = "Reproduce the verified local Level 1 training pool cache" }
 docs = { cmd = "mkdocs build --strict", description = "Build documentation" }

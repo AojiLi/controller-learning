@@ -1,4 +1,4 @@
-"""Run one trusted Controller on one generated Level 1 track."""
+"""Run one trusted Controller on a fixed Level 0 or generated Level 1 Track."""
 
 from __future__ import annotations
 
@@ -20,9 +20,11 @@ from controller_learning.tracks import (
     generation_spec_from_project,
     pack_track,
     track_capacity_from_project,
+    track_from_batch_row,
     validate_track_candidate,
     validation_spec_from_project,
 )
+from controller_learning.tracks.official_assets import verify_official_track_assets
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 UINT32_MAX = int(np.iinfo(np.uint32).max)
@@ -39,7 +41,7 @@ class SimulationOptions:
     """Validated command-line choices for one Controller episode."""
 
     controller_directory: Path
-    track_seed: int
+    track_seed: int | None
     environment_seed: int
     backend: VehicleBackend
     level_id: int
@@ -68,8 +70,8 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--track-seed",
         type=_uint32_argument,
-        default=42,
-        help="Exact procedural Track seed (default: 42)",
+        default=None,
+        help=("Exact procedural Level 1 Track seed (default: 42); Level 0 uses its fixed asset"),
     )
     parser.add_argument(
         "--env-seed",
@@ -87,9 +89,9 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--level-id",
         type=int,
-        choices=(1,),
+        choices=(0, 1),
         default=1,
-        help="Challenge Level; M4 provides procedural Level 1 only (default: 1)",
+        help="Challenge Level: fixed Level 0 or procedural Level 1 (default: 1)",
     )
     parser.add_argument(
         "--render",
@@ -166,6 +168,33 @@ def _generate_validated_track(config: ProjectConfig, track_seed: int) -> Track:
         ) from error
 
 
+def _resolve_track(
+    config: ProjectConfig,
+    *,
+    level_id: int,
+    track_seed: int | None,
+) -> tuple[Track, int]:
+    """Resolve the fixed Level 0 asset or one exact procedural Level 1 seed."""
+
+    if level_id == 0:
+        if track_seed is not None and track_seed != UINT32_MAX:
+            raise SimulationCliError(
+                f"Level 0 has one fixed Track; omit --track-seed or use {UINT32_MAX}"
+            )
+        verification = verify_official_track_assets(config)
+        manifest = verification.manifests["level0"]
+        track = track_from_batch_row(
+            verification.fixed_batches["level0"],
+            0,
+            generator_version=manifest.generator_version,
+        )
+        return track, track.seed
+    if level_id == 1:
+        resolved_seed = 42 if track_seed is None else _require_uint32(track_seed, name="track seed")
+        return _generate_validated_track(config, resolved_seed), resolved_seed
+    raise SimulationCliError("level_id must be 0 or 1")
+
+
 def _display_controller_path(directory: Path, project_root: Path) -> str:
     try:
         return directory.relative_to(project_root).as_posix()
@@ -186,6 +215,7 @@ def _episode_summary(
     options: SimulationOptions,
     controller_directory: Path,
     project_root: Path,
+    track_seed: int,
 ) -> dict[str, JsonScalar]:
     info = result.final_info
     summary: dict[str, JsonScalar] = {
@@ -201,7 +231,7 @@ def _episode_summary(
         "termination_reason": int(info["termination_reason"]),
         "total_reward": float(result.total_reward),
         "track_id": int(info["track_id"]),
-        "track_seed": options.track_seed,
+        "track_seed": track_seed,
         "truncated": bool(result.truncated),
     }
     for key in ("lap_time_s", "total_reward"):
@@ -216,11 +246,10 @@ def _run_simulation(
     *,
     project_root: str | Path = PROJECT_ROOT,
 ) -> dict[str, JsonScalar]:
-    if options.level_id != 1:
-        raise SimulationCliError(
-            "M4 simulation supports only Level 1; the Level 0 asset is M5 work"
-        )
-    _require_uint32(options.track_seed, name="track seed")
+    if options.level_id not in (0, 1):
+        raise SimulationCliError("level_id must be 0 or 1")
+    if options.track_seed is not None:
+        _require_uint32(options.track_seed, name="track seed")
     _require_uint32(options.environment_seed, name="environment seed")
     if options.backend not in ("cpu_reference", "mjx_warp"):
         raise SimulationCliError("backend must be 'cpu_reference' or 'mjx_warp'")
@@ -233,7 +262,11 @@ def _run_simulation(
         project_root=root,
     )
     config = load_project_config(root)
-    track = _generate_validated_track(config, options.track_seed)
+    track, resolved_track_seed = _resolve_track(
+        config,
+        level_id=options.level_id,
+        track_seed=options.track_seed,
+    )
     env = _create_environment(
         project_config=config,
         level_id=options.level_id,
@@ -255,6 +288,7 @@ def _run_simulation(
         options=options,
         controller_directory=controller_directory,
         project_root=root,
+        track_seed=resolved_track_seed,
     )
 
 

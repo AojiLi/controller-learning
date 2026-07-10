@@ -20,7 +20,7 @@ PROJECT_ROOT = Path(__file__).parents[3]
 def _options(**overrides: Any) -> sim.SimulationOptions:
     values: dict[str, Any] = {
         "controller_directory": Path("controllers/template"),
-        "track_seed": 42,
+        "track_seed": None,
         "environment_seed": 0,
         "backend": "cpu_reference",
         "level_id": 1,
@@ -63,7 +63,6 @@ def test_arguments_default_to_one_cpu_level1_template_episode() -> None:
         ["--track-seed", "-1"],
         ["--track-seed", str(2**32)],
         ["--env-seed", "not-an-integer"],
-        ["--level-id", "0"],
         ["--backend", "automatic"],
     ],
 )
@@ -96,6 +95,23 @@ def test_requested_track_seed_is_generated_validated_and_packed() -> None:
     assert track.seed == 42
     assert track.generator_version == config.track.generator.generator_version
     assert track.capacity.max_track_points == config.track.representation.max_track_points
+
+
+def test_level0_resolves_the_fixed_official_asset() -> None:
+    config = load_project_config(PROJECT_ROOT)
+
+    track, seed = sim._resolve_track(config, level_id=0, track_seed=None)
+
+    assert seed == sim.UINT32_MAX
+    assert track.seed == sim.UINT32_MAX
+    assert track.generator_version == config.track.generator.generator_version
+
+
+def test_level0_rejects_a_procedural_seed() -> None:
+    config = load_project_config(PROJECT_ROOT)
+
+    with pytest.raises(sim.SimulationCliError, match="one fixed Track"):
+        sim._resolve_track(config, level_id=0, track_seed=42)
 
 
 def test_invalid_track_is_rejected_without_trying_another_seed(monkeypatch) -> None:
@@ -152,7 +168,7 @@ def test_environment_is_closed_when_controller_execution_fails(
             self.closed = True
 
     monkeypatch.setattr(sim, "load_project_config", lambda root: object())
-    monkeypatch.setattr(sim, "_generate_validated_track", lambda config, seed: object())
+    monkeypatch.setattr(sim, "_resolve_track", lambda *args, **kwargs: (object(), 42))
     monkeypatch.setattr(sim, "_create_environment", FakeEnv)
 
     def fail_runner(env, controller_directory, reset_seed, *, render):
@@ -194,7 +210,7 @@ def test_success_returns_a_strict_json_safe_summary(monkeypatch, tmp_path: Path)
             self.closed = True
 
     monkeypatch.setattr(sim, "load_project_config", lambda root: object())
-    monkeypatch.setattr(sim, "_generate_validated_track", lambda config, seed: object())
+    monkeypatch.setattr(sim, "_resolve_track", lambda *args, **kwargs: (object(), 42))
     monkeypatch.setattr(sim, "_create_environment", FakeEnv)
     monkeypatch.setattr(sim, "run_controller_episode", lambda *args, **kwargs: _result())
 
