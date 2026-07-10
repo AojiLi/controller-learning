@@ -1,0 +1,32 @@
+name = "pid"
+description = "Curvature-aware longitudinal PID with cascaded lateral and heading control"
+schema_version = 1
+
+[longitudinal]
+cruise_speed_mps = 5.0
+minimum_corner_speed_mps = 2.5
+maximum_lateral_acceleration_mps2 = 1.5
+preview_distance_m = 40.0
+preview_step_m = 1.0
+braking_deceleration_mps2 = 3.0
+proportional_gain = 1.5
+integral_gain = 0.25
+derivative_gain = 0.08
+integral_limit = 4.0
+derivative_filter_time_s = 0.15
+
+[lateral]
+projection_backward_segments = 8
+projection_forward_segments = 32
+curvature_lookahead_m = 2.5
+lateral_proportional_gain = 0.35
+lateral_integral_gain = 0.02
+lateral_derivative_gain = 0.12
+lateral_integral_limit = 2.0
+maximum_heading_correction_rad = 0.45
+heading_proportional_gain = 1.4
+heading_derivative_gain = 0.12
+curvature_feedforward_gain = 1.0
+
+[debug]
+preview_points = 12
