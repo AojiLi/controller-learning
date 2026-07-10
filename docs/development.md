@@ -95,3 +95,38 @@ conservative 4 m/s reference policy. It writes
 lap or if a numerical, contact-capacity, unexpected-contact, invalid-action, off-track, or timeout
 gate fails. This reference policy is an offline track-admission tool, not a public Controller or a
 performance baseline. See [Tracks and Race Core](tracks.md) for the reviewed measurements.
+
+## M4 Environment and Controller Workflow
+
+Run one complete template Controller episode through the single-world Gymnasium adapter:
+
+```bash
+pixi run sim
+```
+
+The template is deliberately neutral and reaches the Challenge timeout. Add `--render` for the 2D
+public-observation renderer, or select the formal backend from the GPU environment:
+
+```bash
+pixi run -e gpu sim -- --backend mjx_warp
+```
+
+The CPU suite runs the Gymnasium checker, batch-one agreement, restricted info/config, plugin
+isolation, fresh Controller lifecycle, and renderer integration. The GPU suite adds native batched
+steps, mixed-world NEXT_STEP autoreset, and transfer guards that reject any host/device transfer in
+the warmed JAX action path.
+
+Run the formal 1,024-world wrapper benchmark only from a clean relevant-source worktree:
+
+```bash
+pixi run -e gpu benchmark-racing-env
+```
+
+The default protocol executes 10,000 timed environment steps without per-step host synchronization,
+then performs separate transfer, timeout/autoreset, public numerical-health, source, and memory
+checks. It writes `benchmarks/v0.1/m4_environment_report.json`.
+
+The reviewed 1,024-world run completed 10,240,000 transitions at 165,633 transitions/s. Both
+transfer guards passed, every world timed out and autoreset independently in the separate health
+run, no non-finite public value was observed, and steady process VRAM grew by 10 MiB against a
+64 MiB gate. See [Gymnasium and Controller Platform](environment.md) for the full contract.

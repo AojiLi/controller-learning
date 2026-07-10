@@ -105,7 +105,15 @@ The reference project's useful pattern is its Challenge layering, not its drone 
 - Observation includes vehicle state, progress, and full fixed-capacity track geometry. It does not directly expose lateral error, heading error, target speed, nearest centerline index, future state, or simulator objects.
 - Finite out-of-range actions are clipped and counted. Invalid shape/dtype conversion, NaN, or Inf ends the episode as `invalid_action`.
 - `VecCarRacingEnv` uses a leading `num_envs` dimension and Gymnasium NEXT_STEP masked autoreset.
-- Single-environment and batch-size-one behavior must be tested for consistency.
+- `VecCarRacingEnv` is the sole Challenge state machine. `CarRacingEnv` is a host/NumPy batch-one
+  adapter and requires an explicit reset after termination.
+- Single-environment and batch-size-one behavior is tested for consistency. Warm MJX-Warp active
+  and mixed-autoreset steps must pass JAX transfer guards with no host/device transfer.
+- Reset and step info use the fixed public whitelist: episode seed, Controller seed, Track ID,
+  benchmark version, termination reason, lap-completed flag, and lap time. Neutral terminal values
+  keep the vector schema fixed.
+- The CPU backend is restricted to one world and remains a development/reference path. Formal
+  vector training and evaluation use explicit `backend="mjx_warp"`; there is no silent fallback.
 
 ### Controller Boundary
 
@@ -114,6 +122,9 @@ The reference project's useful pattern is its Challenge layering, not its drone 
 - Controllers receive only public observations, restricted info, read-only public config, and write-only debug drawing.
 - Challenge and Controller configs are separate. Controllers cannot change Level rules, test tracks, actuator limits, or evaluation protocol.
 - Environment and Controller seeds are independently and deterministically derived.
+- The Runner derives Challenge-owned public configuration from the actual unwrapped environment,
+  filters info to the canonical whitelist, drains `DebugDraw` per rendered frame, and never passes
+  an Environment or renderer reference to a Controller.
 - PPO training consumes batched arrays directly; it does not instantiate one Python Controller per world or use a separate simplified environment.
 
 ### Evaluation
@@ -173,11 +184,13 @@ pixi run tests
 pixi run ci
 pixi run benchmark-cpu-vehicle
 pixi run benchmark-track-capacity
+pixi run sim
 pixi run view-cpu-vehicle -- --scenario demo --duration 12
 
 pixi install -e gpu
 pixi run -e gpu gpu-tests
 pixi run -e gpu benchmark-gpu
+pixi run -e gpu benchmark-racing-env
 pixi run -e gpu validate-track-driveability
 ```
 
@@ -203,13 +216,21 @@ memory. Reviewed low-speed physical admission evidence is stored at
 `benchmarks/v0.1/track_driveability_report.json`; 16/16 generated tracks completed on the formal
 four-wheel backend at a 4 m/s target with no recorded failure outcome or numerical/buffer fault.
 
+Reviewed M4 environment evidence is stored at `benchmarks/v0.1/m4_environment_report.json`. The
+formal run used 1,024 different valid Tracks for 10,000 environment steps, measured 165,633
+transitions/s, passed active and mixed-autoreset no-transfer guards, observed timeout and independent
+autoreset in all worlds, recorded no non-finite public value, and used 556 MiB peak sampled process
+VRAM with 10 MiB steady growth against a 64 MiB gate.
+
 ## Experimental Decisions
 
 M1 fixed the physics timestep at 0.005 seconds and proved the standardized actuator mapping on CPU;
 M2 retained that timestep on MJX-Warp and locked the reviewed flat-ground contact/constraint
 capacities. M3 fixed 1.0 m Track sampling, 640 points, 48 checkpoints, the current generator and
-validation ranges, and the 4/12 local projection window from measured evidence. PPO hyperparameters,
-MPC horizon/weights, and later Controller-specific tuning remain experimental decisions for their
+validation ranges, and the 4/12 local projection window from measured evidence. M4 fixed the
+single/vector Gymnasium schema, NEXT_STEP autoreset, restricted Controller boundary, domain-separated
+device-native episode identities, and transfer-free MJX-Warp hot path. PPO hyperparameters, MPC
+horizon/weights, and later Controller-specific tuning remain experimental decisions for their
 implementation milestones.
 
 ## External Reference

@@ -7,15 +7,17 @@ Controller Learning is a benchmark and teaching platform for developing and comp
 controllers under one environment, vehicle, task, and evaluation protocol. PID, MPC, and PPO are
 provided as examples; the reusable Challenge and Controller interface are the core product.
 
-> **Project status:** M3 is complete: deterministic fixed-capacity tracks, batched Race Core logic,
-> 1,024-world track isolation, and low-speed four-wheel driveability have passed their gates. M4
-> Gymnasium environments and the Controller platform are active, but are not available yet.
+> **Project status:** M4 is complete. The Gymnasium single/vector environments, trusted Controller
+> plugin platform, public 2D renderer, and single-run CLI have passed their CPU and GPU gates. M5
+> Level assets and versioned Track pools are now active.
 
 Reviewed machine-readable evidence is available in the
 [M1 CPU report](benchmarks/v0.1/m1_cpu_report.json) and
 [M2 GPU report](benchmarks/v0.1/gpu_report.json). M3 evidence is in the
 [track-capacity report](benchmarks/v0.1/track_capacity_report.json) and
-[track-driveability report](benchmarks/v0.1/track_driveability_report.json).
+[track-driveability report](benchmarks/v0.1/track_driveability_report.json). The complete M4
+environment path is measured in the
+[M4 environment report](benchmarks/v0.1/m4_environment_report.json).
 
 ## Why This Project Exists
 
@@ -52,6 +54,12 @@ pixi run lint
 pixi run docs
 ```
 
+Run the template Controller through one complete development episode:
+
+```bash
+pixi run sim
+```
+
 The NVIDIA environment is installed separately so CPU development and CI do not resolve or install
 CUDA/PyTorch dependencies:
 
@@ -86,7 +94,8 @@ no long-window process-VRAM growth. All states remained finite, all four wheel c
 within the physical gates, and no buffer overflow, unexpected contact, or runtime warning occurred.
 
 This is the M2 physics-layer result. M3 subsequently validated track geometry and independent Race
-Core state; Gymnasium and PPO remain later milestones and are not implied by either result.
+Core state, and M4 exposed them through Gymnasium. PPO remains a later milestone and is not implied
+by these results.
 
 ## Verified M3 Track and Race Core Result
 
@@ -107,6 +116,25 @@ track replacement and race reset preserved unselected worlds, and perturbing one
 target with 0.239 m maximum lateral error, no failure outcome, and no numerical or buffer fault over
 46,400 transitions. See [Tracks and Race Core](docs/tracks.md) for the contract and protocol.
 
+## Verified M4 Environment Result
+
+`CarRacingEnv` and `VecCarRacingEnv` now share one Challenge state machine. The registered ID is
+`ControllerLearning/CarRacing-v0`; the vector path retains leading JAX arrays and strict Gymnasium
+NEXT_STEP masked autoreset. Controllers are loaded from trusted directories, instantiated fresh for
+every episode, and receive only public observations, restricted info, immutable public config, and
+write-only `DebugDraw`.
+
+The formal M4 run placed 1,024 different validated tracks in one MJX-Warp environment and executed
+10,000 environment steps: 10,240,000 transitions in 61.824 seconds, or 165,633 transitions/s. The
+separate health run observed timeout and subsequent independent autoreset for all 1,024 worlds, with
+no unexpected termination or non-finite public output. Warm active and mixed-autoreset steps passed
+JAX transfer guards that disallow both host-to-device and device-to-host transfers.
+
+Peak sampled process VRAM was 556 MiB. The measured steady segment grew by 10 MiB against a 64 MiB
+gate. First-step compilation took 1.698 seconds on the recorded NVIDIA GeForce RTX 5070 Ti Laptop
+GPU. These are zero-action environment-throughput measurements, not Controller performance claims.
+See [Gymnasium and Controller Platform](docs/environment.md) for the API and protocol.
+
 ## Roadmap
 
 The implementation follows strict milestone gates:
@@ -115,8 +143,8 @@ The implementation follows strict milestone gates:
 - M1: stable CPU MuJoCo four-wheel car — complete
 - M2: MJX-Warp 1/64/256/1024-world GPU go/no-go — complete
 - M3: batched tracks and Race Core — complete
-- M4: Gymnasium environments and Controller platform — active
-- M5: Level 0/1 and versioned track pools
+- M4: Gymnasium environments and Controller platform — complete
+- M5: Level 0/1 and versioned track pools — active
 - M6: PID and MPC
 - M7: PPO on the official vector environment
 - M8: evaluation, documentation, and public v0.1 release

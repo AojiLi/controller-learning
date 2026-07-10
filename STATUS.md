@@ -2,65 +2,61 @@
 
 Last updated: 2026-07-10
 
-**Status:** M3 is complete. M4 Gymnasium environments and Controller platform is active.
+**Status:** M4 is complete. M5 Level assets and Track pools are active.
 
 ## Main Line
 
-Expose the proven MJX-Warp vehicle, fixed-capacity tracks, and batched Race Core through one public
-single/vector Gymnasium contract, then add the trusted Controller plugin boundary. Level pools,
-PID/MPC, and PPO remain gated on later milestones.
+Turn the proven M4 Gymnasium/Controller path into a versioned Level 0/1 benchmark by adding fixed
+assets, deterministic train/validation/test splits, and device-native pool reselection. PID/MPC and
+PPO remain gated on M5.
 
 ## Completed Evidence
 
 - M0 established the Linux/Pixi package, typed configuration, tests, docs, and private GitHub CPU CI.
-- M1 established the physical CPU MuJoCo four-wheel reference and selected a 0.005 second physics
-  timestep in `benchmarks/v0.1/m1_cpu_report.json`.
-- M2 established native leading-dimension MJX-Warp simulation. Its reviewed
-  `benchmarks/v0.1/gpu_report.json` passed 1/64/256/1024-world gates and the 1024-world × 10,000-step
-  endurance run at 77,751 transitions/s without numerical, contact-capacity, or memory-growth failure.
-- M3 added immutable fixed-capacity Track arrays, deterministic periodic-spline generation, strict
-  geometry validation, project-config adapters, and rear-axle pose reset.
-- The reviewed `benchmarks/v0.1/track_capacity_report.json` swept 10,000 seeds per spacing. The
-  selected 1.0 m representation generated 9,994 candidates, accepted 9,965, and passed 8/8 sampled
-  reproducibility checks; the only primary rejections were six length and 29 curvature failures.
-- The locked capacity is 640 track points and 48 checkpoints against theoretical maxima of 601 and
-  40. Runtime arrays use 26.640625 MiB for 1,024 worlds and 260.162 MiB for a 10,000-track pool.
-- M3 Race Core implements local topology-aware projection, ordered checkpoint progress, reward,
-  effective boundary, timeout, termination priority, and masked reset.
-- GPU Race Core tests reused one compiled executable across 1,024 distinct tracks, preserved every
-  unselected world during masked replacement/reset, and left 1,023 worlds bit-exact after a 16-step
-  perturbation to one world. Peak JAX allocation was about 140.4 MB.
-- The reviewed `benchmarks/v0.1/track_driveability_report.json` passed 16/16 generated tracks at a
-  4 m/s target over 46,400 transitions. Maximum lateral error was 0.2387 m and maximum speed was
-  3.9847 m/s; no off-track, timeout, invalid-action, numerical, overflow, or unexpected-contact
-  failure occurred.
-- Current local validation passes 153 CPU/default tests and all 17 GPU tests: one environment check,
-  12 vehicle tests, three Race Core tests, and one driveability test.
+- M1 selected the stable 0.005 s CPU MuJoCo physics timestep and validated the four-wheel vehicle.
+- M2 established native MJX-Warp batching through 1,024 worlds × 10,000 steps at 77,751
+  transitions/s without numerical, capacity, or memory-growth failure.
+- M3 locked deterministic 1.0 m Track sampling, 640 points, 48 checkpoints, batched Race Core,
+  1,024-world isolation, and conservative four-wheel driveability.
+- M4 added the registered `ControllerLearning/CarRacing-v0` single environment and the native
+  `VecCarRacingEnv` without a second Challenge implementation.
+- Observation/action, restricted info, invalid-action, terminal, batch-one, and strict NEXT_STEP
+  autoreset semantics pass CPU and GPU tests.
+- Device episode identities reproduce the NumPy `SeedSequence` contract, and warm active/mixed-reset
+  GPU steps pass transfer guards with no host/device transfer.
+- Trusted Controller plugins load in isolated packages, receive immutable public config/info, and
+  start from a fresh instance every episode. The renderer receives only public observations and
+  write-only `DebugDraw` commands.
+- `pixi run sim` completes the neutral template episode on CPU and MJX-Warp; this is an interface
+  test, not a driving baseline.
+- The reviewed `benchmarks/v0.1/m4_environment_report.json` passed all formal gates. It used 1,024
+  distinct valid Tracks for 10,000 steps, measured 165,633 transitions/s, observed independent
+  timeout/autoreset in all worlds, recorded zero non-finite public values, and sampled 556 MiB peak
+  process VRAM with 10 MiB steady growth.
+- Current local validation passes 298 CPU/default tests and all 21 GPU tests.
 
-M3 therefore clears the fixed-shape geometry, independent race state, memory, and conservative
-four-wheel driveability gates. It does not claim Gymnasium compliance or Controller availability.
+M4 therefore clears the public environment, native GPU hot path, Controller isolation, rendering,
+and simulation CLI gates. It does not claim that any driving Controller succeeds.
 
 ## Current Thinking
 
-M4 should remain an adapter milestone. The environment wrappers must compose the existing physical
-step and Race Core without duplicating reward, termination, reset, or track logic. The same vector
-path must remain suitable for direct batched PPO training, while the Controller loader stays outside
-the hot path and creates one fresh trusted plugin instance per single evaluation episode.
+M5 should extend Track ownership rather than environment architecture. A pool-aware Track source
+must feed the same fixed-shape `VecCarRacingEnv`, select replacement geometry on device during
+masked reset, and preserve deterministic episode/Controller seed domains. Fixed validation/test
+geometry and hashes should be committed and immutable, while the roughly 260 MiB training pool
+needs a reproducible materialization/cache strategy instead of an unreviewed large Git artifact.
 
 ## Next Step
 
-Implement the public observation/action codec and deterministic single/vector reset semantics, then
-add `CarRacingEnv`, `VecCarRacingEnv`, and Gymnasium registration on that common transition path.
-After those contracts pass, add the Controller base/loader/template, restricted config/info,
-write-only `DebugDraw`, and minimal simulation CLI.
+Lock the M5 manifest and split schema, public device-native Track ID, per-world pool RNG rule, and
+Level 0 asset before generating the formal 10,000-Track pool.
 
 ## Risks and Blockers
 
-- A convenient Python observation structure could create avoidable host transfers or object work in
-  the later PPO vector path; shapes and dtypes need to be fixed at the boundary.
-- Single and vector wrappers can drift if they own separate transition logic; batch-size-one
-  equivalence and shared implementation are required.
-- Gymnasium terminal-observation and NEXT_STEP autoreset semantics must preserve per-world outcomes
-  without changing the already-tested Race Core reset behavior.
-- Controller configuration, info, callbacks, and rendering must not expose simulator or Challenge
-  internals as accidental control shortcuts.
+- The M4 string Track ID is constant for injected Tracks; dynamic pool selection needs a numerical
+  device representation without breaking the public single-environment API.
+- A convenient host-side pool sampler would reintroduce the transfer bottleneck removed in M4.
+- Committing the full training arrays would create an unsuitable repository artifact; regenerating
+  without hashes would weaken reproducibility.
+- Physical admission of roughly 10,000 Tracks must be batched and bounded so it remains practical
+  while still rejecting undriveable geometry.

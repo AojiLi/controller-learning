@@ -8,6 +8,7 @@ nav:
   - CPU Vehicle: vehicle.md
   - GPU Vehicle: gpu.md
   - Tracks and Race Core: tracks.md
+  - Gymnasium and Controllers: environment.md
   - Development: development.md
 markdown_extensions:
   - admonition

@@ -5,8 +5,9 @@ physical vehicle still runs on a uniform MuJoCo plane: tracks are numerical Chal
 than collision meshes. This lets every GPU world use different geometry without duplicating or
 recompiling the vehicle model.
 
-M3 does not provide a Gymnasium environment or a Controller interface. Those are M4 responsibilities
-built on top of the contracts described here.
+M4 now exposes these contracts through the Gymnasium and Controller interfaces described in
+[Gymnasium and Controller Platform](environment.md). Track pools and fixed Level assets remain M5
+responsibilities.
 
 ## Fixed-Capacity Track Contract
 

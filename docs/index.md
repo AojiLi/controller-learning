@@ -6,9 +6,9 @@ tracks, pluggable Controllers, and reproducible evaluation.
 The project is being implemented through explicit milestone gates. Published documentation will
 only claim features and performance that have passed their corresponding tests and benchmarks.
 
-M3 is complete: deterministic fixed-capacity tracks, batched Race Core state, 1,024-world isolation,
-and low-speed four-wheel driveability have passed their gates. M4 Gymnasium environments and the
-Controller platform are now active; neither interface is available yet.
+M4 is complete: the Gymnasium single/vector environments, trusted Controller platform, renderer,
+single-run CLI, native transfer-free GPU hot path, and 1,024-world environment benchmark have passed
+their gates. M5 Level assets and versioned Track pools are now active.
 
 ## Design Principles
 
@@ -21,4 +21,5 @@ Controller platform are now active; neither interface is available yet.
 See the repository README for the current implementation status and verified commands.
 
 The measured M3 representation and Challenge semantics are documented in
-[Tracks and Race Core](tracks.md).
+[Tracks and Race Core](tracks.md). The public M4 interfaces and measured 165,633 transitions/s
+environment run are documented in [Gymnasium and Controller Platform](environment.md).
