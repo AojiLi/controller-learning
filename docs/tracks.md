@@ -150,11 +150,15 @@ complete machine-readable evidence is the
 The formal M5 admission run completed in 1,266.411 seconds. Its batched four-wheel MJX-Warp work
 took 1,116.205 seconds and executed 54,161,408 transitions at 48,522.822 transitions/s.
 
-| Split | Attempts | Geometry rejected | Driveability rejected | Selected |
-| --- | ---: | ---: | ---: | ---: |
-| Train | 11,306 | 42 | 1,220 | 10,000 |
-| Validation | 1,027 | 3 | 13 | 100 |
-| Test | 1,026 | 2 | 4 | 20 |
+| Split | Candidate rows | Geometry rejected | Driveability rejected | Quota extras | Selected |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Train | 11,306 | 42 | 1,220 | 44 | 10,000 |
+| Validation | 1,027 | 3 | 13 | 911 | 100 |
+| Test | 1,026 | 2 | 4 | 1,000 | 20 |
+
+Admission uses fixed 1,024-world GPU batches. `Quota extras` are candidates retained in the report
+after the required count was reached within the final batch; they are not part of the published
+split. This accounts for every candidate row in the table.
 
 Level 0 and every selected Level 1 Track passed geometry and conservative physical driveability.
 All official locations and hashes, cross-split seed/hash disjointness, serialized artifact readback,

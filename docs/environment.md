@@ -35,8 +35,9 @@ ControllerLearning/CarRacing-v0
 
 `CarRacingEnv` is a host/NumPy batch-one adapter over `VecCarRacingEnv`. The vector environment owns
 all vehicle, Race Core, seed, termination, and NEXT_STEP autoreset state. Both constructors require
-an explicit immutable `ProjectConfig`, Level, Track source, and backend. The source is either fixed
-injected Track data or the published M5 Train TrackPool; both modes use the same Challenge path.
+an explicit immutable `ProjectConfig`, Level, and backend. `CarRacingEnv` accepts one fixed `Track`;
+`VecCarRacingEnv` accepts exactly one of fixed injected Tracks or the published M5 Train `TrackPool`.
+All modes use the same Challenge path.
 
 The public action is a float32 vector in physical units:
 

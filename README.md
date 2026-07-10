@@ -5,7 +5,7 @@ pluggable controllers, and reproducible evaluation.**
 
 Controller Learning is a benchmark and teaching platform for developing and comparing race-car
 controllers under one environment, vehicle, task, and evaluation protocol. PID, MPC, and PPO are
-provided as examples; the reusable Challenge and Controller interface are the core product.
+planned as examples; the reusable Challenge and Controller interface are the core product.
 
 > **Project status:** M5 is complete. Fixed Level 0/1 assets, versioned Track manifests, reproducible
 > training-pool materialization, and the 10,000-Track GPU pool have passed their formal gates. M6
@@ -151,8 +151,9 @@ three disjoint Level 1 namespaces:
 All four manifests are committed. Level 0, Validation, and Test NPZ assets are also committed and
 packaged; the 272,800,000-byte Train pool is reconstructed into the ignored local cache
 `.track-cache/v0.1/train_pool.npz` and verified against its manifest hash. Formal admission selected
-the 10,000 Train Tracks from 11,306 ascending-seed attempts after 42 geometry and 1,220 physical
-driveability rejections. The complete admission took 1,266.411 seconds, including 1,116.205 seconds
+the 10,000 Train Tracks from 11,306 ascending-seed candidates after 42 geometry and 1,220 physical
+driveability rejections; 44 additional valid candidates in the final fixed-size GPU batch were
+recorded as quota extras. The complete admission took 1,266.411 seconds, including 1,116.205 seconds
 and 54,161,408 transitions on the four-wheel GPU backend at 48,522.822 transitions/s. All official
 Tracks, split-disjointness checks, artifact hashes, and serialized readback gates passed.
 
