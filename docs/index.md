@@ -6,9 +6,9 @@ tracks, pluggable Controllers, and reproducible evaluation.
 The project is being implemented through explicit milestone gates. Published documentation will
 only claim features and performance that have passed their corresponding tests and benchmarks.
 
-M4 is complete: the Gymnasium single/vector environments, trusted Controller platform, renderer,
-single-run CLI, native transfer-free GPU hot path, and 1,024-world environment benchmark have passed
-their gates. M5 Level assets and versioned Track pools are now active.
+M5 is complete: fixed Level 0/1 assets, versioned Track manifests, reproducible Train-pool
+materialization, and the formal 10,000-Track GPU pool have passed their gates. M6 PID/MPC
+implementation, documentation, and formal Controller evidence are now active.
 
 ## Design Principles
 
@@ -22,4 +22,7 @@ See the repository README for the current implementation status and verified com
 
 The measured M3 representation and Challenge semantics are documented in
 [Tracks and Race Core](tracks.md). The public M4 interfaces and measured 165,633 transitions/s
-environment run are documented in [Gymnasium and Controller Platform](environment.md).
+environment run are documented in [Gymnasium and Controller Platform](environment.md). The
+observation-only PID and MPC examples are explained in
+[Classical Controllers: PID and MPC](controllers.md); that tutorial does not claim formal
+Controller results before the M6 report passes.

@@ -9,8 +9,14 @@ nav:
   - GPU Vehicle: gpu.md
   - Tracks and Race Core: tracks.md
   - Gymnasium and Controllers: environment.md
+  - Classical Controllers: controllers.md
   - Development: development.md
 markdown_extensions:
   - admonition
   - tables
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
 strict: true

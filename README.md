@@ -4,12 +4,13 @@
 pluggable controllers, and reproducible evaluation.**
 
 Controller Learning is a benchmark and teaching platform for developing and comparing race-car
-controllers under one environment, vehicle, task, and evaluation protocol. PID, MPC, and PPO are
-planned as examples; the reusable Challenge and Controller interface are the core product.
+controllers under one environment, vehicle, task, and evaluation protocol. PID and MPC are
+implemented as educational examples, while PPO remains planned; the reusable Challenge and
+Controller interface are the core product.
 
 > **Project status:** M5 is complete. Fixed Level 0/1 assets, versioned Track manifests, reproducible
 > training-pool materialization, and the 10,000-Track GPU pool have passed their formal gates. M6
-> PID and MPC Controller examples are now active.
+> PID/MPC implementation, documentation, and formal Controller evidence are now active.
 
 Reviewed machine-readable evidence is available in the
 [M1 CPU report](benchmarks/v0.1/m1_cpu_report.json) and
@@ -44,6 +45,9 @@ explicit and reproducible:
 
 Controller success rates will only be documented after the corresponding milestone benchmarks
 pass.
+
+The [Classical Controllers tutorial](docs/controllers.md) explains the Controller lifecycle,
+observation-only geometry, PID and MPC designs, DebugDraw output, and timing interpretation.
 
 ## Development Setup
 
