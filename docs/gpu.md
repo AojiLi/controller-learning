@@ -36,19 +36,18 @@ The reviewed report was generated on an NVIDIA GeForce RTX 5070 Ti Laptop GPU wi
 
 | Worlds | Measured steps | Compile (s) | Transitions/s | Peak process VRAM (MiB) | VRAM growth (MiB) | Minimum wheel coverage |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 1 | 1,000 | 0.610 | 308 | 358 | 4 | 0.920 |
-| 64 | 1,000 | 0.628 | 10,909 | 352 | 1 | 0.866 |
-| 256 | 1,000 | 0.745 | 34,174 | 356 | 1 | 0.853 |
-| 1,024 | 10,000 | 0.912 | 77,679 | 352 | 8 | 0.844 |
+| 1 | 1,000 | 0.581 | 307 | 358 | 1 | 0.923 |
+| 64 | 1,000 | 0.650 | 10,864 | 356 | 2 | 0.862 |
+| 256 | 1,000 | 0.743 | 34,196 | 356 | 1 | 0.857 |
+| 1,024 | 10,000 | 0.899 | 77,751 | 346 | 0 | 0.843 |
 
-The 1,024-world run completed 10,240,000 transitions and 102,400,000 world-physics steps in 131.824
+The 1,024-world run completed 10,240,000 transitions and 102,400,000 world-physics steps in 131.703
 seconds of measured execution. It observed no non-finite state, contact/constraint overflow,
 unexpected contact, invalid action, or native warning. Peak global contact and collision counts were
 8,192 and 5,120 against a 16,384-entry capacity; peak per-world constraints were 24 against 64.
 
 The batch-one CPU/GPU rollout had 0.034 mm maximum planar-position error, 0.010 mm/s maximum body
-velocity error, 0.0000005 rad maximum yaw error, and 0.000030 rad/s maximum wheel-speed error. Contact
+velocity error, 0.0000005 rad maximum yaw error, and 0.000029 rad/s maximum wheel-speed error. Contact
 participation, contact gap, and penetration also agreed within their recorded tolerances.
 
 The complete evidence is stored at `benchmarks/v0.1/gpu_report.json`.
-

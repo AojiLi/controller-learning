@@ -25,12 +25,12 @@ remain gated on later milestones.
   - fresh 1/64/256/1024-world workers all passed;
   - 1024 worlds completed 10,000 measured environment steps, 10,240,000 transitions, and
     102,400,000 world-physics steps;
-  - measured throughput was 77,679 transitions/s and 776,795 world-physics steps/s;
-  - peak process VRAM was 352 MiB with 8 MiB long-window growth and stable JAX live allocation;
+  - measured throughput was 77,751 transitions/s and 777,506 world-physics steps/s;
+  - peak process VRAM was 346 MiB with no long-window growth and stable JAX live allocation;
   - no non-finite state, overflow, unexpected contact, invalid action, or native warning occurred;
-  - the minimum 100-step per-world/per-wheel mean contact participation was 84.4%, maximum contact
+  - the minimum 100-step per-world/per-wheel mean contact participation was 84.3%, maximum contact
     gap 65 ms, maximum penetration 1.361 mm, and 1,255 masked resets were exercised;
-  - CPU/GPU maximum planar-position and body-velocity errors were 0.034 mm and 0.010 mm/s; contact
+  - CPU/GPU maximum planar-position and body-velocity errors were 0.034 mm and 0.009 mm/s; contact
     participation, contact gap, and penetration also agreed within the recorded tolerances.
 
 M2 therefore keeps the approved MJX-Warp path. The pure-JAX four-wheel fallback was not activated.

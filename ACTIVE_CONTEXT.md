@@ -21,8 +21,8 @@ Controller work until M3 geometry, progress, termination, and masked race reset 
 - Formal fresh workers passed at 1, 64, 256, and 1024 worlds. The 1024-world worker completed 10,000
   measured environment steps with finite independent state, 1,255 masked resets, no overflow,
   unexpected contact, invalid action, or native warning.
-- 1024-world measured execution: 131.824 s, 77,679 transitions/s, 776,795 world-physics steps/s,
-  352 MiB peak process VRAM, and 8 MiB long-window process growth.
+- 1024-world measured execution: 131.703 s, 77,751 transitions/s, 777,506 world-physics steps/s,
+  346 MiB peak process VRAM, and no long-window process growth.
 - Contact capacities are locked for the current flat-ground vehicle at 16 entries/world globally and
   64 constraints/world: observed headroom fractions were 0.50 contacts, 0.3125 broad-phase pairs,
   and 0.375 constraints.

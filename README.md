@@ -79,8 +79,8 @@ second simplified training environment.
 
 The formal M2 run used an NVIDIA GeForce RTX 5070 Ti Laptop GPU and the locked Pixi environment. It
 completed 10,000 environment steps with 1,024 native worlds: 10,240,000 transitions and 102,400,000
-world-physics steps. The measured rate was 77,679 transitions/s with 352 MiB peak process VRAM and
-8 MiB long-window process-VRAM growth. All states remained finite, all four wheel contacts stayed
+world-physics steps. The measured rate was 77,751 transitions/s with 346 MiB peak process VRAM and
+no long-window process-VRAM growth. All states remained finite, all four wheel contacts stayed
 within the physical gates, and no buffer overflow, unexpected contact, or runtime warning occurred.
 
 This is a physics-layer result. Procedural tracks, independent race termination, Gymnasium, and PPO
@@ -90,8 +90,8 @@ are later milestones and are not implied by M2.
 
 The implementation follows strict milestone gates:
 
-- M0: repository, Pixi, package, tests, CI, and configuration schemas
-- M1: stable CPU MuJoCo four-wheel car
+- M0: repository, Pixi, package, tests, CI, and configuration schemas — complete
+- M1: stable CPU MuJoCo four-wheel car — complete
 - M2: MJX-Warp 1/64/256/1024-world GPU go/no-go — complete
 - M3: batched tracks and Race Core — active
 - M4: Gymnasium environments and Controller platform
