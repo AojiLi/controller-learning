@@ -85,7 +85,7 @@ ci = { depends-on = ["format-check", "lint", "tests", "verify-track-assets", "do
 
 [tool.pixi.feature.gpu.tasks]
 gpu-check = { cmd = "python scripts/check_gpu_environment.py", description = "Verify GPU dependencies and one MJX-Warp step" }
-gpu-tests = { cmd = "pytest -m gpu tests/gpu", description = "Run GPU tests" }
+gpu-tests = { cmd = "XLA_PYTHON_CLIENT_PREALLOCATE=false pytest -m gpu tests/gpu", description = "Run GPU tests" }
 benchmark-gpu = { cmd = "python scripts/benchmark_gpu.py", description = "Run the formal isolated M2 GPU benchmark" }
 benchmark-racing-env = { cmd = "python scripts/benchmark_racing_env.py", description = "Run the formal 1024-world M4 environment benchmark" }
 validate-track-driveability = { cmd = "python scripts/validate_track_driveability.py --output benchmarks/v0.1/track_driveability_report.json", description = "Validate M3 generated tracks on the formal four-wheel GPU backend" }

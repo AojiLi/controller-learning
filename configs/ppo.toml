@@ -1,0 +1,62 @@
+# Initial M7 Train-only candidate. These feature, reward, optimizer, and budget values may be
+# adjusted using Train evidence, but the complete file must be frozen before Validation access.
+schema_version = 1
+
+[environment]
+benchmark_version = "0.1"
+level_id = 1
+backend = "mjx_warp"
+num_envs = 1024
+environment_seed = 7
+train_cache = ".track-cache/v0.1/train_pool.npz"
+
+[observation]
+# Steering limits and control timing are derived from the Challenge and are not duplicated here.
+preview_points = 16
+preview_distance_m = 40.0
+max_speed_mps = 15.0
+
+[reward]
+# Shaping may use only public observations/actions. Formal ranking still ignores reward.
+progress_scale = 100.0
+success_bonus = 1.0
+failure_penalty = 1.0
+lateral_error_weight = 0.05
+heading_error_weight = 0.02
+reverse_speed_weight = 0.02
+action_change_weight = 0.005
+
+[rollout]
+steps_per_update = 128
+total_vector_steps = 10240
+
+[ppo]
+hidden_sizes = [128, 128]
+policy_seed = 11
+minibatch_seed = 13
+learning_rate = 0.0003
+anneal_learning_rate = true
+discount_factor = 0.99
+gae_lambda = 0.95
+num_minibatches = 32
+update_epochs = 4
+normalize_advantages = true
+clip_coefficient = 0.2
+clip_value_loss = true
+entropy_coefficient = 0.01
+value_coefficient = 0.5
+max_gradient_norm = 0.5
+target_kl = 0.03
+
+[logging]
+run_directory = "runs/ppo"
+log_interval_updates = 1
+csv_flush_interval_updates = 1
+tensorboard_enabled = true
+memory_sample_interval_updates = 10
+
+[checkpoint]
+interval_updates = 10
+keep_last = 3
+save_optimizer_state = true
+public_checkpoint_max_bytes = 5242880

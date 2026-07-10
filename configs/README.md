@@ -34,3 +34,17 @@ evidence is in the
 [M5 TrackPool report](../benchmarks/v0.1/m5_track_pool_report.json). M6 PID and MPC are also
 complete and use these published values through the public Challenge. M7 PPO training is active;
 its Controller and training configuration must not override Challenge, Level, or benchmark values.
+
+`ppo.toml` is the single strict M7 training document. It covers the official environment identity,
+public observation compression, public reward shaping, rollout budget, PPO optimizer, local
+logging, and checkpoint policy. The committed values are an initial Train-only candidate: M7 may
+adjust them using Train evidence, but the entire file must be frozen before any Validation-based
+checkpoint selection. Vehicle steering limits and control timing continue to come from the
+Challenge configuration and are intentionally not duplicated in PPO configuration.
+Environment episode selection, policy sampling, and minibatch shuffling use three explicit,
+distinct seeds so each randomness domain can be reproduced independently.
+
+PPO optimization loads `.track-cache/v0.1/train_pool.npz` through a dedicated Train-only loader.
+That path verifies the Train manifest, cache digest, count, capacity, Track order, and geometry
+contract without calling the general all-split verifier. Validation has a separate later selection
+phase, and no M7 path may load or evaluate Test geometry.
