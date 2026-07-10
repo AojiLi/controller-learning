@@ -191,6 +191,8 @@ class BenchmarkConfig:
     schema_version: int
     version: str
     official_level: int
+    train_track_count: int
+    validation_track_count: int
     test_track_count: int
     controller: ControllerTimingConfig
     episode: EpisodeTimingConfig
@@ -202,6 +204,16 @@ class BenchmarkConfig:
             raise ConfigError("benchmark.version cannot be empty")
         if self.official_level < 0:
             raise ConfigError("benchmark.official_level must be non-negative")
+        _require_integer_at_least(
+            self.train_track_count,
+            1,
+            "benchmark.train_track_count",
+        )
+        _require_integer_at_least(
+            self.validation_track_count,
+            1,
+            "benchmark.validation_track_count",
+        )
         if self.test_track_count < 20:
             raise ConfigError("benchmark.test_track_count must be at least 20")
 

@@ -22,6 +22,8 @@ def test_repository_configuration_is_cross_validated() -> None:
 
     assert config.vehicle.simulation.physics_steps_per_control == 10
     assert config.benchmark.official_level == 1
+    assert config.benchmark.train_track_count == 10_000
+    assert config.benchmark.validation_track_count == 100
     assert config.benchmark.test_track_count == 20
     assert [level.level_id for level in config.levels] == [0, 1]
     assert config.levels[0].track_source == "fixed"

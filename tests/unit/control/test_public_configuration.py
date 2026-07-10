@@ -66,6 +66,8 @@ def test_public_config_contains_only_the_documented_challenge_values() -> None:
         "projection_backward_segments",
         "projection_forward_segments",
         "track_source",
+        "train_track_count",
+        "validation_track_count",
         "test_track_count",
         "ranking",
         "backend",

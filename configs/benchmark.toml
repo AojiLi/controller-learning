@@ -3,6 +3,8 @@ schema_version = 1
 [benchmark]
 version = "0.1"
 official_level = 1
+train_track_count = 10000
+validation_track_count = 100
 test_track_count = 20
 
 [controller]

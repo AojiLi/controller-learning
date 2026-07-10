@@ -191,7 +191,17 @@ def load_benchmark_config(path: str | Path) -> BenchmarkConfig:
         "benchmark config",
     )
     benchmark = _section(data, "benchmark", "benchmark config")
-    _exact_keys(benchmark, {"version", "official_level", "test_track_count"}, "benchmark")
+    _exact_keys(
+        benchmark,
+        {
+            "version",
+            "official_level",
+            "train_track_count",
+            "validation_track_count",
+            "test_track_count",
+        },
+        "benchmark",
+    )
     controller = _section(data, "controller", "benchmark config")
     _exact_keys(
         controller,
@@ -207,6 +217,12 @@ def load_benchmark_config(path: str | Path) -> BenchmarkConfig:
         schema_version=_integer(data, "schema_version", "benchmark config"),
         version=_string(benchmark, "version", "benchmark"),
         official_level=_integer(benchmark, "official_level", "benchmark"),
+        train_track_count=_integer(benchmark, "train_track_count", "benchmark"),
+        validation_track_count=_integer(
+            benchmark,
+            "validation_track_count",
+            "benchmark",
+        ),
         test_track_count=_integer(benchmark, "test_track_count", "benchmark"),
         controller=ControllerTimingConfig(
             frequency_hz=_number(controller, "frequency_hz", "controller"),

@@ -1,5 +1,8 @@
 * text=auto eol=lf
 
+# Fixed benchmark arrays are binary package assets.
+*.npz binary
+
 *.gif binary
 *.jpg binary
 *.jpeg binary

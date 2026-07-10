@@ -26,8 +26,12 @@ __pycache__/
 /runs/
 /results/
 /benchmarks/local/
+/.track-cache/
 /wandb/
 /videos/
+
+# Reproducible training pools are materialized locally from the published manifest.
+/controller_learning/assets/tracks/**/train_pool.npz
 
 # Editor and operating-system files.
 /.idea/
