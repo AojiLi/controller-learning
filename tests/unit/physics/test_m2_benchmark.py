@@ -91,6 +91,31 @@ def test_timeout_output_bytes_are_safe_for_strict_json() -> None:
     assert m2_benchmark._output_tail(b"prefix\xfftail", maximum_chars=5) == "�tail"
 
 
+def test_evidence_redaction_removes_paths_and_gpu_uuid(tmp_path) -> None:
+    project_root = tmp_path / "project"
+    temporary_root = tmp_path / "worker"
+    payload = {
+        "uuid": "GPU-67c4c378-9c6a-8b7d-3285-82fb2b068357",
+        "log": (
+            f"model={project_root}/car.xml output={temporary_root}/result.json "
+            "device=GPU-67c4c378-9c6a-8b7d-3285-82fb2b068357"
+        ),
+    }
+
+    redacted = m2_benchmark.redact_evidence_payload(
+        payload,
+        project_root=project_root,
+        temporary_root=temporary_root,
+    )
+
+    assert "uuid" not in redacted
+    assert str(tmp_path) not in redacted["log"]
+    assert "GPU-67c4" not in redacted["log"]
+    assert redacted["log"] == (
+        "model=<project_root>/car.xml output=<temporary_dir>/result.json device=<gpu_uuid>"
+    )
+
+
 def test_formal_report_passes_only_with_clean_fresh_passing_workers(
     monkeypatch,
     tmp_path,

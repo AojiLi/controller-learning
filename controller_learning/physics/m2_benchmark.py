@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -181,6 +182,83 @@ def _output_tail(output: str | bytes | None, maximum_chars: int = 8_000) -> str:
     return output[-maximum_chars:]
 
 
+def _redact_launcher_text(
+    value: str,
+    *,
+    project_root: Path,
+    worker_path: Path,
+    output_path: Path,
+) -> str:
+    replacements = (
+        (str(output_path), "<temporary_output>"),
+        (str(worker_path), "<worker>"),
+        (str(project_root), "<project_root>"),
+        (str(Path.home()), "$HOME"),
+    )
+    for source, replacement in replacements:
+        value = value.replace(source, replacement)
+    return re.sub(r"(?:GPU|MIG)-[0-9A-Fa-f-]+", "<gpu_uuid>", value)
+
+
+def _display_command(
+    command: Sequence[str],
+    *,
+    project_root: Path,
+    worker_path: Path,
+    output_path: Path,
+) -> list[str]:
+    return [
+        "<python>"
+        if value == sys.executable
+        else _redact_launcher_text(
+            value,
+            project_root=project_root,
+            worker_path=worker_path,
+            output_path=output_path,
+        )
+        for value in command
+    ]
+
+
+def redact_evidence_payload(
+    value: Any,
+    *,
+    project_root: Path,
+    temporary_root: Path,
+) -> Any:
+    """Remove machine-unique paths and GPU identifiers from persisted evidence."""
+
+    if isinstance(value, str):
+        replacements = (
+            (str(project_root.resolve()), "<project_root>"),
+            (str(temporary_root.resolve()), "<temporary_dir>"),
+            (str(Path.home()), "$HOME"),
+        )
+        for source, replacement in replacements:
+            value = value.replace(source, replacement)
+        return re.sub(r"(?:GPU|MIG)-[0-9A-Fa-f-]+", "<gpu_uuid>", value)
+    if isinstance(value, dict):
+        return {
+            key: redact_evidence_payload(
+                item,
+                project_root=project_root,
+                temporary_root=temporary_root,
+            )
+            for key, item in value.items()
+            if key != "uuid"
+        }
+    if isinstance(value, list):
+        return [
+            redact_evidence_payload(
+                item,
+                project_root=project_root,
+                temporary_root=temporary_root,
+            )
+            for item in value
+        ]
+    return value
+
+
 def _failed_worker_payload(
     spec: ScaleSpec,
     *,
@@ -262,9 +340,24 @@ def _run_scale_worker(
                 returncode=None,
             )
             result["launcher"] = {
-                "command": list(command),
-                "stdout_tail": _output_tail(error.stdout),
-                "stderr_tail": _output_tail(error.stderr),
+                "command": _display_command(
+                    command,
+                    project_root=project_root,
+                    worker_path=worker_path,
+                    output_path=output,
+                ),
+                "stdout_tail": _redact_launcher_text(
+                    _output_tail(error.stdout),
+                    project_root=project_root,
+                    worker_path=worker_path,
+                    output_path=output,
+                ),
+                "stderr_tail": _redact_launcher_text(
+                    _output_tail(error.stderr),
+                    project_root=project_root,
+                    worker_path=worker_path,
+                    output_path=output,
+                ),
             }
             return result
 
@@ -287,10 +380,25 @@ def _run_scale_worker(
                 f"passing worker exited with status {completed.returncode}"
             )
         payload["launcher"] = {
-            "command": list(command),
+            "command": _display_command(
+                command,
+                project_root=project_root,
+                worker_path=worker_path,
+                output_path=output,
+            ),
             "returncode": completed.returncode,
-            "stdout_tail": completed.stdout[-8_000:],
-            "stderr_tail": completed.stderr[-8_000:],
+            "stdout_tail": _redact_launcher_text(
+                completed.stdout[-8_000:],
+                project_root=project_root,
+                worker_path=worker_path,
+                output_path=output,
+            ),
+            "stderr_tail": _redact_launcher_text(
+                completed.stderr[-8_000:],
+                project_root=project_root,
+                worker_path=worker_path,
+                output_path=output,
+            ),
         }
         return payload
 
@@ -384,8 +492,8 @@ def run_m2_benchmark(
         _check(
             "protocol.canonical_worker",
             canonical_worker,
-            str(worker_path),
-            str(canonical_worker_path),
+            worker_path.name,
+            canonical_worker_path.name,
         ),
         _check(
             "protocol.canonical_environment",
@@ -508,6 +616,7 @@ __all__ = [
     "PROTOCOL_VERSION",
     "ScaleSpec",
     "extract_worker_json",
+    "redact_evidence_payload",
     "run_m2_benchmark",
     "validate_worker_result",
     "write_m2_report",

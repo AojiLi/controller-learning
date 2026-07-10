@@ -35,6 +35,7 @@ from controller_learning.physics.m2_benchmark import (
     PROTOCOL_VERSION,
     WORKER_JSON_PREFIX,
     WORKER_SCHEMA_VERSION,
+    redact_evidence_payload,
     write_strict_json,
 )
 
@@ -1183,6 +1184,11 @@ def main() -> None:
         and result["checks"]
         and all(check["passed"] for check in result["checks"])
         else "fail"
+    )
+    result = redact_evidence_payload(
+        result,
+        project_root=args.project_root,
+        temporary_root=capture_directory,
     )
     if args.output is not None:
         write_strict_json(args.output, result)
