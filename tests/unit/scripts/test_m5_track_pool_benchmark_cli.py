@@ -35,6 +35,38 @@ def _passing_report() -> dict:
         "source_files_sha256": {"relative/source.py": "b" * 64},
     }
     transitions = benchmark.FORMAL_NUM_WORLDS * benchmark.DEFAULT_ENVIRONMENT_STEPS
+    stabilization_transitions = (
+        benchmark.FORMAL_NUM_WORLDS * benchmark.DEFAULT_ALLOCATOR_STABILIZATION_STEPS
+    )
+    extra_steps = benchmark.DEFAULT_ALLOCATOR_STABILIZATION_STEPS + 2 * (
+        benchmark.DEFAULT_ENVIRONMENT_STEPS
+    )
+    extra_transitions = benchmark.FORMAL_NUM_WORLDS * extra_steps
+
+    def epoch(label: str, seed: int) -> dict:
+        headline = label == benchmark.HEADLINE_EPOCH
+        return {
+            "label": label,
+            "steps": benchmark.DEFAULT_ENVIRONMENT_STEPS,
+            "transitions": transitions,
+            "seconds": 60.0,
+            "settle_seconds": 0.1,
+            "environment_steps_per_second": 166.6,
+            "transitions_per_second": 170_000.0,
+            "reset_seed": seed,
+            "per_step_host_synchronization": False,
+            "full_final_tree_synchronized": True,
+            "effects_barrier_before_memory_sample": True,
+            "final_output_released_before_memory_sample": True,
+            "gc_before_memory_sample": True,
+            "included_in_formal_throughput": headline,
+            "included_in_formal_transition_count": headline,
+            "final_output_finite": True,
+            "final_track_ids_allowed": True,
+            "passed": True,
+        }
+
+    measurement_epochs = [epoch(label, seed) for label, seed in benchmark.MEASUREMENT_EPOCHS]
     return {
         "schema_version": benchmark.REPORT_SCHEMA_VERSION,
         "protocol_version": benchmark.PROTOCOL_VERSION,
@@ -44,6 +76,20 @@ def _passing_report() -> dict:
             "num_worlds": benchmark.FORMAL_NUM_WORLDS,
             "environment_steps": benchmark.DEFAULT_ENVIRONMENT_STEPS,
             "transitions": transitions,
+            "allocator_stabilization_steps": (benchmark.DEFAULT_ALLOCATOR_STABILIZATION_STEPS),
+            "allocator_stabilization_transitions": stabilization_transitions,
+            "allocator_stabilization_seed": benchmark.ALLOCATOR_STABILIZATION_SEED,
+            "measurement_epoch_count": len(benchmark.MEASUREMENT_EPOCHS),
+            "measurement_epoch_labels": [label for label, _ in benchmark.MEASUREMENT_EPOCHS],
+            "measurement_epoch_seeds": [seed for _, seed in benchmark.MEASUREMENT_EPOCHS],
+            "headline_epoch": benchmark.HEADLINE_EPOCH,
+            "extra_non_headline_steps": extra_steps,
+            "extra_non_headline_transitions": extra_transitions,
+            "total_long_run_steps": extra_steps + benchmark.DEFAULT_ENVIRONMENT_STEPS,
+            "total_long_run_transitions": extra_transitions + transitions,
+            "same_environment_E0_through_E3": True,
+            "environment_recreations_between_E0_E3": 0,
+            "jax_cache_clear_calls": 0,
             "warmup_steps": benchmark.DEFAULT_WARMUP_STEPS,
             "reset_seed": benchmark.FORMAL_RESET_SEED,
             "reset_heavy_cycles": benchmark.DEFAULT_RESET_HEAVY_CYCLES,
@@ -111,18 +157,42 @@ def _passing_report() -> dict:
                 "selected_actual_unique_track_id_count": 11,
             },
         },
+        "allocator_stabilization": {
+            "label": "E0",
+            "steps": benchmark.DEFAULT_ALLOCATOR_STABILIZATION_STEPS,
+            "transitions": stabilization_transitions,
+            "seconds": 60.0,
+            "settle_seconds": 0.1,
+            "environment_steps_per_second": 166.6,
+            "transitions_per_second": 170_000.0,
+            "reset_seed": benchmark.ALLOCATOR_STABILIZATION_SEED,
+            "per_step_host_synchronization": False,
+            "full_final_tree_synchronized": True,
+            "effects_barrier_before_memory_sample": True,
+            "final_output_released_before_memory_sample": True,
+            "gc_before_memory_sample": True,
+            "included_in_formal_throughput": False,
+            "included_in_formal_transition_count": False,
+            "final_output_finite": True,
+            "final_track_ids_allowed": True,
+            "passed": True,
+        },
+        "measurement_epochs": measurement_epochs,
         "timing": {
             "environment_create_seconds": 1.0,
             "pool_upload_ready_seconds": 1.2,
             "reset_compile_seconds": 0.5,
             "first_step_compile_seconds": 2.0,
             "warmup_seconds": 1.0,
+            "headline_epoch": benchmark.HEADLINE_EPOCH,
+            "headline_reset_seed": benchmark.FORMAL_RESET_SEED,
             "steady_seconds": 60.0,
             "environment_steps_per_second": 166.6,
             "transitions_per_second": 170_000.0,
             "pool_to_fixed_throughput_ratio": 0.8,
         },
         "fixed_track_baseline": {
+            "reset_seed": benchmark.FORMAL_RESET_SEED,
             "steps": benchmark.DEFAULT_ENVIRONMENT_STEPS,
             "transitions": transitions,
             "steady_seconds": 50.0,
@@ -154,13 +224,18 @@ def _passing_report() -> dict:
             "final_nonfinite_fields": [],
             "disallowed_track_id_event_count": 0,
         },
-        "executable_cache": {"passed": True},
-        "runtime": {"jax_device": {"platform": "gpu", "device_kind": "NVIDIA Test GPU"}},
-        "memory": {
-            "peak_sampled_process_vram_mib": 1_000.0,
-            "steady_process_vram_growth_mib": 2.0,
-            "steady_growth_within_limit": True,
+        "executable_cache": {
+            "passed": True,
+            "cache_sizes_stable_from_E0_through_E3": True,
+            "epoch_snapshots": {
+                "E0": {"step": 1},
+                "E1": {"step": 1},
+                "E2": {"step": 1},
+                "E3": {"step": 1},
+            },
         },
+        "runtime": {"jax_device": {"platform": "gpu", "device_kind": "NVIDIA Test GPU"}},
+        "memory": benchmark._pool_memory_report(_plateau_samples()),
         "source_evidence": {"before": copy.deepcopy(source), "after": copy.deepcopy(source)},
         "final_output": {
             "finite": True,
@@ -176,6 +251,45 @@ def _gate(report: dict, identifier: str) -> dict:
     )
 
 
+def _memory_sample(
+    phase: str,
+    process_mib: float,
+    host_mib: float,
+    live_mib: float,
+    pool_mib: float,
+    peak_mib: float,
+    *,
+    total_mib: float = 24_576.0,
+    free_mib: float = 20_000.0,
+) -> dict:
+    mib = 1024.0 * 1024.0
+    return {
+        "phase": phase,
+        "process_vram_mib": process_mib,
+        "host_rss_mib": host_mib,
+        "jax_allocator": {
+            "bytes_in_use": live_mib * mib,
+            "pool_bytes": pool_mib * mib,
+            "peak_bytes_in_use": peak_mib * mib,
+        },
+        "selected_gpu_memory_mib": {
+            "total_mib": total_mib,
+            "used_mib": total_mib - free_mib,
+            "free_mib": free_mib,
+        },
+    }
+
+
+def _plateau_samples() -> list[dict]:
+    return [
+        _memory_sample("after_initial_compile_and_warmup", 802.0, 1_000.0, 450.6, 538.97, 536.23),
+        _memory_sample("allocator_stabilized_E0", 1_326.0, 1_100.0, 480.0, 1_075.84, 621.83),
+        _memory_sample("post_stabilization_E1", 1_326.0, 1_101.0, 481.0, 1_075.84, 622.0),
+        _memory_sample("post_stabilization_E2", 1_326.0, 1_100.5, 479.0, 1_075.84, 622.0),
+        _memory_sample("post_stabilization_E3", 1_326.0, 1_101.5, 480.0, 1_075.84, 622.5),
+    ]
+
+
 def test_cli_defaults_lock_formal_manifest_cache_and_protocol() -> None:
     options = benchmark._parse_args([])
 
@@ -184,6 +298,7 @@ def test_cli_defaults_lock_formal_manifest_cache_and_protocol() -> None:
     assert options.cache == Path(".track-cache/v0.1/train_pool.npz")
     assert options.admission_report == Path("benchmarks/v0.1/m5_track_admission_report.json")
     assert options.environment_steps == 10_000
+    assert options.allocator_stabilization_steps == 10_000
     assert options.health_max_steps == 5_000
     assert options.reset_heavy_cycles == 64
 
@@ -192,6 +307,7 @@ def test_cli_defaults_lock_formal_manifest_cache_and_protocol() -> None:
     "arguments",
     (
         ("--steps", "0"),
+        ("--allocator-stabilization-steps", "0"),
         ("--warmup-steps", "-1"),
         ("--health-max-steps", "bad"),
         ("--reset-heavy-cycles", "0"),
@@ -209,6 +325,59 @@ def test_complete_fake_report_passes_every_formal_gate() -> None:
     assert len(checks) >= 35
     assert len({check["id"] for check in checks}) == len(checks)
     assert all(check["passed"] for check in checks)
+
+
+def test_memory_report_separates_one_time_expansion_from_fixed_E0_plateau() -> None:
+    report = benchmark._pool_memory_report(_plateau_samples())
+
+    assert report["claim"] == "post-stabilization allocator plateau"
+    assert report["initial_compiled_to_stabilized"]["process_vram_mib"]["delta"] == 524.0
+    assert report["initial_compiled_to_stabilized"]["jax_allocator_bytes"]["pool_bytes"][
+        "delta"
+    ] == pytest.approx((1_075.84 - 538.97) * 1024.0 * 1024.0)
+    plateau = report["post_stabilization"]
+    assert plateau["process_vram_mib"]["max_growth_from_baseline"] == 0.0
+    assert plateau["process_vram_mib"]["passed"] is True
+    assert plateau["jax_allocator_bytes"]["pool_bytes"]["passed"] is True
+    assert plateau["jax_allocator_bytes"]["bytes_in_use"]["passed"] is True
+    assert plateau["host_rss_mib"]["available"] is True
+    assert report["absolute_headroom"]["passed"] is True
+    assert report["passed"] is True
+
+
+def test_memory_report_rejects_cumulative_growth_pool_growth_and_live_trend() -> None:
+    process_growth = _plateau_samples()
+    process_growth[-1]["process_vram_mib"] += 65.0
+    assert (
+        benchmark._pool_memory_report(process_growth)["post_stabilization"]["process_vram_mib"][
+            "passed"
+        ]
+        is False
+    )
+
+    pool_growth = _plateau_samples()
+    pool_growth[3]["jax_allocator"]["pool_bytes"] += 1.0
+    assert (
+        benchmark._pool_memory_report(pool_growth)["post_stabilization"]["jax_allocator_bytes"][
+            "pool_bytes"
+        ]["passed"]
+        is False
+    )
+
+    monotonic_live_growth = _plateau_samples()
+    for index, sample in enumerate(monotonic_live_growth[1:]):
+        sample["jax_allocator"]["bytes_in_use"] = (480.0 + index) * 1024.0 * 1024.0
+    live = benchmark._pool_memory_report(monotonic_live_growth)["post_stabilization"][
+        "jax_allocator_bytes"
+    ]["bytes_in_use"]
+    assert live["max_growth_from_baseline"] < benchmark.LIVE_BYTES_GROWTH_LIMIT
+    assert live["monotonic_non_decreasing_with_positive_growth"] is True
+    assert live["passed"] is False
+
+    low_headroom = _plateau_samples()
+    for sample in low_headroom:
+        sample["selected_gpu_memory_mib"].update(total_mib=1_500.0, free_mib=100.0)
+    assert benchmark._pool_memory_report(low_headroom)["absolute_headroom"]["passed"] is False
 
 
 def test_expected_track_ids_use_host_domain2_and_advanced_episode_counters() -> None:
@@ -238,6 +407,16 @@ def test_expected_track_ids_use_host_domain2_and_advanced_episode_counters() -> 
         (
             "protocol.environment_steps",
             lambda report: report["protocol"].update(environment_steps=9),
+        ),
+        (
+            "protocol.allocator_stabilization_steps",
+            lambda report: report["protocol"].update(allocator_stabilization_steps=9_999),
+        ),
+        (
+            "protocol.repeated_epochs",
+            lambda report: report["protocol"]["measurement_epoch_seeds"].__setitem__(
+                1, benchmark.FORMAL_RESET_SEED
+            ),
         ),
         (
             "assets.cache_integrity",
@@ -288,6 +467,22 @@ def test_expected_track_ids_use_host_domain2_and_advanced_episode_counters() -> 
             ),
         ),
         (
+            "allocator.stabilization",
+            lambda report: report["allocator_stabilization"].update(
+                final_output_released_before_memory_sample=False
+            ),
+        ),
+        (
+            "allocator.repeated_epochs",
+            lambda report: report["measurement_epochs"][2].update(
+                included_in_formal_transition_count=True
+            ),
+        ),
+        (
+            "timing.headline_epoch",
+            lambda report: report["timing"].update(headline_epoch="E2"),
+        ),
+        (
             "timing.pool_ratio",
             lambda report: report["timing"].update(pool_to_fixed_throughput_ratio=0.749),
         ),
@@ -319,6 +514,49 @@ def test_expected_track_ids_use_host_domain2_and_advanced_episode_counters() -> 
             lambda report: report["health"].update(disallowed_track_id_event_count=1),
         ),
         ("cache.no_recompile", lambda report: report["executable_cache"].update(passed=False)),
+        (
+            "cache.epoch_plateau",
+            lambda report: report["executable_cache"].update(
+                cache_sizes_stable_from_E0_through_E3=False
+            ),
+        ),
+        (
+            "memory.raw_sample_binding",
+            lambda report: report["memory"].update(steady_process_vram_growth_mib=999.0),
+        ),
+        (
+            "memory.steady_growth",
+            lambda report: report["memory"]["post_stabilization"]["process_vram_mib"].update(
+                max_growth_from_baseline=65.0
+            ),
+        ),
+        (
+            "memory.allocator_pool_plateau",
+            lambda report: report["memory"]["post_stabilization"]["jax_allocator_bytes"][
+                "pool_bytes"
+            ].update(max_window_growth=1.0),
+        ),
+        (
+            "memory.live_bytes_plateau",
+            lambda report: report["memory"]["post_stabilization"]["jax_allocator_bytes"][
+                "bytes_in_use"
+            ].update(monotonic_non_decreasing_with_positive_growth=True),
+        ),
+        (
+            "memory.host_rss_observed",
+            lambda report: report["memory"]["post_stabilization"]["host_rss_mib"].update(
+                available=False
+            ),
+        ),
+        (
+            "memory.absolute_headroom",
+            lambda report: report["memory"]["absolute_headroom"].update(
+                peak_process_vram_fraction=0.9,
+                minimum_sampled_gpu_free_mib=100.0,
+                fraction_criterion_passed=False,
+                free_criterion_passed=False,
+            ),
+        ),
         (
             "source.clean",
             lambda report: report["source_evidence"]["after"].update(tracked_worktree_clean=False),

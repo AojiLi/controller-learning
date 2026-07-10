@@ -58,17 +58,30 @@ from controller_learning.tracks.pool import TrackPool
 from controller_learning.tracks.types import Track, TrackBatch
 from scripts import benchmark_racing_env as m4_benchmark
 
-REPORT_SCHEMA_VERSION = "controller-learning.m5-track-pool.v1"
-PROTOCOL_VERSION = "m5-track-pool-gpu-v1"
+REPORT_SCHEMA_VERSION = "controller-learning.m5-track-pool.v2"
+PROTOCOL_VERSION = "m5-track-pool-gpu-v2"
 FORMAL_NUM_WORLDS = 1024
 FORMAL_LEVEL_ID = 1
 FORMAL_RESET_SEED = 20260710
+ALLOCATOR_STABILIZATION_SEED = 20260711
+MEASUREMENT_EPOCHS = (
+    ("E1", FORMAL_RESET_SEED),
+    ("E2", 20260712),
+    ("E3", 20260713),
+)
+HEADLINE_EPOCH = "E1"
 FORMAL_TRAIN_TRACK_COUNT = 10_000
 DEFAULT_ENVIRONMENT_STEPS = 10_000
+DEFAULT_ALLOCATOR_STABILIZATION_STEPS = 10_000
 DEFAULT_WARMUP_STEPS = 8
 DEFAULT_HEALTH_MAX_STEPS = 5_000
 DEFAULT_RESET_HEAVY_CYCLES = 64
 MINIMUM_POOL_TO_FIXED_THROUGHPUT_RATIO = 0.75
+PROCESS_VRAM_GROWTH_LIMIT_MIB = 64.0
+LIVE_BYTES_GROWTH_LIMIT = 32 * 1024 * 1024
+POOL_BYTES_GROWTH_TOLERANCE = 0
+MAXIMUM_PROCESS_VRAM_FRACTION = 0.80
+MINIMUM_GPU_FREE_MIB = 1024.0
 DEFAULT_MANIFEST = Path("controller_learning/assets/tracks/v0.1/train.json")
 DEFAULT_CACHE = Path(".track-cache/v0.1/train_pool.npz")
 DEFAULT_ADMISSION_REPORT = Path("benchmarks/v0.1/m5_track_admission_report.json")
@@ -136,6 +149,7 @@ class BenchmarkOptions:
     cache: Path = DEFAULT_CACHE
     admission_report: Path = DEFAULT_ADMISSION_REPORT
     environment_steps: int = DEFAULT_ENVIRONMENT_STEPS
+    allocator_stabilization_steps: int = DEFAULT_ALLOCATOR_STABILIZATION_STEPS
     warmup_steps: int = DEFAULT_WARMUP_STEPS
     health_max_steps: int = DEFAULT_HEALTH_MAX_STEPS
     reset_heavy_cycles: int = DEFAULT_RESET_HEAVY_CYCLES
@@ -143,6 +157,7 @@ class BenchmarkOptions:
     def __post_init__(self) -> None:
         for name in (
             "environment_steps",
+            "allocator_stabilization_steps",
             "warmup_steps",
             "health_max_steps",
             "reset_heavy_cycles",
@@ -189,6 +204,15 @@ def _build_parser() -> argparse.ArgumentParser:
         default=DEFAULT_WARMUP_STEPS,
     )
     parser.add_argument(
+        "--allocator-stabilization-steps",
+        type=_positive_integer,
+        default=DEFAULT_ALLOCATOR_STABILIZATION_STEPS,
+        help=(
+            "Untimed no-sync steps used to stabilize allocator growth before the formal memory "
+            "baseline (default: 10000)"
+        ),
+    )
+    parser.add_argument(
         "--health-max-steps",
         type=_positive_integer,
         default=DEFAULT_HEALTH_MAX_STEPS,
@@ -209,6 +233,7 @@ def _parse_args(argv: list[str] | None = None) -> BenchmarkOptions:
         cache=values.cache,
         admission_report=values.admission_report,
         environment_steps=values.environment_steps,
+        allocator_stabilization_steps=values.allocator_stabilization_steps,
         warmup_steps=values.warmup_steps,
         health_max_steps=values.health_max_steps,
         reset_heavy_cycles=values.reset_heavy_cycles,
@@ -700,6 +725,22 @@ def _cache_evidence(
     }
 
 
+def _add_epoch_cache_evidence(
+    evidence: dict[str, Any],
+    snapshots: Mapping[str, Mapping[str, int | None]],
+) -> None:
+    ordered = {label: dict(snapshot) for label, snapshot in snapshots.items()}
+    values = list(ordered.values())
+    stable = bool(values) and all(snapshot == values[0] for snapshot in values[1:])
+    evidence.update(
+        {
+            "epoch_snapshots": ordered,
+            "cache_sizes_stable_from_E0_through_E3": stable,
+            "passed": bool(evidence["passed"] and stable),
+        }
+    )
+
+
 def _track_rows_preserved(
     before: TrackBatch,
     after: TrackBatch,
@@ -1001,6 +1042,365 @@ def _measure_steady_steps(
     return time.perf_counter() - started, final
 
 
+def _run_no_sync_epoch(
+    jax: Any,
+    jnp: Any,
+    env: Any,
+    action: Any,
+    sorted_allowed_ids: Any,
+    *,
+    label: str,
+    steps: int,
+    reset_seed: int,
+    headline: bool,
+) -> dict[str, Any]:
+    """Run one reset/step epoch, fully settle effects, and release outputs before sampling."""
+
+    seconds, final = _measure_steady_steps(
+        jax,
+        env,
+        action,
+        steps=steps,
+        reset_seed=reset_seed,
+    )
+    finite, failures = _all_public_finite(final)
+    track_ids_allowed = bool(
+        np.asarray(jnp.all(_ids_allowed(jnp, final[4]["track_id"], sorted_allowed_ids)))
+    )
+    effects_barrier = getattr(jax, "effects_barrier", None)
+    effects_barrier_used = callable(effects_barrier)
+    settle_started = time.perf_counter()
+    if effects_barrier_used:
+        effects_barrier()
+    del final
+    collected_objects = gc.collect()
+    settle_seconds = time.perf_counter() - settle_started
+    transitions = FORMAL_NUM_WORLDS * steps
+    return {
+        "label": label,
+        "steps": steps,
+        "transitions": transitions,
+        "seconds": seconds,
+        "settle_seconds": settle_seconds,
+        "environment_steps_per_second": steps / seconds,
+        "transitions_per_second": transitions / seconds,
+        "reset_seed": reset_seed,
+        "performance_action": [0.0, 0.0],
+        "per_step_host_synchronization": False,
+        "full_final_tree_synchronized": True,
+        "effects_barrier_before_memory_sample": effects_barrier_used,
+        "final_output_released_before_memory_sample": True,
+        "gc_before_memory_sample": True,
+        "gc_collected_objects": collected_objects,
+        "included_in_formal_throughput": headline,
+        "included_in_formal_transition_count": headline,
+        "final_output_finite": finite,
+        "final_nonfinite_fields": failures,
+        "final_track_ids_allowed": track_ids_allowed,
+        "passed": bool(finite and track_ids_allowed and effects_barrier_used),
+    }
+
+
+def _host_rss_mib() -> tuple[float | None, str | None]:
+    """Read current Linux resident-set size without adding a runtime dependency."""
+
+    try:
+        fields = Path("/proc/self/statm").read_text(encoding="utf-8").split()
+        resident_pages = int(fields[1])
+        page_size = int(os.sysconf("SC_PAGE_SIZE"))
+    except (IndexError, OSError, TypeError, ValueError) as error:
+        return None, f"procfs RSS unavailable: {type(error).__name__}"
+    return resident_pages * page_size / (1024.0 * 1024.0), None
+
+
+def _selected_gpu_memory_mib(gpu_uuid: str | None) -> tuple[dict[str, float], str | None]:
+    """Return selected-device totals without persisting its private UUID."""
+
+    if gpu_uuid is None:
+        return {}, "selected physical GPU is unavailable"
+    stdout, error = m4_benchmark._run_command(
+        (
+            "nvidia-smi",
+            "--query-gpu=uuid,memory.total,memory.used,memory.free",
+            "--format=csv,noheader,nounits",
+        )
+    )
+    if stdout is None:
+        return {}, error
+    for line in stdout.splitlines():
+        fields = [value.strip() for value in line.split(",")]
+        if len(fields) != 4 or fields[0] != gpu_uuid:
+            continue
+        try:
+            return {
+                "total_mib": float(fields[1]),
+                "used_mib": float(fields[2]),
+                "free_mib": float(fields[3]),
+            }, None
+        except ValueError:
+            break
+    return {}, "selected GPU memory row was unavailable"
+
+
+def _formal_memory_sample(device: Any, phase: str, gpu_uuid: str | None) -> dict[str, Any]:
+    sample = m4_benchmark._memory_sample(device, phase, gpu_uuid)
+    host_rss, host_error = _host_rss_mib()
+    gpu_memory, gpu_error = _selected_gpu_memory_mib(gpu_uuid)
+    sample.update(
+        {
+            "host_rss_mib": host_rss,
+            "host_rss_error": host_error,
+            "selected_gpu_memory_mib": gpu_memory,
+            "selected_gpu_memory_error": gpu_error,
+        }
+    )
+    return sample
+
+
+def _number(value: Any) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    converted = float(value)
+    return converted if math.isfinite(converted) else None
+
+
+def _series_delta_evidence(
+    samples: Mapping[str, Mapping[str, Any]],
+    phases: Sequence[str],
+    getter: Any,
+) -> dict[str, Any]:
+    values = [_number(getter(samples.get(phase, {}))) for phase in phases]
+    labelled = [
+        {"phase": phase, "value": value} for phase, value in zip(phases, values, strict=True)
+    ]
+    if any(value is None for value in values):
+        return {
+            "available": False,
+            "values": labelled,
+            "window_deltas": [],
+            "cumulative_deltas_from_baseline": [],
+            "max_growth_from_baseline": None,
+            "end_growth_from_baseline": None,
+            "max_window_growth": None,
+            "monotonic_non_decreasing_with_positive_growth": None,
+            "linear_slope_per_epoch": None,
+        }
+
+    numeric = [float(value) for value in values if value is not None]
+    windows = [
+        {
+            "from_phase": first_phase,
+            "to_phase": second_phase,
+            "delta": second - first,
+        }
+        for first_phase, second_phase, first, second in zip(
+            phases[:-1],
+            phases[1:],
+            numeric[:-1],
+            numeric[1:],
+            strict=True,
+        )
+    ]
+    cumulative = [
+        {"phase": phase, "delta": value - numeric[0]}
+        for phase, value in zip(phases[1:], numeric[1:], strict=True)
+    ]
+    cumulative_values = [item["delta"] for item in cumulative]
+    window_values = [item["delta"] for item in windows]
+    mean_x = (len(numeric) - 1) / 2.0
+    mean_y = sum(numeric) / len(numeric)
+    denominator = sum((index - mean_x) ** 2 for index in range(len(numeric)))
+    slope = (
+        sum((index - mean_x) * (value - mean_y) for index, value in enumerate(numeric))
+        / denominator
+        if denominator
+        else 0.0
+    )
+    return {
+        "available": True,
+        "values": labelled,
+        "window_deltas": windows,
+        "cumulative_deltas_from_baseline": cumulative,
+        "max_growth_from_baseline": max(0.0, *cumulative_values),
+        "end_growth_from_baseline": numeric[-1] - numeric[0],
+        "max_window_growth": max(window_values, default=0.0),
+        "monotonic_non_decreasing_with_positive_growth": bool(
+            all(delta >= 0.0 for delta in window_values)
+            and any(delta > 0.0 for delta in window_values)
+        ),
+        "linear_slope_per_epoch": slope,
+    }
+
+
+def _stabilization_memory_delta(
+    before: Mapping[str, Any],
+    after: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Record one-time allocator expansion separately from the formal leak measurement."""
+
+    before_process = _number(before.get("process_vram_mib"))
+    after_process = _number(after.get("process_vram_mib"))
+    process_delta = (
+        after_process - before_process
+        if before_process is not None and after_process is not None
+        else None
+    )
+    before_allocator = before.get("jax_allocator", {})
+    after_allocator = after.get("jax_allocator", {})
+    allocator_fields: dict[str, dict[str, float] | None] = {}
+    for field in ("bytes_in_use", "peak_bytes_in_use", "pool_bytes"):
+        first = _number(before_allocator.get(field))
+        second = _number(after_allocator.get(field))
+        allocator_fields[field] = (
+            {
+                "before": first,
+                "after": second,
+                "delta": second - first,
+            }
+            if first is not None and second is not None
+            else None
+        )
+    before_host = _number(before.get("host_rss_mib"))
+    after_host = _number(after.get("host_rss_mib"))
+    return {
+        "before_phase": before["phase"],
+        "after_phase": after["phase"],
+        "process_vram_mib": {
+            "before": before_process,
+            "after": after_process,
+            "delta": process_delta,
+        },
+        "host_rss_mib": {
+            "before": before_host,
+            "after": after_host,
+            "delta": (
+                after_host - before_host
+                if before_host is not None and after_host is not None
+                else None
+            ),
+        },
+        "jax_allocator_bytes": allocator_fields,
+    }
+
+
+def _pool_memory_report(samples: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    """Build the fixed-E0 plateau evidence without adapting its baseline."""
+
+    by_phase = {str(sample["phase"]): sample for sample in samples}
+    plateau_phases = (
+        "allocator_stabilized_E0",
+        *(f"post_stabilization_{label}" for label, _ in MEASUREMENT_EPOCHS),
+    )
+    process = _series_delta_evidence(
+        by_phase,
+        plateau_phases,
+        lambda sample: sample.get("process_vram_mib"),
+    )
+    host_rss = _series_delta_evidence(
+        by_phase,
+        plateau_phases,
+        lambda sample: sample.get("host_rss_mib"),
+    )
+    allocator = {
+        field: _series_delta_evidence(
+            by_phase,
+            plateau_phases,
+            lambda sample, field=field: sample.get("jax_allocator", {}).get(field),
+        )
+        for field in ("bytes_in_use", "pool_bytes", "peak_bytes_in_use")
+    }
+    process["growth_limit_mib"] = PROCESS_VRAM_GROWTH_LIMIT_MIB
+    process["passed"] = bool(
+        process["available"]
+        and process["max_growth_from_baseline"] <= PROCESS_VRAM_GROWTH_LIMIT_MIB
+        and process["end_growth_from_baseline"] <= PROCESS_VRAM_GROWTH_LIMIT_MIB
+    )
+    pool_bytes = allocator["pool_bytes"]
+    pool_bytes["growth_tolerance_bytes"] = POOL_BYTES_GROWTH_TOLERANCE
+    pool_bytes["passed"] = bool(
+        pool_bytes["available"]
+        and pool_bytes["max_growth_from_baseline"] <= POOL_BYTES_GROWTH_TOLERANCE
+        and pool_bytes["end_growth_from_baseline"] <= POOL_BYTES_GROWTH_TOLERANCE
+        and pool_bytes["max_window_growth"] <= POOL_BYTES_GROWTH_TOLERANCE
+    )
+    live_bytes = allocator["bytes_in_use"]
+    live_bytes["growth_limit_bytes"] = LIVE_BYTES_GROWTH_LIMIT
+    live_bytes["passed"] = bool(
+        live_bytes["available"]
+        and live_bytes["max_growth_from_baseline"] <= LIVE_BYTES_GROWTH_LIMIT
+        and live_bytes["end_growth_from_baseline"] <= LIVE_BYTES_GROWTH_LIMIT
+        and live_bytes["monotonic_non_decreasing_with_positive_growth"] is False
+    )
+
+    process_values = [
+        value
+        for sample in samples
+        if (value := _number(sample.get("process_vram_mib"))) is not None
+    ]
+    gpu_totals = [
+        value
+        for sample in samples
+        if (value := _number(sample.get("selected_gpu_memory_mib", {}).get("total_mib")))
+        is not None
+    ]
+    gpu_free = [
+        value
+        for sample in samples
+        if (value := _number(sample.get("selected_gpu_memory_mib", {}).get("free_mib"))) is not None
+    ]
+    peak_process = max(process_values, default=None)
+    selected_total = min(gpu_totals, default=None)
+    minimum_free = min(gpu_free, default=None)
+    peak_fraction = (
+        peak_process / selected_total
+        if peak_process is not None and selected_total not in (None, 0.0)
+        else None
+    )
+    fraction_passed = peak_fraction is not None and peak_fraction <= MAXIMUM_PROCESS_VRAM_FRACTION
+    free_passed = minimum_free is not None and minimum_free >= MINIMUM_GPU_FREE_MIB
+    headroom = {
+        "peak_process_vram_mib": peak_process,
+        "selected_gpu_total_mib": selected_total,
+        "peak_process_vram_fraction": peak_fraction,
+        "maximum_process_vram_fraction": MAXIMUM_PROCESS_VRAM_FRACTION,
+        "minimum_sampled_gpu_free_mib": minimum_free,
+        "minimum_gpu_free_mib": MINIMUM_GPU_FREE_MIB,
+        "fraction_criterion_passed": fraction_passed,
+        "free_criterion_passed": free_passed,
+        "passed": bool(fraction_passed or free_passed),
+    }
+    initial_compiled = by_phase.get("after_initial_compile_and_warmup", {})
+    stabilized = by_phase.get("allocator_stabilized_E0", {})
+    cold_to_stabilized = _stabilization_memory_delta(initial_compiled, stabilized)
+    return {
+        "claim": "post-stabilization allocator plateau",
+        "samples": list(samples),
+        "baseline_phase": "allocator_stabilized_E0",
+        "baseline_fixed_before_repeated_epochs": True,
+        "comparison_phases": list(plateau_phases),
+        "initial_compiled_to_stabilized": cold_to_stabilized,
+        "post_stabilization": {
+            "process_vram_mib": process,
+            "host_rss_mib": host_rss,
+            "jax_allocator_bytes": allocator,
+        },
+        "absolute_headroom": headroom,
+        "peak_sampled_process_vram_mib": peak_process,
+        "steady_process_vram_growth_mib": process["end_growth_from_baseline"],
+        "steady_growth_limit_mib": PROCESS_VRAM_GROWTH_LIMIT_MIB,
+        "steady_growth_within_limit": process["passed"],
+        "baseline_after_allocator_stabilization": True,
+        "formal_comparison": "fixed E0 baseline through distinct-seed E1-E3 epochs",
+        "passed": bool(
+            process["passed"]
+            and pool_bytes["passed"]
+            and live_bytes["passed"]
+            and host_rss["available"]
+            and headroom["passed"]
+        ),
+    }
+
+
 def _run_reset_heavy_measurement(
     env: Any,
     action: Any,
@@ -1123,8 +1523,8 @@ def _track_from_batch_row(batch: TrackBatch, index: int, generator_version: str)
     )
 
 
-def _fixed_tracks_for_formal_reset(pool: TrackPool) -> tuple[Track, ...]:
-    identity = initialize_episode_identities(FORMAL_RESET_SEED, FORMAL_NUM_WORLDS)
+def _fixed_tracks_for_reset(pool: TrackPool, reset_seed: int) -> tuple[Track, ...]:
+    identity = initialize_episode_identities(reset_seed, FORMAL_NUM_WORLDS)
     selection_seeds = track_pool_seeds(identity)
     indices = np.remainder(selection_seeds, np.uint32(pool.size)).astype(np.int64)
     return tuple(
@@ -1140,6 +1540,7 @@ def _measure_fixed_track_baseline(
     *,
     steps: int,
     warmup_steps: int,
+    reset_seed: int,
 ) -> dict[str, Any]:
     create_started = time.perf_counter()
     env = _create_environment(
@@ -1152,7 +1553,7 @@ def _measure_fixed_track_baseline(
     )
     create_seconds = time.perf_counter() - create_started
     try:
-        observation, info = env.reset(seed=FORMAL_RESET_SEED)
+        observation, info = env.reset(seed=reset_seed)
         jax.block_until_ready((observation, info["track_id"]))
         first_started = time.perf_counter()
         first = env.step(action)
@@ -1170,7 +1571,7 @@ def _measure_fixed_track_baseline(
             env,
             action,
             steps=steps,
-            reset_seed=FORMAL_RESET_SEED,
+            reset_seed=reset_seed,
         )
         final_finite, final_failures = _all_public_finite(final)
         backend = env.backend
@@ -1179,6 +1580,7 @@ def _measure_fixed_track_baseline(
     return {
         "backend": backend,
         "track_mode": "fixed_injected",
+        "reset_seed": reset_seed,
         "steps": steps,
         "transitions": FORMAL_NUM_WORLDS * steps,
         "environment_create_seconds": create_seconds,
@@ -1238,6 +1640,8 @@ def evaluate_report_gates(report: Mapping[str, Any]) -> list[dict[str, Any]]:
     timing = report["timing"]
     baseline = report["fixed_track_baseline"]
     transfer = report["transfer_guard"]
+    stabilization = report["allocator_stabilization"]
+    measurement_epochs = report["measurement_epochs"]
     health = report["health"]
     reset_heavy = report["reset_heavy"]
     cache = report["executable_cache"]
@@ -1247,6 +1651,12 @@ def evaluate_report_gates(report: Mapping[str, Any]) -> list[dict[str, Any]]:
     determinism = report["deterministic_reset"]
     final_output = report["final_output"]
     expected_transitions = FORMAL_NUM_WORLDS * int(protocol["environment_steps"])
+    expected_epoch_pairs = list(MEASUREMENT_EPOCHS)
+    expected_extra_steps = (
+        protocol["allocator_stabilization_steps"]
+        + (len(MEASUREMENT_EPOCHS) - 1) * protocol["environment_steps"]
+    )
+    expected_extra_transitions = FORMAL_NUM_WORLDS * expected_extra_steps
     timing_values = (
         timing["environment_create_seconds"],
         timing["pool_upload_ready_seconds"],
@@ -1265,6 +1675,20 @@ def evaluate_report_gates(report: Mapping[str, Any]) -> list[dict[str, Any]]:
     after = source["after"]
     privacy_failures = _privacy_violations(
         {key: value for key, value in report.items() if key not in {"checks", "privacy"}}
+    )
+    post_stabilization = memory["post_stabilization"]
+    process_plateau = post_stabilization["process_vram_mib"]
+    pool_plateau = post_stabilization["jax_allocator_bytes"]["pool_bytes"]
+    live_plateau = post_stabilization["jax_allocator_bytes"]["bytes_in_use"]
+    headroom = memory["absolute_headroom"]
+    recomputed_memory = _pool_memory_report(memory["samples"])
+    peak_process_fraction = _number(headroom["peak_process_vram_fraction"])
+    minimum_sampled_gpu_free = _number(headroom["minimum_sampled_gpu_free_mib"])
+    fraction_criterion = bool(
+        peak_process_fraction is not None and peak_process_fraction <= MAXIMUM_PROCESS_VRAM_FRACTION
+    )
+    free_criterion = bool(
+        minimum_sampled_gpu_free is not None and minimum_sampled_gpu_free >= MINIMUM_GPU_FREE_MIB
     )
     return [
         _check(
@@ -1299,6 +1723,57 @@ def evaluate_report_gates(report: Mapping[str, Any]) -> list[dict[str, Any]]:
             protocol["environment_steps"] == DEFAULT_ENVIRONMENT_STEPS,
             protocol["environment_steps"],
             DEFAULT_ENVIRONMENT_STEPS,
+        ),
+        _check(
+            "protocol.allocator_stabilization_steps",
+            protocol["allocator_stabilization_steps"] == DEFAULT_ALLOCATOR_STABILIZATION_STEPS
+            and protocol["allocator_stabilization_transitions"]
+            == FORMAL_NUM_WORLDS * DEFAULT_ALLOCATOR_STABILIZATION_STEPS,
+            {
+                "steps": protocol["allocator_stabilization_steps"],
+                "transitions": protocol["allocator_stabilization_transitions"],
+            },
+            {
+                "steps": DEFAULT_ALLOCATOR_STABILIZATION_STEPS,
+                "transitions": FORMAL_NUM_WORLDS * DEFAULT_ALLOCATOR_STABILIZATION_STEPS,
+            },
+        ),
+        _check(
+            "protocol.repeated_epochs",
+            protocol["headline_epoch"] == HEADLINE_EPOCH
+            and protocol["measurement_epoch_labels"] == [label for label, _ in expected_epoch_pairs]
+            and protocol["measurement_epoch_seeds"] == [seed for _, seed in expected_epoch_pairs]
+            and protocol["measurement_epoch_count"] == len(expected_epoch_pairs)
+            and len(
+                {
+                    protocol["allocator_stabilization_seed"],
+                    *protocol["measurement_epoch_seeds"],
+                }
+            )
+            == len(expected_epoch_pairs) + 1
+            and protocol["extra_non_headline_steps"] == expected_extra_steps
+            and protocol["extra_non_headline_transitions"] == expected_extra_transitions
+            and protocol["total_long_run_steps"]
+            == expected_extra_steps + protocol["environment_steps"]
+            and protocol["total_long_run_transitions"]
+            == expected_extra_transitions + expected_transitions
+            and protocol["same_environment_E0_through_E3"] is True
+            and protocol["environment_recreations_between_E0_E3"] == 0
+            and protocol["jax_cache_clear_calls"] == 0,
+            {
+                "headline_epoch": protocol["headline_epoch"],
+                "allocator_stabilization_seed": protocol["allocator_stabilization_seed"],
+                "measurement_epoch_labels": protocol["measurement_epoch_labels"],
+                "measurement_epoch_seeds": protocol["measurement_epoch_seeds"],
+                "extra_non_headline_steps": protocol["extra_non_headline_steps"],
+                "extra_non_headline_transitions": protocol["extra_non_headline_transitions"],
+                "same_environment_E0_through_E3": protocol["same_environment_E0_through_E3"],
+                "environment_recreations_between_E0_E3": protocol[
+                    "environment_recreations_between_E0_E3"
+                ],
+                "jax_cache_clear_calls": protocol["jax_cache_clear_calls"],
+            },
+            "fixed distinct-seed E0 plus E1-E3 protocol with all extra work disclosed",
         ),
         _check(
             "protocol.transition_count",
@@ -1478,6 +1953,69 @@ def evaluate_report_gates(report: Mapping[str, Any]) -> list[dict[str, Any]]:
             "equal and greater than one",
         ),
         _check(
+            "allocator.stabilization",
+            stabilization["passed"]
+            and stabilization["label"] == "E0"
+            and stabilization["steps"] == protocol["allocator_stabilization_steps"]
+            and stabilization["transitions"]
+            == FORMAL_NUM_WORLDS * protocol["allocator_stabilization_steps"]
+            and stabilization["steps"] == DEFAULT_ALLOCATOR_STABILIZATION_STEPS
+            and stabilization["reset_seed"] == ALLOCATOR_STABILIZATION_SEED
+            and stabilization["per_step_host_synchronization"] is False
+            and stabilization["full_final_tree_synchronized"] is True
+            and stabilization["effects_barrier_before_memory_sample"] is True
+            and stabilization["final_output_released_before_memory_sample"] is True
+            and stabilization["gc_before_memory_sample"] is True
+            and stabilization["included_in_formal_throughput"] is False
+            and stabilization["included_in_formal_transition_count"] is False
+            and stabilization["final_output_finite"]
+            and stabilization["final_track_ids_allowed"]
+            and _finite_positive(
+                (
+                    stabilization["seconds"],
+                    stabilization["environment_steps_per_second"],
+                    stabilization["transitions_per_second"],
+                )
+            ),
+            stabilization,
+            "one fixed-seed 10000-step settled E0 excluded from formal counts",
+        ),
+        _check(
+            "allocator.repeated_epochs",
+            len(measurement_epochs) == len(expected_epoch_pairs)
+            and all(
+                epoch["label"] == expected_label
+                and epoch["reset_seed"] == expected_seed
+                and epoch["steps"] == protocol["environment_steps"]
+                and epoch["transitions"] == expected_transitions
+                and epoch["per_step_host_synchronization"] is False
+                and epoch["full_final_tree_synchronized"] is True
+                and epoch["effects_barrier_before_memory_sample"] is True
+                and epoch["final_output_released_before_memory_sample"] is True
+                and epoch["gc_before_memory_sample"] is True
+                and epoch["included_in_formal_throughput"] == (expected_label == HEADLINE_EPOCH)
+                and epoch["included_in_formal_transition_count"]
+                == (expected_label == HEADLINE_EPOCH)
+                and epoch["final_output_finite"]
+                and epoch["final_track_ids_allowed"]
+                and epoch["passed"]
+                and _finite_positive(
+                    (
+                        epoch["seconds"],
+                        epoch["environment_steps_per_second"],
+                        epoch["transitions_per_second"],
+                    )
+                )
+                and _number(epoch["settle_seconds"]) is not None
+                and epoch["settle_seconds"] >= 0.0
+                for epoch, (expected_label, expected_seed) in zip(
+                    measurement_epochs, expected_epoch_pairs, strict=True
+                )
+            ),
+            measurement_epochs,
+            "three settled, finite, distinct-seed epochs with E1 as the sole headline epoch",
+        ),
+        _check(
             "timing.finite_positive",
             _finite_positive(timing_values),
             timing_values,
@@ -1490,9 +2028,23 @@ def evaluate_report_gates(report: Mapping[str, Any]) -> list[dict[str, Any]]:
             f">= {MINIMUM_POOL_TO_FIXED_THROUGHPUT_RATIO}",
         ),
         _check(
+            "timing.headline_epoch",
+            timing["headline_epoch"] == HEADLINE_EPOCH
+            and timing["headline_reset_seed"] == FORMAL_RESET_SEED
+            and timing["steady_seconds"] == measurement_epochs[0]["seconds"]
+            and timing["transitions_per_second"] == measurement_epochs[0]["transitions_per_second"],
+            {
+                "headline_epoch": timing["headline_epoch"],
+                "headline_reset_seed": timing["headline_reset_seed"],
+                "steady_seconds": timing["steady_seconds"],
+            },
+            "E1 timing and seed exactly",
+        ),
+        _check(
             "baseline.protocol",
             baseline["steps"] == protocol["environment_steps"]
             and baseline["transitions"] == protocol["transitions"]
+            and baseline["reset_seed"] == timing["headline_reset_seed"]
             and baseline["final_output_finite"]
             and baseline["matches_pool_initial_selection"]
             and baseline["per_step_host_synchronization"] is False,
@@ -1556,6 +2108,17 @@ def evaluate_report_gates(report: Mapping[str, Any]) -> list[dict[str, Any]]:
         ),
         _check("cache.no_recompile", cache["passed"], cache, {"passed": True}),
         _check(
+            "cache.epoch_plateau",
+            cache["cache_sizes_stable_from_E0_through_E3"] is True
+            and list(cache["epoch_snapshots"]) == ["E0", "E1", "E2", "E3"]
+            and all(
+                snapshot == cache["epoch_snapshots"]["E0"]
+                for snapshot in cache["epoch_snapshots"].values()
+            ),
+            cache["epoch_snapshots"],
+            "identical E0-E3 cache-size snapshots",
+        ),
+        _check(
             "runtime.jax_gpu",
             runtime["jax_device"]["platform"] == "gpu",
             runtime["jax_device"]["platform"],
@@ -1568,12 +2131,69 @@ def evaluate_report_gates(report: Mapping[str, Any]) -> list[dict[str, Any]]:
             "contains NVIDIA",
         ),
         _check(
-            "memory.steady_growth",
-            memory["peak_sampled_process_vram_mib"] is not None
-            and memory["steady_process_vram_growth_mib"] is not None
-            and memory["steady_growth_within_limit"] is True,
-            memory["steady_growth_within_limit"],
+            "memory.raw_sample_binding",
+            memory == recomputed_memory,
+            memory == recomputed_memory,
             True,
+        ),
+        _check(
+            "memory.steady_growth",
+            memory["claim"] == "post-stabilization allocator plateau"
+            and memory["baseline_phase"] == "allocator_stabilized_E0"
+            and memory["baseline_fixed_before_repeated_epochs"] is True
+            and process_plateau["available"] is True
+            and process_plateau["max_growth_from_baseline"] <= PROCESS_VRAM_GROWTH_LIMIT_MIB
+            and process_plateau["end_growth_from_baseline"] <= PROCESS_VRAM_GROWTH_LIMIT_MIB
+            and process_plateau["growth_limit_mib"] == PROCESS_VRAM_GROWTH_LIMIT_MIB
+            and process_plateau["passed"] is True
+            and memory["formal_comparison"]
+            == "fixed E0 baseline through distinct-seed E1-E3 epochs",
+            {
+                "claim": memory["claim"],
+                "process_vram_mib": process_plateau,
+                "formal_comparison": memory["formal_comparison"],
+            },
+            "fixed E0, cumulative max/end process growth <=64 MiB through E3",
+        ),
+        _check(
+            "memory.allocator_pool_plateau",
+            pool_plateau["available"] is True
+            and pool_plateau["max_growth_from_baseline"] <= POOL_BYTES_GROWTH_TOLERANCE
+            and pool_plateau["end_growth_from_baseline"] <= POOL_BYTES_GROWTH_TOLERANCE
+            and pool_plateau["max_window_growth"] <= POOL_BYTES_GROWTH_TOLERANCE
+            and pool_plateau["growth_tolerance_bytes"] == POOL_BYTES_GROWTH_TOLERANCE
+            and pool_plateau["passed"] is True,
+            pool_plateau,
+            "no cumulative or per-window pool_bytes growth after E0",
+        ),
+        _check(
+            "memory.live_bytes_plateau",
+            live_plateau["available"] is True
+            and live_plateau["max_growth_from_baseline"] <= LIVE_BYTES_GROWTH_LIMIT
+            and live_plateau["end_growth_from_baseline"] <= LIVE_BYTES_GROWTH_LIMIT
+            and live_plateau["monotonic_non_decreasing_with_positive_growth"] is False
+            and live_plateau["growth_limit_bytes"] == LIVE_BYTES_GROWTH_LIMIT
+            and live_plateau["passed"] is True,
+            live_plateau,
+            "cumulative max/end <=32 MiB and no monotonic non-decreasing growth",
+        ),
+        _check(
+            "memory.host_rss_observed",
+            memory["post_stabilization"]["host_rss_mib"]["available"] is True,
+            memory["post_stabilization"]["host_rss_mib"],
+            "current host RSS present at E0-E3 boundaries",
+        ),
+        _check(
+            "memory.absolute_headroom",
+            headroom["maximum_process_vram_fraction"] == MAXIMUM_PROCESS_VRAM_FRACTION
+            and headroom["minimum_gpu_free_mib"] == MINIMUM_GPU_FREE_MIB
+            and headroom["fraction_criterion_passed"] == fraction_criterion
+            and headroom["free_criterion_passed"] == free_criterion
+            and headroom["passed"]
+            == (headroom["fraction_criterion_passed"] or headroom["free_criterion_passed"])
+            and headroom["passed"] is True,
+            headroom,
+            "peak process VRAM <=80% of total GPU VRAM or sampled free VRAM >=1 GiB",
         ),
         _check(
             "source.revision_stable",
@@ -1690,7 +2310,7 @@ def run_benchmark(
         jnp.zeros((FORMAL_NUM_WORLDS, 2), dtype=jnp.float32),
         device=device,
     )
-    memory_samples = [m4_benchmark._memory_sample(device, "before_environment", gpu_uuid)]
+    memory_samples = [_formal_memory_sample(device, "before_environment", gpu_uuid)]
 
     create_started = time.perf_counter()
     env = _create_environment(
@@ -1709,9 +2329,7 @@ def run_benchmark(
             asset_evidence["pool_array_bytes"],
         )
         pool_upload_ready_seconds = time.perf_counter() - create_started
-        memory_samples.append(
-            m4_benchmark._memory_sample(device, "after_environment_create", gpu_uuid)
-        )
+        memory_samples.append(_formal_memory_sample(device, "after_environment_create", gpu_uuid))
 
         reset_started = time.perf_counter()
         reset_observation, reset_info = env.reset(seed=FORMAL_RESET_SEED)
@@ -1739,7 +2357,7 @@ def run_benchmark(
         warmup_seconds = time.perf_counter() - warm_started
         cache_after_compile = _jit_cache_snapshot(env)
         memory_samples.append(
-            m4_benchmark._memory_sample(device, "after_compile_and_warmup", gpu_uuid)
+            _formal_memory_sample(device, "after_initial_compile_and_warmup", gpu_uuid)
         )
 
         transfer_guard = _run_transfer_and_mixed_reset_checks(
@@ -1749,15 +2367,6 @@ def run_benchmark(
             allowed_ids_device,
         )
 
-        steady_seconds, steady_final = _measure_steady_steps(
-            jax,
-            env,
-            action,
-            steps=options.environment_steps,
-            reset_seed=FORMAL_RESET_SEED,
-        )
-        memory_samples.append(m4_benchmark._memory_sample(device, "after_steady", gpu_uuid))
-
         health = _run_health_validation(
             env,
             action,
@@ -1766,7 +2375,7 @@ def run_benchmark(
             sorted_allowed_ids=allowed_ids_device,
             maximum_steps=options.health_max_steps,
         )
-        memory_samples.append(m4_benchmark._memory_sample(device, "after_health", gpu_uuid))
+        memory_samples.append(_formal_memory_sample(device, "after_health_preflight", gpu_uuid))
 
         reset_heavy = _run_reset_heavy_measurement(
             env,
@@ -1775,26 +2384,62 @@ def run_benchmark(
             allowed_ids_device,
             cycles=options.reset_heavy_cycles,
         )
-        memory_samples.append(m4_benchmark._memory_sample(device, "after_reset_heavy", gpu_uuid))
+        memory_samples.append(
+            _formal_memory_sample(device, "after_reset_heavy_preflight", gpu_uuid)
+        )
+
+        # Release every preflight output before fixing E0; the baseline never moves afterwards.
+        del reset_observation, reset_info, first, warm
+        jax.effects_barrier()
+        gc.collect()
+        memory_samples.append(
+            _formal_memory_sample(device, "before_allocator_stabilization", gpu_uuid)
+        )
+        allocator_stabilization = _run_no_sync_epoch(
+            jax,
+            jnp,
+            env,
+            action,
+            allowed_ids_device,
+            label="E0",
+            steps=options.allocator_stabilization_steps,
+            reset_seed=ALLOCATOR_STABILIZATION_SEED,
+            headline=False,
+        )
+        allocator_stabilization["memory_sample_phase"] = "allocator_stabilized_E0"
+        memory_samples.append(_formal_memory_sample(device, "allocator_stabilized_E0", gpu_uuid))
+        epoch_cache_snapshots: dict[str, dict[str, int | None]] = {"E0": _jit_cache_snapshot(env)}
+
+        measurement_epochs: list[dict[str, Any]] = []
+        for label, reset_seed in MEASUREMENT_EPOCHS:
+            epoch = _run_no_sync_epoch(
+                jax,
+                jnp,
+                env,
+                action,
+                allowed_ids_device,
+                label=label,
+                steps=options.environment_steps,
+                reset_seed=reset_seed,
+                headline=label == HEADLINE_EPOCH,
+            )
+            phase = f"post_stabilization_{label}"
+            epoch["memory_sample_phase"] = phase
+            measurement_epochs.append(epoch)
+            memory_samples.append(_formal_memory_sample(device, phase, gpu_uuid))
+            epoch_cache_snapshots[label] = _jit_cache_snapshot(env)
+
         cache_after_all_pool_work = _jit_cache_snapshot(env)
         executable_cache = _cache_evidence(cache_after_compile, cache_after_all_pool_work)
-        steady_finite, steady_failures = _all_public_finite(steady_final)
-        steady_ids_allowed = bool(
-            np.asarray(
-                jnp.all(
-                    _ids_allowed(
-                        jnp,
-                        steady_final[4]["track_id"],
-                        allowed_ids_device,
-                    )
-                )
-            )
+        _add_epoch_cache_evidence(executable_cache, epoch_cache_snapshots)
+        headline_epoch = next(
+            epoch for epoch in measurement_epochs if epoch["label"] == HEADLINE_EPOCH
         )
         pool_backend = env.backend
     finally:
         env.close()
 
-    fixed_tracks = _fixed_tracks_for_formal_reset(pool)
+    fixed_tracks = _fixed_tracks_for_reset(pool, FORMAL_RESET_SEED)
     fixed_track_id_digest = _uint32_digest([track.seed for track in fixed_tracks])
     expected_initial_digest = deterministic_reset["initial_track_id_uint32_sha256"]
     del env
@@ -1806,15 +2451,30 @@ def run_benchmark(
         action,
         steps=options.environment_steps,
         warmup_steps=options.warmup_steps,
+        reset_seed=FORMAL_RESET_SEED,
     )
     fixed_baseline["initial_track_id_uint32_sha256"] = fixed_track_id_digest
     fixed_baseline["matches_pool_initial_selection"] = (
         fixed_track_id_digest == expected_initial_digest
     )
+    jax.effects_barrier()
+    gc.collect()
+    memory_samples.append(_formal_memory_sample(device, "after_fixed_baseline", gpu_uuid))
 
     transitions = FORMAL_NUM_WORLDS * options.environment_steps
-    pool_transitions_per_second = transitions / steady_seconds
+    pool_transitions_per_second = headline_epoch["transitions_per_second"]
     throughput_ratio = pool_transitions_per_second / fixed_baseline["transitions_per_second"]
+    extra_non_headline_steps = (
+        options.allocator_stabilization_steps
+        + (len(MEASUREMENT_EPOCHS) - 1) * options.environment_steps
+    )
+    extra_non_headline_transitions = FORMAL_NUM_WORLDS * extra_non_headline_steps
+    total_long_run_steps = extra_non_headline_steps + options.environment_steps
+    total_long_run_transitions = FORMAL_NUM_WORLDS * total_long_run_steps
+    memory_report = _pool_memory_report(memory_samples)
+    allocator_stabilization["memory_delta_from_initial_compile"] = memory_report[
+        "initial_compiled_to_stabilized"
+    ]
     source_after = _source_snapshot(root)
     report: dict[str, Any] = {
         "schema_version": REPORT_SCHEMA_VERSION,
@@ -1827,6 +2487,22 @@ def run_benchmark(
             "num_worlds": FORMAL_NUM_WORLDS,
             "environment_steps": options.environment_steps,
             "transitions": transitions,
+            "allocator_stabilization_steps": options.allocator_stabilization_steps,
+            "allocator_stabilization_transitions": (
+                FORMAL_NUM_WORLDS * options.allocator_stabilization_steps
+            ),
+            "allocator_stabilization_seed": ALLOCATOR_STABILIZATION_SEED,
+            "measurement_epoch_count": len(MEASUREMENT_EPOCHS),
+            "measurement_epoch_labels": [label for label, _ in MEASUREMENT_EPOCHS],
+            "measurement_epoch_seeds": [seed for _, seed in MEASUREMENT_EPOCHS],
+            "headline_epoch": HEADLINE_EPOCH,
+            "extra_non_headline_steps": extra_non_headline_steps,
+            "extra_non_headline_transitions": extra_non_headline_transitions,
+            "total_long_run_steps": total_long_run_steps,
+            "total_long_run_transitions": total_long_run_transitions,
+            "same_environment_E0_through_E3": True,
+            "environment_recreations_between_E0_E3": 0,
+            "jax_cache_clear_calls": 0,
             "warmup_steps": options.warmup_steps,
             "reset_seed": FORMAL_RESET_SEED,
             "reset_heavy_cycles": options.reset_heavy_cycles,
@@ -1850,6 +2526,8 @@ def run_benchmark(
         "pool_residency": pool_residency,
         "deterministic_reset": deterministic_reset,
         "transfer_guard": transfer_guard,
+        "allocator_stabilization": allocator_stabilization,
+        "measurement_epochs": measurement_epochs,
         "timing": {
             "environment_create_seconds": environment_create_seconds,
             "pool_upload_ready_seconds": pool_upload_ready_seconds,
@@ -1857,8 +2535,10 @@ def run_benchmark(
             "two_cached_deterministic_resets_seconds": repeated_reset_seconds,
             "first_step_compile_seconds": first_step_compile_seconds,
             "warmup_seconds": warmup_seconds,
-            "steady_seconds": steady_seconds,
-            "environment_steps_per_second": options.environment_steps / steady_seconds,
+            "headline_epoch": HEADLINE_EPOCH,
+            "headline_reset_seed": FORMAL_RESET_SEED,
+            "steady_seconds": headline_epoch["seconds"],
+            "environment_steps_per_second": headline_epoch["environment_steps_per_second"],
             "transitions_per_second": pool_transitions_per_second,
             "pool_to_fixed_throughput_ratio": throughput_ratio,
             "minimum_pool_to_fixed_throughput_ratio": (MINIMUM_POOL_TO_FIXED_THROUGHPUT_RATIO),
@@ -1874,15 +2554,17 @@ def run_benchmark(
         },
         "executable_cache": executable_cache,
         "final_output": {
-            "finite": steady_finite,
-            "nonfinite_fields": steady_failures,
-            "all_track_ids_allowed": steady_ids_allowed,
+            "epoch": HEADLINE_EPOCH,
+            "finite": headline_epoch["final_output_finite"],
+            "nonfinite_fields": headline_epoch["final_nonfinite_fields"],
+            "all_track_ids_allowed": headline_epoch["final_track_ids_allowed"],
         },
         "runtime": runtime,
-        "memory": m4_benchmark._memory_report(memory_samples),
+        "memory": memory_report,
         "configuration": {
             "project": m4_benchmark._json_value(asdict(config)),
             "environment_steps": options.environment_steps,
+            "allocator_stabilization_steps": options.allocator_stabilization_steps,
             "warmup_steps": options.warmup_steps,
             "health_max_steps": options.health_max_steps,
             "reset_heavy_cycles": options.reset_heavy_cycles,
