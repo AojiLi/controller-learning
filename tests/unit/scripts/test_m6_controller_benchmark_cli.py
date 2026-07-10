@@ -523,12 +523,14 @@ def test_execution_recorder_measures_calls_and_public_numerical_health() -> None
             "jax_allocator_error": None,
         }
 
+    progress_events: list[dict[str, Any]] = []
     recorder = benchmark._ExecutionRecorder(
         device=object(),
         gpu_uuid="private-test-id",
         gpu_selection_error=None,
         environment_factory=lambda **_kwargs: FakeEnvironment(),
         memory_sampler=memory_sampler,
+        progress_sink=lambda payload: progress_events.append(dict(payload)),
     )
     recorder.begin_group("pid.level0")
     env = recorder.create_environment()
@@ -547,6 +549,15 @@ def test_execution_recorder_measures_calls_and_public_numerical_health() -> None
     assert recorder.checked_transitions == 2
     assert recorder.numerical_failure_count == 1
     assert recorder.numerical_fields == {"observation.position": 1}
+    assert progress_events == [
+        {
+            "event": "m6_environment_closed",
+            "group": "pid.level0",
+            "group_episode_completed": 1,
+            "group_episode_total": 1,
+            "environment_steps": 2,
+        }
+    ]
     assert [sample["phase"] for sample in recorder.memory_samples] == [
         "before_evaluation",
         "after_first_environment_create",

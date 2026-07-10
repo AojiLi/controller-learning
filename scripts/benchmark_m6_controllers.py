@@ -81,6 +81,12 @@ EXECUTION_GROUPS = (
     "mpc.level0",
     "mpc.validation",
 )
+EXECUTION_GROUP_EPISODE_COUNTS = {
+    "pid.level0": FORMAL_LEVEL0_TRACKS,
+    "pid.validation": FORMAL_PID_VALIDATION_TRACKS,
+    "mpc.level0": FORMAL_LEVEL0_TRACKS,
+    "mpc.validation": FORMAL_MPC_VALIDATION_TRACKS,
+}
 MEMORY_SAMPLE_PHASES = (
     "before_evaluation",
     "after_first_environment_create",
@@ -245,7 +251,9 @@ class _MeasuredEnvironment:
         try:
             self._environment.close()
         finally:
-            self._record.closed = True
+            if not self._record.closed:
+                self._record.closed = True
+                self._recorder.record_environment_closed(self._record)
 
 
 class _ExecutionRecorder:
@@ -259,12 +267,14 @@ class _ExecutionRecorder:
         gpu_selection_error: str | None,
         environment_factory: Callable[..., Any],
         memory_sampler: Callable[[Any, str, str | None], Mapping[str, Any]],
+        progress_sink: Callable[[Mapping[str, Any]], None] | None = None,
     ) -> None:
         self._device = device
         self._gpu_uuid = gpu_uuid
         self._gpu_selection_error = gpu_selection_error
         self._environment_factory = environment_factory
         self._memory_sampler = memory_sampler
+        self._progress_sink = progress_sink
         self._current_group: str | None = None
         self._instances: list[_EnvironmentCallRecord] = []
         self._groups: list[_EvaluationGroupRecord] = []
@@ -345,6 +355,24 @@ class _ExecutionRecorder:
         if not self._first_step_sampled:
             self._first_step_sampled = True
             self.sample_memory("after_first_step")
+
+    def record_environment_closed(self, record: _EnvironmentCallRecord) -> None:
+        if not any(instance is record for instance in self._instances) or not record.closed:
+            raise RuntimeError("closed environment record is not owned by this recorder")
+        if self._progress_sink is None:
+            return
+        completed = sum(
+            instance.closed and instance.group == record.group for instance in self._instances
+        )
+        self._progress_sink(
+            {
+                "event": "m6_environment_closed",
+                "group": record.group,
+                "group_episode_completed": completed,
+                "group_episode_total": EXECUTION_GROUP_EPISODE_COUNTS[record.group],
+                "environment_steps": record.step_count,
+            }
+        )
 
     def finish_evaluation(self) -> None:
         if self._current_group is not None:
@@ -744,12 +772,17 @@ def _formal_execution_recorder() -> _ExecutionRecorder:
     if inventory_error is not None and selection_error is None:
         selection_error = inventory_error
     gpu_uuid = None if selected is None else str(selected["uuid"])
+
+    def progress_sink(payload: Mapping[str, Any]) -> None:
+        print(json.dumps(dict(payload), sort_keys=True), file=sys.stderr, flush=True)
+
     return _ExecutionRecorder(
         device=device,
         gpu_uuid=gpu_uuid,
         gpu_selection_error=selection_error,
         environment_factory=CarRacingEnv,
         memory_sampler=m4_benchmark._memory_sample,
+        progress_sink=progress_sink,
     )
 
 
