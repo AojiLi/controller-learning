@@ -58,6 +58,7 @@ from controller_learning.tracks.types import (
     TrackSchemaError,
     stack_tracks,
     track_array_bytes,
+    track_from_batch_row,
 )
 from controller_learning.tracks.validator import (
     TrackValidationSpec,
@@ -106,6 +107,7 @@ __all__ = [
     "track_array_bytes",
     "track_batch_geometry_sha256",
     "track_capacity_from_project",
+    "track_from_batch_row",
     "track_geometry_sha256",
     "track_pool_indices",
     "validate_track_batch",

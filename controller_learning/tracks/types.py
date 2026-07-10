@@ -243,6 +243,50 @@ def stack_tracks(tracks: tuple[Track, ...] | list[Track]) -> TrackBatch:
     )
 
 
+def track_from_batch_row(
+    batch: TrackBatch,
+    index: int,
+    *,
+    generator_version: str,
+) -> Track:
+    """Copy one host batch row into an immutable :class:`Track`.
+
+    This is intended for sequential single-environment development and evaluation. Device-resident
+    training code should keep using batched Track values and must not call this host conversion.
+    """
+
+    if not isinstance(batch, TrackBatch):
+        raise TypeError("batch must be a TrackBatch")
+    if isinstance(index, bool) or not isinstance(index, int):
+        raise TypeError("index must be an integer")
+    track_count = int(np.asarray(batch.seed).shape[0])
+    if not 0 <= index < track_count:
+        raise IndexError(f"Track row {index} is outside batch size {track_count}")
+    if not isinstance(generator_version, str) or not generator_version:
+        raise ValueError("generator_version must be a non-empty string")
+
+    return Track(
+        seed=int(np.asarray(batch.seed)[index]),
+        generator_version=generator_version,
+        centerline_m=np.asarray(batch.centerline_m)[index],
+        left_boundary_m=np.asarray(batch.left_boundary_m)[index],
+        right_boundary_m=np.asarray(batch.right_boundary_m)[index],
+        tangent=np.asarray(batch.tangent)[index],
+        curvature_1pm=np.asarray(batch.curvature_1pm)[index],
+        cumulative_s_m=np.asarray(batch.cumulative_s_m)[index],
+        track_mask=np.asarray(batch.track_mask)[index],
+        checkpoint_center_m=np.asarray(batch.checkpoint_center_m)[index],
+        checkpoint_tangent=np.asarray(batch.checkpoint_tangent)[index],
+        checkpoint_s_m=np.asarray(batch.checkpoint_s_m)[index],
+        checkpoint_mask=np.asarray(batch.checkpoint_mask)[index],
+        start_pose=np.asarray(batch.start_pose)[index],
+        point_count=int(np.asarray(batch.point_count)[index]),
+        checkpoint_count=int(np.asarray(batch.checkpoint_count)[index]),
+        length_m=float(np.asarray(batch.length_m)[index]),
+        width_m=float(np.asarray(batch.width_m)[index]),
+    )
+
+
 def track_array_bytes(track: Track) -> int:
     """Return bytes used by the fixed numerical arrays of one host track."""
 
@@ -272,4 +316,5 @@ __all__ = [
     "TrackSchemaError",
     "stack_tracks",
     "track_array_bytes",
+    "track_from_batch_row",
 ]

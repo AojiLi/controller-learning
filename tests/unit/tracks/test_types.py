@@ -13,6 +13,7 @@ from controller_learning.tracks.types import (
     TrackSchemaError,
     stack_tracks,
     track_array_bytes,
+    track_from_batch_row,
 )
 
 
@@ -128,6 +129,32 @@ def test_stacked_batch_preserves_leading_world_dimension() -> None:
     assert batch.checkpoint_center_m.shape == (2, 3, 2)
     assert batch.point_count.tolist() == [5, 5]
     assert batch.length_m.dtype == np.float32
+
+
+def test_track_from_batch_row_roundtrips_one_host_track() -> None:
+    first = _track(seed=1, version="roundtrip-v1")
+    second = _track(seed=2, version="roundtrip-v1")
+    batch = stack_tracks([first, second])
+
+    restored = track_from_batch_row(batch, 1, generator_version="roundtrip-v1")
+
+    restored_batch = stack_tracks([restored])
+    expected_batch = stack_tracks([second])
+    for actual, expected in zip(restored_batch, expected_batch, strict=True):
+        np.testing.assert_array_equal(actual, expected)
+    assert restored is not second
+    assert not restored.centerline_m.flags.writeable
+
+
+@pytest.mark.parametrize(
+    ("index", "error"),
+    [(-1, IndexError), (2, IndexError), (True, TypeError), (1.5, TypeError)],
+)
+def test_track_from_batch_row_rejects_invalid_indices(index, error) -> None:
+    batch = stack_tracks([_track(seed=1), _track(seed=2)])
+
+    with pytest.raises(error):
+        track_from_batch_row(batch, index, generator_version="test-v1")
 
 
 def test_stack_rejects_mixed_versions_or_capacities() -> None:
