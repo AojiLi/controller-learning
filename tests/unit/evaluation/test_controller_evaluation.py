@@ -218,6 +218,56 @@ def test_evaluate_track_batch_reuses_one_env_preserves_order_and_aggregates(
         evaluation.success_rate = 1.0  # type: ignore[misc]
 
 
+def test_evaluate_track_batch_without_pool_preserves_per_track_environment_path(
+    project_config: ProjectConfig,
+    track_batch: TrackBatch,
+) -> None:
+    events: list[tuple[Any, ...]] = []
+
+    @dataclass
+    class PerTrackEnv:
+        track: Track
+
+        def close(self) -> None:
+            events.append(("close", self.track.seed))
+
+    def factory(**kwargs) -> PerTrackEnv:
+        assert "track_pool" not in kwargs
+        env = PerTrackEnv(track=kwargs["track"])
+        events.append(("create", env.track.seed))
+        return env
+
+    def runner(env: PerTrackEnv, directory: str, reset_seed: int) -> EpisodeRunResult:
+        events.append(("run", env.track.seed, directory, reset_seed))
+        return _result(
+            track_id=env.track.seed,
+            success=True,
+            lap_time_s=1.0 + reset_seed,
+            compute_times_s=(0.001,),
+        )
+
+    evaluation = evaluate_track_batch(
+        project_config,
+        1,
+        track_batch,
+        "v0.1",
+        "controllers/pid",
+        "cpu_reference",
+        env_factory=factory,
+        run_episode=runner,
+    )
+
+    assert events == [
+        ("create", 101),
+        ("run", 101, "controllers/pid", 0),
+        ("close", 101),
+        ("create", 102),
+        ("run", 102, "controllers/pid", 1),
+        ("close", 102),
+    ]
+    assert tuple(episode.track_id for episode in evaluation.episodes) == (101, 102)
+
+
 def test_evaluate_track_batch_forwards_explicit_reset_seeds(
     project_config: ProjectConfig,
     track_batch: TrackBatch,
@@ -342,7 +392,7 @@ def test_evaluate_track_batch_rejects_invalid_inputs(
         evaluate_track_batch(**arguments)
 
 
-def test_multi_track_evaluation_requires_an_exact_ordered_pool(
+def test_multi_track_evaluation_rejects_a_mismatched_ordered_pool(
     project_config: ProjectConfig,
     track_batch: TrackBatch,
     track_pool: TrackPool,
@@ -357,9 +407,6 @@ def test_multi_track_evaluation_requires_an_exact_ordered_pool(
         "env_factory": lambda **_kwargs: None,
         "run_episode": lambda *_args, **_kwargs: None,
     }
-    with pytest.raises(ValueError, match="requires a matching TrackPool"):
-        evaluate_track_batch(**arguments)
-
     reversed_batch = TrackBatch(*(np.array(value[::-1], copy=True) for value in track_batch))
     with pytest.raises(ValueError, match="do not exactly match"):
         evaluate_track_batch(

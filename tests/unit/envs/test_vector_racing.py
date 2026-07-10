@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import gc
+import weakref
 from dataclasses import replace
 from pathlib import Path
 
@@ -389,3 +391,33 @@ def test_step_requires_reset_and_close_is_idempotent(project_config, track) -> N
         env.step(np.zeros((1, 2), dtype=np.float32))
     env.close()
     env.close()
+
+
+def test_close_severs_jit_and_driver_reference_cycles(project_config, track) -> None:
+    def close_environment() -> tuple[
+        weakref.ReferenceType[VecCarRacingEnv],
+        weakref.ReferenceType[object],
+    ]:
+        env = _environment(project_config, track)
+        env.reset(seed=7)
+        environment_reference = weakref.ref(env)
+        driver_reference = weakref.ref(env._vehicle_driver)
+
+        env.close()
+
+        assert env._vehicle_driver is None
+        assert env._vehicle_state is None
+        assert env._track_batch is None
+        return environment_reference, driver_reference
+
+    gc.collect()
+    collector_was_enabled = gc.isenabled()
+    gc.disable()
+    try:
+        environment_reference, driver_reference = close_environment()
+        assert environment_reference() is None
+        assert driver_reference() is None
+    finally:
+        if collector_was_enabled:
+            gc.enable()
+        gc.collect()

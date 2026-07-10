@@ -644,11 +644,47 @@ class VecCarRacingEnv(gym.vector.VectorEnv):
         return None
 
     def close(self) -> None:
-        """Release backend-owned resources; repeated close calls are safe."""
+        """Release backend-owned resources and instance-owned device references.
+
+        Several JIT callables close over this environment or its vehicle driver. Merely closing
+        the driver would therefore leave an unreachable reference cycle holding the most recent
+        device state until Python's cyclic collector happened to run. Explicitly severing those
+        references makes repeated short-lived environments release promptly without clearing any
+        process-global JAX compilation cache.
+        """
 
         if not self._closed:
-            self._vehicle_driver.close()
-            self._closed = True
+            try:
+                self._vehicle_driver.close()
+            finally:
+                for name in (
+                    "_reset_race",
+                    "_maybe_reset_race",
+                    "_advance_identity",
+                    "_step_race",
+                    "_encode_observation",
+                    "_normalize_actions",
+                    "_select_pool_tracks",
+                    "_gather_pool_tracks",
+                    "_read_vehicle_state",
+                    "_planar_position",
+                    "_finalize_gpu_step",
+                    "_vehicle_driver",
+                    "_vehicle_state",
+                    "_race_state",
+                    "_identity",
+                    "_track_batch",
+                    "_pool_batch",
+                    "_pending_reset",
+                    "_zero_actions",
+                    "_control_dt_device",
+                    "_last_race_step",
+                    "_last_applied_action",
+                    "_tracks",
+                    "track_pool",
+                ):
+                    setattr(self, name, None)
+                self._closed = True
 
 
 __all__ = ["VecCarRacingEnv"]

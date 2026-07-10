@@ -9,6 +9,7 @@ import numpy as np
 import pytest
 
 from controller_learning.config import load_project_config
+from controller_learning.envs.car_racing import CarRacingEnv
 from controller_learning.envs.episode import (
     initialize_episode_identities,
     masked_next_episode,
@@ -16,7 +17,13 @@ from controller_learning.envs.episode import (
 )
 from controller_learning.envs.race_core import RaceTermination
 from controller_learning.envs.vector_racing import VecCarRacingEnv
+from controller_learning.tracks.assets import load_manifest_track_batch
 from controller_learning.tracks.generator import generate_track_candidate, pack_track
+from controller_learning.tracks.official_assets import (
+    official_track_asset_directory,
+    official_track_split_spec,
+    validate_official_manifest,
+)
 from controller_learning.tracks.pool import TrackPool
 from controller_learning.tracks.specs import (
     generation_spec_from_project,
@@ -206,14 +213,18 @@ def test_pool_autoreset_selects_and_replaces_tracks_without_transfers() -> None:
 
 def test_pool_explicit_rows_reuse_one_gpu_backend_with_fresh_identity_reset() -> None:
     project = load_project_config(PROJECT_ROOT)
-    tracks = _tracks(project, 3)
-    pool = TrackPool.from_tracks(
-        tracks,
-        benchmark_version=project.benchmark.version,
-        split="validation",
+    validation_spec = official_track_split_spec("validation")
+    manifest, batch = load_manifest_track_batch(
+        official_track_asset_directory() / validation_spec.manifest_file
     )
-    env = VecCarRacingEnv(
-        num_envs=1,
+    validate_official_manifest(project, manifest)
+    pool = TrackPool(
+        benchmark_version=project.benchmark.version,
+        generator_version=manifest.generator_version,
+        split="validation",
+        batch=batch,
+    )
+    env = CarRacingEnv(
         project_config=project,
         level_id=1,
         track_pool=pool,
@@ -221,34 +232,54 @@ def test_pool_explicit_rows_reuse_one_gpu_backend_with_fresh_identity_reset() ->
     )
     try:
         identities = []
-        action = jax.numpy.zeros((1, 2), dtype=jax.numpy.float32)
+        first_cache_sizes = None
+        action = np.zeros(2, dtype=np.float32)
         for index in range(pool.size):
             observation, info = env.reset(
                 seed=19,
-                options={"track_indices": np.asarray((index,), dtype=np.int32)},
+                options={"track_index": index},
             )
             step = env.step(action)
-            jax.block_until_ready((observation, info["track_id"], step[:4]))
 
-            assert int(info["track_id"][0]) == int(pool.batch.seed[index])
-            np.testing.assert_array_equal(
-                observation["centerline"][0], pool.batch.centerline_m[index]
-            )
+            assert info["track_id"] == int(pool.batch.seed[index])
+            np.testing.assert_array_equal(observation["centerline"], pool.batch.centerline_m[index])
+            np.testing.assert_array_equal(observation["track_mask"], pool.batch.track_mask[index])
             np.testing.assert_allclose(
-                observation["position"][0],
+                observation["position"],
                 pool.batch.start_pose[index, :2],
                 rtol=0.0,
                 atol=1.0e-6,
             )
             assert np.isfinite(np.asarray(step[1])).all()
-            assert not bool(step[2][0])
-            assert not bool(step[3][0])
+            assert not step[2]
+            assert not step[3]
+            assert step[4]["track_id"] == int(pool.batch.seed[index])
             identities.append(
                 (
-                    int(info["episode_seed"][0]),
-                    int(info["controller_seed"][0]),
+                    info["episode_seed"],
+                    info["controller_seed"],
                 )
             )
+            if index == 0:
+                vector = env._vector_env
+                jit_functions = {
+                    "gather": vector._gather_pool_tracks,
+                    "reset": vector._reset_race,
+                    "race_step": vector._step_race,
+                    "encode": vector._encode_observation,
+                    "normalize": vector._normalize_actions,
+                    "read": vector._read_vehicle_state,
+                    "finalize": vector._finalize_gpu_step,
+                    "vehicle_step": vector._vehicle_driver._vehicle._step_function,
+                }
+                first_cache_sizes = {
+                    name: function._cache_size() for name, function in jit_functions.items()
+                }
+                assert all(size >= 1 for size in first_cache_sizes.values())
         assert len(set(identities)) == 1
+        assert first_cache_sizes is not None
+        assert {
+            name: function._cache_size() for name, function in jit_functions.items()
+        } == first_cache_sizes
     finally:
         env.close()
