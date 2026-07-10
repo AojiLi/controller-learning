@@ -291,6 +291,7 @@ class VecCarRacingEnv(gym.vector.VectorEnv):
                 track_pool_indices(track_pool_seeds_device(identity), self._pool_size),
             )
         )
+        self._gather_pool_tracks = jax.jit(gather_track_batch)
         self._read_vehicle_state = self._vehicle_driver.read_state
         self._planar_position = lambda view: jnp.asarray(
             view.position_world_m,
@@ -414,12 +415,33 @@ class VecCarRacingEnv(gym.vector.VectorEnv):
         super().reset(seed=None)
         return int(self.np_random.integers(0, 2**32, dtype=np.uint32))
 
-    @staticmethod
-    def _validate_options(options: dict[str, Any] | None) -> None:
+    def _explicit_track_indices(
+        self,
+        options: dict[str, Any] | None,
+    ) -> jax.Array | None:
+        """Validate an optional explicit TrackPool row for each world."""
+
         if options is not None and not isinstance(options, dict):
             raise TypeError("reset options must be a dictionary or None")
-        if options:
-            raise ValueError("VecCarRacingEnv does not define reset options")
+        if not options:
+            return None
+        if not self._pool_mode:
+            raise ValueError("VecCarRacingEnv does not define reset options without a TrackPool")
+        if set(options) != {"track_indices"}:
+            raise ValueError("TrackPool reset options must contain only 'track_indices'")
+
+        source = np.asarray(options["track_indices"])
+        if source.shape != (self.num_envs,):
+            raise ValueError(
+                "track_indices must contain exactly one row index per world; "
+                f"expected shape {(self.num_envs,)}, got {source.shape}"
+            )
+        if source.dtype.kind not in {"i", "u"}:
+            raise TypeError("track_indices must contain integers")
+        indices = np.asarray(source, dtype=np.int64)
+        if np.any(indices < 0) or np.any(indices >= self._pool_size):
+            raise ValueError(f"track_indices must be in the range [0, {self._pool_size})")
+        return jnp.asarray(indices, dtype=jnp.int32)
 
     def _observation(self) -> dict[str, jax.Array]:
         if self._vehicle_state is None or self._race_state is None:
@@ -439,13 +461,17 @@ class VecCarRacingEnv(gym.vector.VectorEnv):
     ) -> tuple[dict[str, jax.Array], dict[str, Any]]:
         """Reset every world and deterministically select initial pool Tracks when configured."""
 
-        self._validate_options(options)
+        explicit_track_indices = self._explicit_track_indices(options)
         root_seed = self._root_seed(seed)
         self._identity = episode_identity_to_device(
             initialize_episode_identities(root_seed, self.num_envs)
         )
         if self._pool_mode:
-            self._track_batch = self._select_pool_tracks(self._pool_batch, self._identity)
+            self._track_batch = (
+                self._select_pool_tracks(self._pool_batch, self._identity)
+                if explicit_track_indices is None
+                else self._gather_pool_tracks(self._pool_batch, explicit_track_indices)
+            )
         self._vehicle_state = self._vehicle_driver.initial_state(self._track_batch.start_pose)
         self._race_state = self._reset_race(self._track_batch)
         self._pending_reset = jnp.zeros(self.num_envs, dtype=bool)

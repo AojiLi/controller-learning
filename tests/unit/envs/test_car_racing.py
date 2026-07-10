@@ -15,6 +15,7 @@ from controller_learning.envs.car_racing import CarRacingEnv
 from controller_learning.envs.episode import PUBLIC_INFO_KEYS
 from controller_learning.envs.vector_racing import VecCarRacingEnv
 from controller_learning.tracks.generator import generate_track_candidate, pack_track
+from controller_learning.tracks.pool import TrackPool
 from controller_learning.tracks.specs import (
     generation_spec_from_project,
     track_capacity_from_project,
@@ -33,6 +34,20 @@ def track(project_config):
     return pack_track(
         generate_track_candidate(42, generation_spec_from_project(project_config)),
         track_capacity_from_project(project_config),
+    )
+
+
+@pytest.fixture(scope="module")
+def track_pool(project_config):
+    generation = generation_spec_from_project(project_config)
+    capacity = track_capacity_from_project(project_config)
+    tracks = tuple(
+        pack_track(generate_track_candidate(seed, generation), capacity) for seed in (101, 202, 303)
+    )
+    return TrackPool.from_tracks(
+        tracks,
+        benchmark_version=project_config.benchmark.version,
+        split="validation",
     )
 
 
@@ -108,6 +123,126 @@ def test_single_rejects_unsupported_reset_options(project_config, track) -> None
             env.reset(options={"track_seed": 4})
     finally:
         env.close()
+
+
+def test_single_pool_reset_translates_one_explicit_track_index(project_config, track_pool) -> None:
+    env = CarRacingEnv(
+        project_config=project_config,
+        level_id=1,
+        track_pool=track_pool,
+        backend="cpu_reference",
+    )
+    try:
+        first_observation, first_info = env.reset(seed=8, options={"track_index": 0})
+        last_observation, last_info = env.reset(
+            seed=8,
+            options={"track_index": np.int64(track_pool.size - 1)},
+        )
+
+        assert first_info["track_id"] == int(track_pool.batch.seed[0])
+        assert last_info["track_id"] == int(track_pool.batch.seed[-1])
+        np.testing.assert_array_equal(first_info["episode_seed"], last_info["episode_seed"])
+        np.testing.assert_array_equal(first_info["controller_seed"], last_info["controller_seed"])
+        np.testing.assert_array_equal(
+            first_observation["centerline"], track_pool.batch.centerline_m[0]
+        )
+        np.testing.assert_array_equal(
+            last_observation["centerline"], track_pool.batch.centerline_m[-1]
+        )
+    finally:
+        env.close()
+
+
+def test_reused_pool_episode_matches_fresh_fixed_environment(project_config, track) -> None:
+    pool = TrackPool.from_tracks(
+        (track,),
+        benchmark_version=project_config.benchmark.version,
+        split="validation",
+    )
+    fixed = CarRacingEnv(
+        project_config=project_config,
+        level_id=1,
+        track=track,
+        backend="cpu_reference",
+    )
+    reused = CarRacingEnv(
+        project_config=project_config,
+        level_id=1,
+        track_pool=pool,
+        backend="cpu_reference",
+    )
+    try:
+        fixed_output = fixed.reset(seed=37)
+        reused_output = reused.reset(seed=37, options={"track_index": 0})
+        for key in fixed_output[0]:
+            np.testing.assert_array_equal(fixed_output[0][key], reused_output[0][key])
+        assert fixed_output[1] == reused_output[1]
+
+        for action in (
+            np.asarray((0.0, 1.0), dtype=np.float32),
+            np.asarray((0.1, 0.5), dtype=np.float32),
+            np.asarray((-0.1, -0.25), dtype=np.float32),
+        ):
+            fixed_step = fixed.step(action)
+            reused_step = reused.step(action)
+            for key in fixed_step[0]:
+                np.testing.assert_allclose(fixed_step[0][key], reused_step[0][key], atol=1.0e-6)
+            assert fixed_step[1] == pytest.approx(reused_step[1])
+            assert fixed_step[2] is reused_step[2]
+            assert fixed_step[3] is reused_step[3]
+            assert fixed_step[4] == reused_step[4]
+    finally:
+        fixed.close()
+        reused.close()
+
+
+@pytest.mark.parametrize(
+    ("options", "error"),
+    [
+        ({"track_index": True}, TypeError),
+        ({"track_index": 1.0}, TypeError),
+        ({"track_index": -1}, ValueError),
+        ({"track_index": 3}, ValueError),
+        ({"track_indices": (0,)}, ValueError),
+        ({"track_index": 0, "extra": 1}, ValueError),
+    ],
+)
+def test_single_pool_reset_rejects_invalid_track_index(
+    project_config,
+    track_pool,
+    options,
+    error,
+) -> None:
+    env = CarRacingEnv(
+        project_config=project_config,
+        level_id=1,
+        track_pool=track_pool,
+        backend="cpu_reference",
+    )
+    try:
+        with pytest.raises(error):
+            env.reset(seed=8, options=options)
+    finally:
+        env.close()
+
+
+def test_single_constructor_requires_exactly_one_track_source(
+    project_config, track, track_pool
+) -> None:
+    with pytest.raises(ValueError, match="exactly one"):
+        CarRacingEnv(
+            project_config=project_config,
+            level_id=1,
+            backend="cpu_reference",
+        )
+    with pytest.raises(ValueError, match="exactly one"):
+        CarRacingEnv(
+            project_config=project_config,
+            level_id=1,
+            backend="cpu_reference",
+            track=track,
+            track_pool=track_pool,
+        )
 
 
 def test_single_exposes_the_actual_challenge_configuration(project_config, track) -> None:

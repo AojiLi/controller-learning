@@ -314,6 +314,75 @@ def test_pool_reset_and_next_step_selection_are_reproducible_and_atomic(
         env.close()
 
 
+def test_pool_reset_accepts_strict_explicit_rows_without_changing_identity(
+    project_config,
+    track_pool,
+) -> None:
+    env = VecCarRacingEnv(
+        num_envs=1,
+        project_config=project_config,
+        level_id=1,
+        track_pool=track_pool,
+        backend="cpu_reference",
+    )
+    try:
+        first_observation, first_info = env.reset(
+            seed=123,
+            options={"track_indices": np.asarray((0,), dtype=np.int32)},
+        )
+        last_observation, last_info = env.reset(
+            seed=123,
+            options={"track_indices": np.asarray((track_pool.size - 1,), dtype=np.int64)},
+        )
+
+        assert int(first_info["track_id"][0]) == int(track_pool.batch.seed[0])
+        assert int(last_info["track_id"][0]) == int(track_pool.batch.seed[-1])
+        np.testing.assert_array_equal(
+            first_observation["centerline"][0],
+            track_pool.batch.centerline_m[0],
+        )
+        np.testing.assert_array_equal(
+            last_observation["centerline"][0],
+            track_pool.batch.centerline_m[-1],
+        )
+        np.testing.assert_array_equal(first_info["episode_seed"], last_info["episode_seed"])
+        np.testing.assert_array_equal(first_info["controller_seed"], last_info["controller_seed"])
+    finally:
+        env.close()
+
+
+@pytest.mark.parametrize(
+    ("options", "error"),
+    [
+        ({"track_indices": np.asarray((0, 1), dtype=np.int32)}, ValueError),
+        ({"track_indices": np.asarray((0.0,), dtype=np.float32)}, TypeError),
+        ({"track_indices": np.asarray((True,), dtype=np.bool_)}, TypeError),
+        ({"track_indices": np.asarray((-1,), dtype=np.int32)}, ValueError),
+        ({"track_indices": np.asarray((3,), dtype=np.int32)}, ValueError),
+        ({"track_index": 0}, ValueError),
+        ({"track_indices": np.asarray((0,), dtype=np.int32), "extra": 1}, ValueError),
+    ],
+)
+def test_pool_reset_rejects_invalid_explicit_rows(
+    project_config,
+    track_pool,
+    options,
+    error,
+) -> None:
+    env = VecCarRacingEnv(
+        num_envs=1,
+        project_config=project_config,
+        level_id=1,
+        track_pool=track_pool,
+        backend="cpu_reference",
+    )
+    try:
+        with pytest.raises(error):
+            env.reset(seed=1, options=options)
+    finally:
+        env.close()
+
+
 def test_step_requires_reset_and_close_is_idempotent(project_config, track) -> None:
     env = _environment(project_config, track)
     with pytest.raises(error.ResetNeeded, match="call reset"):

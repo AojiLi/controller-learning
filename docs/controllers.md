@@ -252,7 +252,10 @@ pixi run -e gpu benchmark-controllers
 
 It evaluates both Controllers on Level 0, the PID on the fixed prefix of 10 Validation Tracks, and
 the MPC on all 100 fixed Validation Tracks. It does not load or evaluate the Test split. The
-generated report path is `benchmarks/v0.1/m6_controller_report.json`.
+generated report path is `benchmarks/v0.1/m6_controller_report.json`. Each controller/split group
+reuses one batch-one MJX-Warp environment while the Runner constructs a fresh Controller for every
+episode. Validation Tracks are selected in manifest order from a verified immutable pool; reset and
+Controller seeds remain the fixed row-index seeds.
 
 In that report, interpret `success_rate` before successful-lap mean time, then inspect per-Track
 termination reasons and timing. The real-time diagnostic requires P99 at or below 50 ms and a miss

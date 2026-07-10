@@ -14,6 +14,7 @@ os.environ.setdefault("XLA_PYTHON_CLIENT_PREALLOCATE", "false")
 os.environ.setdefault("CUDA_DEVICE_ORDER", "PCI_BUS_ID")
 
 import argparse
+import gc
 import hashlib
 import json
 import math
@@ -37,6 +38,7 @@ from controller_learning.config import ProjectConfig, load_project_config
 from controller_learning.envs.race_core import RaceTermination
 from controller_learning.evaluation import (
     ControllerEvaluation,
+    EpisodeEvaluation,
     evaluate_track_batch,
     summarize_compute_times,
 )
@@ -50,6 +52,7 @@ from controller_learning.tracks.official_assets import (
     official_track_split_spec,
     validate_official_manifest,
 )
+from controller_learning.tracks.pool import TrackPool
 from controller_learning.tracks.types import TrackBatch
 from scripts import benchmark_racing_env as m4_benchmark
 
@@ -64,6 +67,9 @@ REALTIME_MISS_RATE_LIMIT = 0.01
 FORMAL_INIT_TIMEOUT_S = 30.0
 FORMAL_ENVIRONMENTS_PER_EPISODE = 1
 FORMAL_EPISODE_COUNT = 112
+FORMAL_BACKEND_INSTANCE_COUNT = 4
+FORMAL_JAX_CACHE_CLEAR_CALLS = 0
+FORMAL_GROUP_GC_CALLS = 4
 FORMAL_PHYSICS_SUBSTEPS_PER_ENVIRONMENT_STEP = 10
 M2_EVIDENCE_PATH = Path("benchmarks/v0.1/gpu_report.json")
 M2_EVIDENCE_SHA256 = "22c885cbef07632e7a6fd8bb19cc4abd316cd64c065663823985a56e0ad4a702"
@@ -104,11 +110,15 @@ FIRST_USE_TIMING_METHOD = (
     "include one execution, JAX context and IPOPT plugin discovery are excluded, and persistent "
     "compilation caches are not cleared"
 )
-CONTROLLER_EXECUTION_MODEL = "sequential host Controller with batch-one MJX-Warp physics"
+CONTROLLER_EXECUTION_MODEL = (
+    "sequential host Controller with one reused batch-one MJX-Warp backend per controller/split "
+    "group and one fresh Controller per episode"
+)
 THROUGHPUT_SCOPE = (
     "closed-loop batch-one evaluation with per-step host synchronization; end-to-end wall time "
-    "includes in-band public numerical checks and first-call evidence sampling, while environment "
-    "step-call timing excludes those checks; neither value is native GPU physics throughput"
+    "includes in-band public numerical checks, first-call evidence sampling, and group-level "
+    "backend teardown/garbage collection, while environment step-call timing excludes those "
+    "operations; neither value is native GPU physics throughput"
 )
 MEMORY_SAMPLING_METHOD = (
     "selected-process VRAM from nvidia-smi plus JAX allocator statistics sampled at synchronized "
@@ -177,6 +187,7 @@ class EvaluationAssets:
     level0_batch: TrackBatch
     validation_manifest: TrackAssetManifest
     validation_batch: TrackBatch
+    validation_pool: TrackPool
     evidence: Mapping[str, Any]
 
 
@@ -211,6 +222,7 @@ class _EvaluationGroupRecord:
     episode_count: int
     environment_steps: int
     wall_s: float
+    gc_collected_objects: int
 
 
 class _MeasuredEnvironment:
@@ -251,9 +263,7 @@ class _MeasuredEnvironment:
         try:
             self._environment.close()
         finally:
-            if not self._record.closed:
-                self._record.closed = True
-                self._recorder.record_environment_closed(self._record)
+            self._record.closed = True
 
 
 class _ExecutionRecorder:
@@ -282,6 +292,7 @@ class _ExecutionRecorder:
         self._numerical_failure_count = 0
         self._numerical_fields: Counter[str] = Counter()
         self._checked_transitions = 0
+        self._completed_episodes: Counter[str] = Counter()
         self._first_create_sampled = False
         self._first_reset_sampled = False
         self._first_step_sampled = False
@@ -299,9 +310,19 @@ class _ExecutionRecorder:
             raise RuntimeError("an execution group is already active")
         self._current_group = label
 
-    def end_group(self, label: str, evaluation: ControllerEvaluation, wall_s: float) -> None:
+    def end_group(
+        self,
+        label: str,
+        evaluation: ControllerEvaluation,
+        wall_s: float,
+        gc_collected_objects: int,
+    ) -> None:
         if self._current_group != label:
             raise RuntimeError("execution group lifecycle is inconsistent")
+        if self._completed_episodes[label] != len(evaluation.episodes):
+            raise RuntimeError("execution progress did not cover every completed episode")
+        if type(gc_collected_objects) is not int or gc_collected_objects < 0:
+            raise ValueError("group garbage-collection count must be a non-negative integer")
         self._current_group = None
         self._groups.append(
             _EvaluationGroupRecord(
@@ -309,6 +330,7 @@ class _ExecutionRecorder:
                 episode_count=len(evaluation.episodes),
                 environment_steps=sum(episode.steps for episode in evaluation.episodes),
                 wall_s=float(wall_s),
+                gc_collected_objects=int(gc_collected_objects),
             )
         )
         self.sample_memory(f"after_{label.replace('.', '_')}")
@@ -356,21 +378,31 @@ class _ExecutionRecorder:
             self._first_step_sampled = True
             self.sample_memory("after_first_step")
 
-    def record_environment_closed(self, record: _EnvironmentCallRecord) -> None:
-        if not any(instance is record for instance in self._instances) or not record.closed:
-            raise RuntimeError("closed environment record is not owned by this recorder")
+    def record_episode(self, label: str, episode: EpisodeEvaluation) -> None:
+        if self._current_group != label:
+            raise RuntimeError("episode progress does not match the active execution group")
+        if not isinstance(episode, EpisodeEvaluation):
+            raise TypeError("episode progress requires an EpisodeEvaluation")
+        completed_before = self._completed_episodes[label]
+        if episode.track_index != completed_before:
+            raise RuntimeError("episode progress must preserve contiguous Track order")
+        completed = completed_before + 1
+        total = EXECUTION_GROUP_EPISODE_COUNTS[label]
+        if completed > total:
+            raise RuntimeError("episode progress exceeds the fixed group workload")
+        self._completed_episodes[label] = completed
         if self._progress_sink is None:
             return
-        completed = sum(
-            instance.closed and instance.group == record.group for instance in self._instances
-        )
         self._progress_sink(
             {
-                "event": "m6_environment_closed",
-                "group": record.group,
+                "event": "m6_episode_completed",
+                "group": label,
                 "group_episode_completed": completed,
-                "group_episode_total": EXECUTION_GROUP_EPISODE_COUNTS[record.group],
-                "environment_steps": record.step_count,
+                "group_episode_total": total,
+                "track_index": episode.track_index,
+                "track_id": episode.track_id,
+                "success": episode.success,
+                "episode_steps": episode.steps,
             }
         )
 
@@ -830,6 +862,7 @@ def _execution_evidence(
             "episode_count": group.episode_count,
             "environment_steps": group.environment_steps,
             "wall_s": group.wall_s,
+            "gc_collected_objects": group.gc_collected_objects,
             "end_to_end_transitions_per_second": _positive_rate(
                 group.environment_steps,
                 group.wall_s,
@@ -875,6 +908,12 @@ def _execution_evidence(
             "maximum_concurrent_worlds": FORMAL_ENVIRONMENTS_PER_EPISODE,
             "environment_instances": len(instances),
             "episode_count": episode_count,
+            "fresh_controller_instance_count": episode_count,
+            "backend_reused_within_each_group": True,
+            "explicit_validation_track_index_selection": True,
+            "jax_cache_clear_calls": FORMAL_JAX_CACHE_CLEAR_CALLS,
+            "group_gc_calls": len(groups),
+            "group_gc_collected_objects": sum(group.gc_collected_objects for group in groups),
             "environment_steps": environment_steps,
             "transitions": environment_steps,
             "physics_substeps_per_environment_step": physics_substeps,
@@ -969,11 +1008,18 @@ def _load_evaluation_assets(config: ProjectConfig, project_root: Path) -> Evalua
 
     level0_manifest, level0_batch = loaded["level0"]
     validation_manifest, validation_batch = loaded["validation"]
+    validation_pool = TrackPool(
+        benchmark_version=config.benchmark.version,
+        generator_version=validation_manifest.generator_version,
+        split="validation",
+        batch=validation_batch,
+    )
     return EvaluationAssets(
         level0_manifest=level0_manifest,
         level0_batch=level0_batch,
         validation_manifest=validation_manifest,
         validation_batch=validation_batch,
+        validation_pool=validation_pool,
         evidence=evidence,
     )
 
@@ -1096,6 +1142,12 @@ def _run_controller_evaluations(
     generator_version0 = assets.level0_manifest.generator_version
     validation_version = assets.validation_manifest.generator_version
     pid_validation = _first_rows(assets.validation_batch, FORMAL_PID_VALIDATION_TRACKS)
+    pid_validation_pool = TrackPool(
+        benchmark_version=config.benchmark.version,
+        generator_version=validation_version,
+        split="validation",
+        batch=pid_validation,
+    )
     reset0 = np.arange(FORMAL_LEVEL0_TRACKS, dtype=np.uint32)
     pid_reset = np.arange(FORMAL_PID_VALIDATION_TRACKS, dtype=np.uint32)
     mpc_reset = np.arange(FORMAL_MPC_VALIDATION_TRACKS, dtype=np.uint32)
@@ -1109,11 +1161,16 @@ def _run_controller_evaluations(
         generator_version: str,
         directory: Path,
         reset_seeds: np.ndarray,
+        track_pool: TrackPool | None,
     ) -> ControllerEvaluation:
-        kwargs: dict[str, Any] = {"reset_seeds": reset_seeds}
+        kwargs: dict[str, Any] = {
+            "reset_seeds": reset_seeds,
+            "track_pool": track_pool,
+        }
         if recorder is not None:
             recorder.begin_group(label)
             kwargs["env_factory"] = recorder.create_environment
+            kwargs["progress_callback"] = lambda episode: recorder.record_episode(label, episode)
         started = time.perf_counter()
         evaluation = evaluator(
             config,
@@ -1124,9 +1181,10 @@ def _run_controller_evaluations(
             FORMAL_BACKEND,
             **kwargs,
         )
+        gc_collected_objects = gc.collect()
         elapsed = time.perf_counter() - started
         if recorder is not None:
-            recorder.end_group(label, evaluation, elapsed)
+            recorder.end_group(label, evaluation, elapsed, gc_collected_objects)
         return evaluation
 
     pid_level0 = run_group(
@@ -1136,6 +1194,7 @@ def _run_controller_evaluations(
         generator_version0,
         pid_directory,
         reset0,
+        None,
     )
     pid_validation_result = run_group(
         "pid.validation",
@@ -1144,6 +1203,7 @@ def _run_controller_evaluations(
         validation_version,
         pid_directory,
         pid_reset,
+        pid_validation_pool,
     )
     mpc_level0 = run_group(
         "mpc.level0",
@@ -1152,6 +1212,7 @@ def _run_controller_evaluations(
         generator_version0,
         mpc_directory,
         reset0,
+        None,
     )
     mpc_validation_result = run_group(
         "mpc.validation",
@@ -1160,6 +1221,7 @@ def _run_controller_evaluations(
         validation_version,
         mpc_directory,
         mpc_reset,
+        assets.validation_pool,
     )
     return {
         "pid": _controller_result(
@@ -1444,6 +1506,7 @@ def _execution_count_findings(report: Mapping[str, Any]) -> list[str]:
     instance_counts: Counter[str] = Counter()
     instance_steps: Counter[str] = Counter()
     total_step_wall_s = 0.0
+    total_gc_collected_objects = 0
     valid_instances = True
     for index, instance in enumerate(instances):
         if not isinstance(instance, Mapping):
@@ -1452,12 +1515,13 @@ def _execution_count_findings(report: Mapping[str, Any]) -> list[str]:
             continue
         group = instance.get("group")
         step_count = instance.get("step_count")
+        expected_resets = EXECUTION_GROUP_EPISODE_COUNTS.get(str(group))
         valid = (
             group in EXECUTION_GROUPS
             and type(step_count) is int
             and step_count > 0
             and type(instance.get("reset_count")) is int
-            and instance.get("reset_count") == 1
+            and instance.get("reset_count") == expected_resets
             and instance.get("closed") is True
             and all(
                 _finite_number(instance.get(field_name), minimum=np.finfo(np.float64).tiny)
@@ -1493,13 +1557,16 @@ def _execution_count_findings(report: Mapping[str, Any]) -> list[str]:
             if isinstance(episode, Mapping) and type(episode.get("steps")) is int
         )
         wall_s = group.get("wall_s")
+        gc_collected_objects = group.get("gc_collected_objects")
         if (
             group.get("episode_count") != expected_group_episodes
             or type(group.get("episode_count")) is not int
             or group.get("environment_steps") != expected_group_steps
             or type(group.get("environment_steps")) is not int
-            or instance_counts[label] != expected_group_episodes
+            or instance_counts[label] != 1
             or instance_steps[label] != expected_group_steps
+            or type(gc_collected_objects) is not int
+            or int(gc_collected_objects) < 0
             or not _finite_number(wall_s, minimum=np.finfo(np.float64).tiny)
             or not _close_number(
                 group.get("end_to_end_transitions_per_second"),
@@ -1510,6 +1577,8 @@ def _execution_count_findings(report: Mapping[str, Any]) -> list[str]:
             findings.append(f"controller_evaluation.groups.{label}")
         if _finite_number(wall_s):
             group_wall_total += float(wall_s)
+        if type(gc_collected_objects) is int and gc_collected_objects >= 0:
+            total_gc_collected_objects += gc_collected_objects
 
     physics_substeps = FORMAL_PHYSICS_SUBSTEPS_PER_ENVIRONMENT_STEP
     if (
@@ -1521,10 +1590,20 @@ def _execution_count_findings(report: Mapping[str, Any]) -> list[str]:
         or type(evaluation.get("maximum_concurrent_worlds")) is not int
         or evaluation.get("environment_instances") != len(instances)
         or type(evaluation.get("environment_instances")) is not int
-        or len(instances) != FORMAL_EPISODE_COUNT
+        or len(instances) != FORMAL_BACKEND_INSTANCE_COUNT
         or evaluation.get("episode_count") != expected_episode_count
         or type(evaluation.get("episode_count")) is not int
         or expected_episode_count != FORMAL_EPISODE_COUNT
+        or evaluation.get("fresh_controller_instance_count") != FORMAL_EPISODE_COUNT
+        or type(evaluation.get("fresh_controller_instance_count")) is not int
+        or evaluation.get("backend_reused_within_each_group") is not True
+        or evaluation.get("explicit_validation_track_index_selection") is not True
+        or evaluation.get("jax_cache_clear_calls") != FORMAL_JAX_CACHE_CLEAR_CALLS
+        or type(evaluation.get("jax_cache_clear_calls")) is not int
+        or evaluation.get("group_gc_calls") != FORMAL_GROUP_GC_CALLS
+        or type(evaluation.get("group_gc_calls")) is not int
+        or evaluation.get("group_gc_collected_objects") != total_gc_collected_objects
+        or type(evaluation.get("group_gc_collected_objects")) is not int
         or evaluation.get("environment_steps") != expected_steps
         or type(evaluation.get("environment_steps")) is not int
         or evaluation.get("transitions") != expected_steps
@@ -1855,6 +1934,12 @@ def evaluate_report_gates(report: Mapping[str, Any]) -> list[dict[str, Any]]:
             and protocol.get("realtime_qualification_required_for_m6_pass") is False
             and protocol.get("num_envs_per_environment") == FORMAL_ENVIRONMENTS_PER_EPISODE
             and protocol.get("maximum_concurrent_worlds") == FORMAL_ENVIRONMENTS_PER_EPISODE
+            and protocol.get("backend_environment_instance_count") == FORMAL_BACKEND_INSTANCE_COUNT
+            and protocol.get("fresh_controller_instance_count") == FORMAL_EPISODE_COUNT
+            and protocol.get("backend_reuse_scope") == "one environment per controller/split group"
+            and protocol.get("validation_track_selection") == "explicit_verified_pool_row_index"
+            and protocol.get("jax_cache_clear_calls") == FORMAL_JAX_CACHE_CLEAR_CALLS
+            and protocol.get("group_gc_calls") == FORMAL_GROUP_GC_CALLS
             and protocol.get("physics_substeps_per_environment_step")
             == FORMAL_PHYSICS_SUBSTEPS_PER_ENVIRONMENT_STEP
             and protocol.get("controller_execution_model") == CONTROLLER_EXECUTION_MODEL
@@ -1875,6 +1960,12 @@ def evaluate_report_gates(report: Mapping[str, Any]) -> list[dict[str, Any]]:
                 "realtime_qualification_required_for_m6_pass": False,
                 "num_envs_per_environment": FORMAL_ENVIRONMENTS_PER_EPISODE,
                 "maximum_concurrent_worlds": FORMAL_ENVIRONMENTS_PER_EPISODE,
+                "backend_environment_instance_count": FORMAL_BACKEND_INSTANCE_COUNT,
+                "fresh_controller_instance_count": FORMAL_EPISODE_COUNT,
+                "backend_reuse_scope": "one environment per controller/split group",
+                "validation_track_selection": "explicit_verified_pool_row_index",
+                "jax_cache_clear_calls": FORMAL_JAX_CACHE_CLEAR_CALLS,
+                "group_gc_calls": FORMAL_GROUP_GC_CALLS,
                 "physics_substeps_per_environment_step": (
                     FORMAL_PHYSICS_SUBSTEPS_PER_ENVIRONMENT_STEP
                 ),
@@ -2266,6 +2357,12 @@ def run_benchmark(
         raise RuntimeError("formal Level 0 asset must contain exactly one Track")
     if int(assets.validation_batch.seed.shape[0]) != FORMAL_MPC_VALIDATION_TRACKS:
         raise RuntimeError("formal Validation asset must contain exactly 100 Tracks")
+    if (
+        assets.validation_pool.split != "validation"
+        or assets.validation_pool.size != FORMAL_MPC_VALIDATION_TRACKS
+        or not np.array_equal(assets.validation_pool.batch.seed, assets.validation_batch.seed)
+    ):
+        raise RuntimeError("formal Validation TrackPool must exactly match the verified asset")
 
     historical_gpu_evidence = dict(load_historical(root))
     runtime = dict(load_runtime())
@@ -2310,6 +2407,12 @@ def run_benchmark(
             "realtime_qualification_required_for_m6_pass": False,
             "num_envs_per_environment": FORMAL_ENVIRONMENTS_PER_EPISODE,
             "maximum_concurrent_worlds": FORMAL_ENVIRONMENTS_PER_EPISODE,
+            "backend_environment_instance_count": FORMAL_BACKEND_INSTANCE_COUNT,
+            "fresh_controller_instance_count": FORMAL_EPISODE_COUNT,
+            "backend_reuse_scope": "one environment per controller/split group",
+            "validation_track_selection": "explicit_verified_pool_row_index",
+            "jax_cache_clear_calls": FORMAL_JAX_CACHE_CLEAR_CALLS,
+            "group_gc_calls": FORMAL_GROUP_GC_CALLS,
             "physics_substeps_per_environment_step": (
                 config.vehicle.simulation.physics_steps_per_control
             ),

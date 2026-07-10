@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from numbers import Integral
 from typing import TYPE_CHECKING, Any, ClassVar
 
 import gymnasium as gym
@@ -13,6 +14,7 @@ from controller_learning.envs._vehicle_driver import VehicleBackend
 from controller_learning.envs.episode import PublicScalarInfo, unbatch_public_info
 from controller_learning.envs.observation import unbatch_observation
 from controller_learning.envs.vector_racing import VecCarRacingEnv
+from controller_learning.tracks.pool import TrackPool
 from controller_learning.tracks.types import Track
 
 if TYPE_CHECKING:
@@ -33,22 +35,29 @@ class CarRacingEnv(gym.Env):
         *,
         project_config: ProjectConfig,
         level_id: int,
-        track: Track,
         backend: VehicleBackend,
+        track: Track | None = None,
+        track_pool: TrackPool | None = None,
         render_mode: str | None = None,
     ) -> None:
         super().__init__()
-        if not isinstance(track, Track):
-            raise TypeError("track must be an immutable Track value")
+        if (track is None) == (track_pool is None):
+            raise ValueError("provide exactly one of track or track_pool")
+        if track is not None and not isinstance(track, Track):
+            raise TypeError("track must be an immutable Track value or None")
+        if track_pool is not None and not isinstance(track_pool, TrackPool):
+            raise TypeError("track_pool must be an immutable TrackPool or None")
         if render_mode not in (None, "human", "rgb_array"):
             raise ValueError("render_mode must be None, 'human', or 'rgb_array'")
         self.render_mode = render_mode
         self.metadata = dict(type(self).metadata)
+        self._pool_mode = track_pool is not None
         self._vector_env = VecCarRacingEnv(
             num_envs=1,
             project_config=project_config,
             level_id=level_id,
-            tracks=(track,),
+            tracks=None if track is None else (track,),
+            track_pool=track_pool,
             backend=backend,
             render_mode=None,
         )
@@ -77,8 +86,22 @@ class CarRacingEnv(gym.Env):
     ) -> tuple[dict[str, np.ndarray], PublicScalarInfo]:
         """Explicitly begin a new single-world episode."""
 
+        if options is not None and not isinstance(options, dict):
+            raise TypeError("reset options must be a dictionary or None")
+        vector_options: dict[str, Any] | None = options
+        if options:
+            if not self._pool_mode:
+                raise ValueError("CarRacingEnv does not define reset options without a TrackPool")
+            if set(options) != {"track_index"}:
+                raise ValueError("TrackPool reset options must contain only 'track_index'")
+            track_index = options["track_index"]
+            if isinstance(track_index, bool) or not isinstance(track_index, Integral):
+                raise TypeError("track_index must be an integer")
+            vector_options = {
+                "track_indices": np.asarray((int(track_index),), dtype=np.int64),
+            }
         super().reset(seed=seed)
-        observation, info = self._vector_env.reset(seed=seed, options=options)
+        observation, info = self._vector_env.reset(seed=seed, options=vector_options)
         self._needs_reset = False
         self._last_observation = unbatch_observation(observation)
         self._debug_commands = ()

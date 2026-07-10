@@ -3,6 +3,7 @@
 from controller_learning.evaluation.controller import (
     ControllerEvaluation,
     EpisodeEvaluation,
+    EvaluationProgressCallback,
     TimingSummary,
     evaluate_track_batch,
     summarize_compute_times,
@@ -11,6 +12,7 @@ from controller_learning.evaluation.controller import (
 __all__ = [
     "ControllerEvaluation",
     "EpisodeEvaluation",
+    "EvaluationProgressCallback",
     "TimingSummary",
     "evaluate_track_batch",
     "summarize_compute_times",

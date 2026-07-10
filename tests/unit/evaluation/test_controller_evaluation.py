@@ -17,7 +17,8 @@ from controller_learning.evaluation import (
     summarize_compute_times,
 )
 from controller_learning.tracks.level0 import build_level0_track
-from controller_learning.tracks.types import Track, TrackBatch, stack_tracks
+from controller_learning.tracks.pool import TrackPool
+from controller_learning.tracks.types import Track, TrackBatch, stack_tracks, track_from_batch_row
 
 PROJECT_ROOT = Path(__file__).parents[3]
 
@@ -38,17 +39,38 @@ def track_batch() -> TrackBatch:
     )
 
 
+@pytest.fixture(scope="module")
+def track_pool(project_config: ProjectConfig, track_batch: TrackBatch) -> TrackPool:
+    return TrackPool(
+        benchmark_version=project_config.benchmark.version,
+        generator_version="v0.1",
+        split="validation",
+        batch=track_batch,
+    )
+
+
 @dataclass
 class FakeEnv:
-    """Minimal closeable value carrying the Track selected by the evaluator."""
+    """Minimal reusable environment carrying an ordered immutable TrackPool."""
 
-    track: Track
+    track_pool: TrackPool
     events: list[tuple[Any, ...]]
     closed: bool = False
+    track: Track | None = None
+
+    def reset(self, *, seed: int, options: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+        index = int(options["track_index"])
+        self.track = track_from_batch_row(
+            self.track_pool.batch,
+            index,
+            generator_version=self.track_pool.generator_version,
+        )
+        self.events.append(("reset", self.track.seed, seed, index))
+        return {}, {"track_id": self.track.seed}
 
     def close(self) -> None:
         self.closed = True
-        self.events.append(("close", self.track.seed))
+        self.events.append(("close",))
 
 
 def _result(
@@ -110,23 +132,34 @@ def test_summarize_compute_times_rejects_invalid_samples(values, deadline, error
         summarize_compute_times(values, deadline_s=deadline)
 
 
-def test_evaluate_track_batch_preserves_order_closes_each_env_and_aggregates(
+def test_evaluate_track_batch_reuses_one_env_preserves_order_and_aggregates(
     project_config: ProjectConfig,
     track_batch: TrackBatch,
+    track_pool: TrackPool,
 ) -> None:
     events: list[tuple[Any, ...]] = []
     environments: list[FakeEnv] = []
+    progress = []
 
     def factory(**kwargs) -> FakeEnv:
         assert kwargs["project_config"] is project_config
         assert kwargs["level_id"] == 1
         assert kwargs["backend"] == "mjx_warp"
-        env = FakeEnv(track=kwargs["track"], events=events)
+        assert kwargs["track_pool"] is track_pool
+        env = FakeEnv(track_pool=kwargs["track_pool"], events=events)
         environments.append(env)
-        events.append(("create", env.track.seed))
+        events.append(("create",))
         return env
 
-    def runner(env: FakeEnv, directory: str, reset_seed: int) -> EpisodeRunResult:
+    def runner(
+        env: FakeEnv,
+        directory: str,
+        reset_seed: int,
+        *,
+        reset_options: dict[str, Any],
+    ) -> EpisodeRunResult:
+        env.reset(seed=reset_seed, options=reset_options)
+        assert env.track is not None
         events.append(("run", env.track.seed, directory, reset_seed))
         if env.track.seed == 101:
             return _result(
@@ -149,19 +182,23 @@ def test_evaluate_track_batch_preserves_order_closes_each_env_and_aggregates(
         "v0.1",
         Path("controllers/pid"),
         "mjx_warp",
+        track_pool=track_pool,
         env_factory=factory,
         run_episode=runner,
+        progress_callback=progress.append,
     )
 
     assert events == [
-        ("create", 101),
+        ("create",),
+        ("reset", 101, 0, 0),
         ("run", 101, "controllers/pid", 0),
-        ("close", 101),
-        ("create", 102),
+        ("reset", 102, 1, 1),
         ("run", 102, "controllers/pid", 1),
-        ("close", 102),
+        ("close",),
     ]
     assert all(env.closed for env in environments)
+    assert tuple(episode.track_index for episode in progress) == (0, 1)
+    assert tuple(episode.track_id for episode in progress) == (101, 102)
     assert evaluation.controller_directory == "controllers/pid"
     assert evaluation.level_id == 1
     assert evaluation.backend == "mjx_warp"
@@ -184,13 +221,22 @@ def test_evaluate_track_batch_preserves_order_closes_each_env_and_aggregates(
 def test_evaluate_track_batch_forwards_explicit_reset_seeds(
     project_config: ProjectConfig,
     track_batch: TrackBatch,
+    track_pool: TrackPool,
 ) -> None:
     received: list[int] = []
 
     def factory(**kwargs) -> FakeEnv:
-        return FakeEnv(track=kwargs["track"], events=[])
+        return FakeEnv(track_pool=kwargs["track_pool"], events=[])
 
-    def runner(env: FakeEnv, _directory: str, reset_seed: int) -> EpisodeRunResult:
+    def runner(
+        env: FakeEnv,
+        _directory: str,
+        reset_seed: int,
+        *,
+        reset_options: dict[str, Any],
+    ) -> EpisodeRunResult:
+        env.reset(seed=reset_seed, options=reset_options)
+        assert env.track is not None
         received.append(reset_seed)
         return _result(
             track_id=env.track.seed,
@@ -207,6 +253,7 @@ def test_evaluate_track_batch_forwards_explicit_reset_seeds(
         "controllers/pid",
         "cpu_reference",
         reset_seeds=np.asarray((11, 17), dtype=np.uint32),
+        track_pool=track_pool,
         env_factory=factory,
         run_episode=runner,
     )
@@ -219,16 +266,17 @@ def test_evaluate_track_batch_forwards_explicit_reset_seeds(
 def test_evaluate_track_batch_closes_before_propagating_runner_exception(
     project_config: ProjectConfig,
     track_batch: TrackBatch,
+    track_pool: TrackPool,
 ) -> None:
     environments: list[FakeEnv] = []
     failure = RuntimeError("controller failed")
 
     def factory(**kwargs) -> FakeEnv:
-        env = FakeEnv(track=kwargs["track"], events=[])
+        env = FakeEnv(track_pool=kwargs["track_pool"], events=[])
         environments.append(env)
         return env
 
-    def runner(*_args) -> EpisodeRunResult:
+    def runner(*_args, **_kwargs) -> EpisodeRunResult:
         raise failure
 
     with pytest.raises(RuntimeError) as caught:
@@ -239,6 +287,7 @@ def test_evaluate_track_batch_closes_before_propagating_runner_exception(
             "v0.1",
             "controllers/pid",
             "mjx_warp",
+            track_pool=track_pool,
             env_factory=factory,
             run_episode=runner,
         )
@@ -262,13 +311,16 @@ def test_evaluate_track_batch_closes_before_propagating_runner_exception(
         ({"reset_seeds": (1, -1)}, ValueError),
         ({"reset_seeds": (1, 2**32)}, ValueError),
         ({"reset_seeds": (1, 1.5)}, TypeError),
+        ({"track_pool": object()}, TypeError),
         ({"env_factory": None}, TypeError),
         ({"run_episode": None}, TypeError),
+        ({"progress_callback": 1}, TypeError),
     ],
 )
 def test_evaluate_track_batch_rejects_invalid_inputs(
     project_config: ProjectConfig,
     track_batch: TrackBatch,
+    track_pool: TrackPool,
     overrides: dict[str, Any],
     error: type[Exception],
 ) -> None:
@@ -280,6 +332,7 @@ def test_evaluate_track_batch_rejects_invalid_inputs(
         "controller_directory": "controllers/pid",
         "backend": "cpu_reference",
         "reset_seeds": (3, 4),
+        "track_pool": track_pool,
         "env_factory": lambda **_kwargs: None,
         "run_episode": lambda *_args: None,
     }
@@ -289,18 +342,45 @@ def test_evaluate_track_batch_rejects_invalid_inputs(
         evaluate_track_batch(**arguments)
 
 
+def test_multi_track_evaluation_requires_an_exact_ordered_pool(
+    project_config: ProjectConfig,
+    track_batch: TrackBatch,
+    track_pool: TrackPool,
+) -> None:
+    arguments = {
+        "project_config": project_config,
+        "level_id": 1,
+        "batch": track_batch,
+        "generator_version": "v0.1",
+        "controller_directory": "controllers/pid",
+        "backend": "cpu_reference",
+        "env_factory": lambda **_kwargs: None,
+        "run_episode": lambda *_args, **_kwargs: None,
+    }
+    with pytest.raises(ValueError, match="requires a matching TrackPool"):
+        evaluate_track_batch(**arguments)
+
+    reversed_batch = TrackBatch(*(np.array(value[::-1], copy=True) for value in track_batch))
+    with pytest.raises(ValueError, match="do not exactly match"):
+        evaluate_track_batch(
+            **arguments,
+            track_pool=replace(track_pool, batch=reversed_batch),
+        )
+
+
 def test_evaluate_track_batch_rejects_mismatched_runner_track_id_after_close(
     project_config: ProjectConfig,
     track_batch: TrackBatch,
+    track_pool: TrackPool,
 ) -> None:
     environments: list[FakeEnv] = []
 
     def factory(**kwargs) -> FakeEnv:
-        env = FakeEnv(track=kwargs["track"], events=[])
+        env = FakeEnv(track_pool=kwargs["track_pool"], events=[])
         environments.append(env)
         return env
 
-    def runner(*_args) -> EpisodeRunResult:
+    def runner(*_args, **_kwargs) -> EpisodeRunResult:
         return _result(
             track_id=999,
             success=True,
@@ -316,6 +396,7 @@ def test_evaluate_track_batch_rejects_mismatched_runner_track_id_after_close(
             "v0.1",
             "controllers/pid",
             "cpu_reference",
+            track_pool=track_pool,
             env_factory=factory,
             run_episode=runner,
         )
@@ -326,11 +407,20 @@ def test_evaluate_track_batch_rejects_mismatched_runner_track_id_after_close(
 def test_controller_evaluation_requires_immutable_episode_tuple(
     project_config: ProjectConfig,
     track_batch: TrackBatch,
+    track_pool: TrackPool,
 ) -> None:
     def factory(**kwargs) -> FakeEnv:
-        return FakeEnv(track=kwargs["track"], events=[])
+        return FakeEnv(track_pool=kwargs["track_pool"], events=[])
 
-    def runner(env: FakeEnv, *_args) -> EpisodeRunResult:
+    def runner(
+        env: FakeEnv,
+        _directory: str,
+        reset_seed: int,
+        *,
+        reset_options: dict[str, Any],
+    ) -> EpisodeRunResult:
+        env.reset(seed=reset_seed, options=reset_options)
+        assert env.track is not None
         return _result(
             track_id=env.track.seed,
             success=True,
@@ -345,6 +435,7 @@ def test_controller_evaluation_requires_immutable_episode_tuple(
         "v0.1",
         "controllers/pid",
         "cpu_reference",
+        track_pool=track_pool,
         env_factory=factory,
         run_episode=runner,
     )

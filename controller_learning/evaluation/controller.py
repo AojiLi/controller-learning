@@ -16,6 +16,7 @@ from controller_learning.config import ProjectConfig
 from controller_learning.control import EpisodeRunResult, run_controller_episode
 from controller_learning.envs.car_racing import CarRacingEnv
 from controller_learning.tracks.assets import validate_track_batch
+from controller_learning.tracks.pool import TrackPool
 from controller_learning.tracks.types import TrackBatch, track_from_batch_row
 
 DEFAULT_COMPUTE_DEADLINE_S = 0.05
@@ -200,6 +201,9 @@ class EpisodeEvaluation:
         object.__setattr__(self, "controller_import_time_s", import_time)
         object.__setattr__(self, "controller_init_time_s", init_time)
         object.__setattr__(self, "compute_times_s", compute_times)
+
+
+EvaluationProgressCallback: TypeAlias = Callable[[EpisodeEvaluation], None]
 
 
 @dataclass(frozen=True, slots=True)
@@ -392,6 +396,43 @@ def _episode_from_run(
     )
 
 
+def _validated_evaluation_pool(
+    value: TrackPool | None,
+    *,
+    project_config: ProjectConfig,
+    batch: TrackBatch,
+    generator_version: str,
+) -> TrackPool | None:
+    """Bind an optional reusable pool exactly to the ordered evaluation batch."""
+
+    track_count = int(batch.seed.shape[0])
+    if value is None:
+        if track_count != 1:
+            raise ValueError("multi-Track evaluation requires a matching TrackPool")
+        return None
+    if not isinstance(value, TrackPool):
+        raise TypeError("track_pool must be an immutable TrackPool or None")
+    if value.benchmark_version != project_config.benchmark.version:
+        raise ValueError("track_pool benchmark version does not match project_config")
+    if value.generator_version != generator_version:
+        raise ValueError("track_pool generator version does not match the evaluation batch")
+    if value.size != track_count:
+        raise ValueError("track_pool must contain exactly the ordered evaluation batch")
+    mismatched = tuple(
+        name
+        for name in TrackBatch._fields
+        if not np.array_equal(
+            np.asarray(getattr(value.batch, name)), np.asarray(getattr(batch, name))
+        )
+    )
+    if mismatched:
+        raise ValueError(
+            "track_pool rows do not exactly match the ordered evaluation batch: "
+            + ", ".join(mismatched)
+        )
+    return value
+
+
 def evaluate_track_batch(
     project_config: ProjectConfig,
     level_id: int,
@@ -401,14 +442,17 @@ def evaluate_track_batch(
     backend: EvaluationBackend,
     reset_seeds: Sequence[Integral] | NDArray[np.integer] | None = None,
     *,
+    track_pool: TrackPool | None = None,
     env_factory: EnvironmentFactory = CarRacingEnv,
     run_episode: EpisodeRunner = run_controller_episode,
+    progress_callback: EvaluationProgressCallback | None = None,
 ) -> ControllerEvaluation:
-    """Evaluate a fresh Controller episode on every Track row, in fixed order.
+    """Evaluate a fresh Controller on every ordered Track row using one environment backend.
 
     Controller and environment exceptions intentionally propagate to the caller. The environment
-    created for a row is still closed before propagation, leaving formal failure policy to the
-    higher-level evaluation script.
+    shared by the batch is still closed before propagation, leaving formal failure policy to the
+    higher-level evaluation script. Multi-Track evaluation requires an exactly matching immutable
+    TrackPool so row selection can occur without reconstructing the backend.
     """
 
     if not isinstance(project_config, ProjectConfig):
@@ -433,41 +477,66 @@ def evaluate_track_batch(
         raise TypeError("env_factory must be callable")
     if not callable(run_episode):
         raise TypeError("run_episode must be callable")
+    if progress_callback is not None and not callable(progress_callback):
+        raise TypeError("progress_callback must be callable or None")
 
     track_count = int(batch.seed.shape[0])
     seeds = _normalized_reset_seeds(reset_seeds, track_count=track_count)
+    reusable_pool = _validated_evaluation_pool(
+        track_pool,
+        project_config=project_config,
+        batch=batch,
+        generator_version=generator_version,
+    )
     deadline_s = project_config.benchmark.controller.compute_deadline_s
     episodes: list[EpisodeEvaluation] = []
     all_compute_times: list[float] = []
 
-    for track_index, reset_seed in enumerate(seeds):
-        track = track_from_batch_row(
-            batch,
-            track_index,
-            generator_version=generator_version,
-        )
-        env = env_factory(
-            project_config=project_config,
-            level_id=level_id,
-            track=track,
-            backend=backend,
-        )
-        close = getattr(env, "close", None)
-        if not callable(close):
-            raise TypeError("env_factory must return an environment with close()")
-        try:
-            result = run_episode(env, directory, reset_seed)
-        finally:
-            close()
-        episode = _episode_from_run(
-            result,
-            track_index=track_index,
-            expected_track_id=track.seed,
-            reset_seed=reset_seed,
-            deadline_s=deadline_s,
-        )
-        episodes.append(episode)
-        all_compute_times.extend(episode.compute_times_s)
+    first_track = track_from_batch_row(batch, 0, generator_version=generator_version)
+    environment_kwargs: dict[str, object] = {
+        "project_config": project_config,
+        "level_id": level_id,
+        "backend": backend,
+    }
+    if reusable_pool is None:
+        environment_kwargs["track"] = first_track
+    else:
+        environment_kwargs["track_pool"] = reusable_pool
+    env = env_factory(**environment_kwargs)
+    close = getattr(env, "close", None)
+    if not callable(close):
+        raise TypeError("env_factory must return an environment with close()")
+    try:
+        for track_index, reset_seed in enumerate(seeds):
+            reset_options = None if reusable_pool is None else {"track_index": track_index}
+            result = (
+                run_episode(env, directory, reset_seed)
+                if reset_options is None
+                else run_episode(
+                    env,
+                    directory,
+                    reset_seed,
+                    reset_options=reset_options,
+                )
+            )
+            episode = _episode_from_run(
+                result,
+                track_index=track_index,
+                expected_track_id=int(batch.seed[track_index]),
+                reset_seed=reset_seed,
+                deadline_s=deadline_s,
+            )
+            episodes.append(episode)
+            all_compute_times.extend(episode.compute_times_s)
+            if progress_callback is not None:
+                progress_callback(episode)
+    finally:
+        close()
+    # Release the backend wrapper before aggregate construction and the caller's group-level memory
+    # sample. Formal evaluation may then collect unreachable per-environment JIT reference cycles
+    # once per group without clearing global JAX or Warp caches.
+    del close
+    del env
 
     successful_laps = tuple(episode.lap_time_s for episode in episodes if episode.success)
     success_count = len(successful_laps)
@@ -490,6 +559,7 @@ __all__ = [
     "DEFAULT_COMPUTE_DEADLINE_S",
     "ControllerEvaluation",
     "EpisodeEvaluation",
+    "EvaluationProgressCallback",
     "TimingSummary",
     "evaluate_track_batch",
     "summarize_compute_times",

@@ -35,9 +35,9 @@ ControllerLearning/CarRacing-v0
 
 `CarRacingEnv` is a host/NumPy batch-one adapter over `VecCarRacingEnv`. The vector environment owns
 all vehicle, Race Core, seed, termination, and NEXT_STEP autoreset state. Both constructors require
-an explicit immutable `ProjectConfig`, Level, and backend. `CarRacingEnv` accepts one fixed `Track`;
-`VecCarRacingEnv` accepts exactly one of fixed injected Tracks or the published M5 Train `TrackPool`.
-All modes use the same Challenge path.
+an explicit immutable `ProjectConfig`, Level, and backend. Both accept exactly one fixed Track source
+or one immutable `TrackPool`; the single-world adapter preserves the batch-one vector path. All modes
+use the same Challenge implementation.
 
 The public action is a float32 vector in physical units:
 
@@ -100,6 +100,12 @@ contains the old Track ID. On the following NEXT_STEP call, affected worlds firs
 episode counters, derive their new domain-2 choice, and atomically replace Track, vehicle, Race Core,
 and observation state. That reset transition returns the new Track ID with zero reward and false
 termination flags; unaffected worlds advance normally.
+
+Trusted evaluators may instead select an explicit in-range TrackPool row during a full reset. The
+single-world option is `{"track_index": index}` and the vector option is
+`{"track_indices": indices}` with exactly one integer per world. Explicit selection changes only the
+Track row: episode and Controller identities still come from the supplied reset seed. Controllers do
+not receive the pool, row index, reset options, or environment object.
 
 Termination reason values are `0=none`, `1=success`, `2=off_track`, `3=invalid_action`, and
 `4=timeout`. Timeout sets `truncated`; success, off-track, and invalid action set `terminated`.

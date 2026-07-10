@@ -90,21 +90,21 @@ def _fake_execution_evidence(
                 "episode_count": len(episodes),
                 "environment_steps": steps,
                 "wall_s": wall_s,
+                "gc_collected_objects": 0,
                 "end_to_end_transitions_per_second": steps / wall_s,
             }
-            instances.extend(
+            instances.append(
                 {
                     "group": label,
                     "create_s": 0.001,
-                    "reset_count": 1,
-                    "reset_wall_s": 0.002,
+                    "reset_count": len(episodes),
+                    "reset_wall_s": len(episodes) * 0.002,
                     "first_reset_s": 0.002,
-                    "step_count": episode["steps"],
-                    "step_wall_s": episode["steps"] * 0.004,
+                    "step_count": steps,
+                    "step_wall_s": steps * 0.004,
                     "first_step_s": 0.004,
                     "closed": True,
                 }
-                for episode in episodes
             )
     environment_steps = sum(instance["step_count"] for instance in instances)
     evaluation_wall_s = sum(group["wall_s"] for group in groups.values())
@@ -126,7 +126,13 @@ def _fake_execution_evidence(
             "num_envs_per_environment": 1,
             "maximum_concurrent_worlds": 1,
             "environment_instances": len(instances),
-            "episode_count": len(instances),
+            "episode_count": sum(group["episode_count"] for group in groups.values()),
+            "fresh_controller_instance_count": benchmark.FORMAL_EPISODE_COUNT,
+            "backend_reused_within_each_group": True,
+            "explicit_validation_track_index_selection": True,
+            "jax_cache_clear_calls": 0,
+            "group_gc_calls": 4,
+            "group_gc_collected_objects": 0,
             "environment_steps": environment_steps,
             "transitions": environment_steps,
             "physics_substeps_per_environment_step": (
@@ -265,6 +271,12 @@ def passing_report(official_assets):
                 "directory": Path(directory).name,
                 "backend": backend,
                 "reset_seeds": tuple(int(value) for value in kwargs["reset_seeds"]),
+                "track_pool_split": (
+                    None if kwargs["track_pool"] is None else kwargs["track_pool"].split
+                ),
+                "track_pool_size": (
+                    None if kwargs["track_pool"] is None else kwargs["track_pool"].size
+                ),
             }
         )
         return _evaluation(batch, Path(directory), level_id, kwargs["reset_seeds"])
@@ -341,6 +353,9 @@ def test_official_loader_reads_only_level0_and_validation(monkeypatch) -> None:
     assert accessed == ["level0.json", "validation.json"]
     assert assets.evidence["loaded_splits"] == ["level0", "validation"]
     assert assets.evidence["test_split_accessed"] is False
+    assert assets.validation_pool.split == "validation"
+    assert assets.validation_pool.size == 100
+    np.testing.assert_array_equal(assets.validation_pool.batch.seed, assets.validation_batch.seed)
     assert "test" not in assets.evidence
     assert not any("test.json" in path for path in benchmark.RELEVANT_SOURCE_PATHS)
     assert not any("test.npz" in path for path in benchmark.RELEVANT_SOURCE_PATHS)
@@ -356,6 +371,8 @@ def test_formal_workload_and_row_index_seeds_are_fixed(passing_report) -> None:
             "directory": "pid",
             "backend": "mjx_warp",
             "reset_seeds": (0,),
+            "track_pool_split": None,
+            "track_pool_size": None,
         },
         {
             "level_id": 1,
@@ -363,6 +380,8 @@ def test_formal_workload_and_row_index_seeds_are_fixed(passing_report) -> None:
             "directory": "pid",
             "backend": "mjx_warp",
             "reset_seeds": tuple(range(10)),
+            "track_pool_split": "validation",
+            "track_pool_size": 10,
         },
         {
             "level_id": 0,
@@ -370,6 +389,8 @@ def test_formal_workload_and_row_index_seeds_are_fixed(passing_report) -> None:
             "directory": "mpc",
             "backend": "mjx_warp",
             "reset_seeds": (0,),
+            "track_pool_split": None,
+            "track_pool_size": None,
         },
         {
             "level_id": 1,
@@ -377,6 +398,8 @@ def test_formal_workload_and_row_index_seeds_are_fixed(passing_report) -> None:
             "directory": "mpc",
             "backend": "mjx_warp",
             "reset_seeds": tuple(range(100)),
+            "track_pool_split": "validation",
+            "track_pool_size": 100,
         },
     ]
     assert report["status"] == "pass"
@@ -386,8 +409,12 @@ def test_formal_workload_and_row_index_seeds_are_fixed(passing_report) -> None:
     execution = report["execution"]["controller_evaluation"]
     assert execution["num_envs_per_environment"] == 1
     assert execution["maximum_concurrent_worlds"] == 1
-    assert execution["environment_instances"] == 112
+    assert execution["environment_instances"] == 4
     assert execution["episode_count"] == 112
+    assert execution["fresh_controller_instance_count"] == 112
+    assert execution["backend_reused_within_each_group"] is True
+    assert execution["jax_cache_clear_calls"] == 0
+    assert [instance["reset_count"] for instance in execution["instances"]] == [1, 10, 1, 100]
     assert execution["environment_steps"] == 112
     assert execution["transitions"] == 112
     assert execution["world_physics_steps"] == 1120
@@ -401,6 +428,18 @@ def test_formal_workload_and_row_index_seeds_are_fixed(passing_report) -> None:
         (
             lambda report: report["execution"]["controller_evaluation"].__setitem__(
                 "transitions", 113
+            ),
+            "execution.counts_and_throughput",
+        ),
+        (
+            lambda report: report["execution"]["controller_evaluation"]["instances"][1].__setitem__(
+                "reset_count", 9
+            ),
+            "execution.counts_and_throughput",
+        ),
+        (
+            lambda report: report["execution"]["controller_evaluation"].__setitem__(
+                "jax_cache_clear_calls", 1
             ),
             "execution.counts_and_throughput",
         ),
@@ -460,6 +499,21 @@ def test_historical_gpu_gate_cross_checks_source_snapshot_hashes(passing_report)
     }
 
     assert failed == {"evidence.historical_gpu_reports"}
+
+
+def test_protocol_gate_rejects_cache_clear_or_backend_recreation_drift(passing_report) -> None:
+    report, _calls = passing_report
+    for field, value in (
+        ("jax_cache_clear_calls", 1),
+        ("backend_environment_instance_count", 112),
+        ("validation_track_selection", "seed_hash_modulo"),
+    ):
+        failing = copy.deepcopy(report)
+        failing["protocol"][field] = value
+        failed = {
+            check["id"] for check in benchmark.evaluate_report_gates(failing) if not check["passed"]
+        }
+        assert failed == {"protocol.fixed_workload"}
 
 
 def test_gpu_execution_gates_have_no_performance_threshold(passing_report) -> None:
@@ -537,6 +591,23 @@ def test_execution_recorder_measures_calls_and_public_numerical_health() -> None
     env.reset(seed=0)
     env.step([0.0, 0.0])
     env.step([float("nan"), 0.0])
+    episode = EpisodeEvaluation(
+        track_index=0,
+        track_id=1,
+        reset_seed=0,
+        success=True,
+        lap_time_s=0.1,
+        steps=2,
+        total_reward=1.0,
+        terminated=True,
+        truncated=False,
+        termination_reason=1,
+        controller_import_time_s=0.001,
+        controller_init_time_s=0.001,
+        compute_times_s=(0.001, 0.001),
+        compute_timing=summarize_compute_times((0.001, 0.001)),
+    )
+    recorder.record_episode("pid.level0", episode)
     env.close()
 
     record = recorder.instances[0]
@@ -551,11 +622,14 @@ def test_execution_recorder_measures_calls_and_public_numerical_health() -> None
     assert recorder.numerical_fields == {"observation.position": 1}
     assert progress_events == [
         {
-            "event": "m6_environment_closed",
+            "event": "m6_episode_completed",
             "group": "pid.level0",
             "group_episode_completed": 1,
             "group_episode_total": 1,
-            "environment_steps": 2,
+            "track_index": 0,
+            "track_id": 1,
+            "success": True,
+            "episode_steps": 2,
         }
     ]
     assert [sample["phase"] for sample in recorder.memory_samples] == [
@@ -601,23 +675,28 @@ def test_default_execution_path_builds_evidence_from_instrumented_environment(
             "jax_allocator_error": None,
         }
 
+    progress_events: list[dict[str, Any]] = []
     recorder = benchmark._ExecutionRecorder(
         device=object(),
         gpu_uuid="private-test-id",
         gpu_selection_error=None,
         environment_factory=lambda **_kwargs: FakeEnvironment(),
         memory_sampler=memory_sampler,
+        progress_sink=lambda payload: progress_events.append(dict(payload)),
     )
     monkeypatch.setattr(benchmark, "_formal_execution_recorder", lambda: recorder)
 
     def evaluator(config, level_id, batch, generator_version, directory, backend, **kwargs):
         del config, generator_version, backend
+        env = kwargs["env_factory"]()
         for _ in range(int(batch.seed.shape[0])):
-            env = kwargs["env_factory"]()
             env.reset(seed=0)
             env.step([0.0, 0.0])
-            env.close()
-        return _evaluation(batch, Path(directory), level_id, kwargs["reset_seeds"])
+        env.close()
+        result = _evaluation(batch, Path(directory), level_id, kwargs["reset_seeds"])
+        for episode in result.episodes:
+            kwargs["progress_callback"](episode)
+        return result
 
     report = benchmark.run_benchmark(
         benchmark.BenchmarkOptions(),
@@ -629,8 +708,16 @@ def test_default_execution_path_builds_evidence_from_instrumented_environment(
     )
 
     assert report["status"] == "pass"
-    assert report["execution"]["controller_evaluation"]["environment_instances"] == 112
+    assert report["execution"]["controller_evaluation"]["environment_instances"] == 4
+    assert [
+        instance["reset_count"]
+        for instance in report["execution"]["controller_evaluation"]["instances"]
+    ] == [1, 10, 1, 100]
     assert report["execution"]["numerical"]["checked_transition_count"] == 112
+    assert len(progress_events) == 112
+    assert [event["group_episode_completed"] for event in progress_events[:2]] == [1, 1]
+    assert progress_events[-1]["group"] == "mpc.validation"
+    assert progress_events[-1]["group_episode_completed"] == 100
     assert [sample["phase"] for sample in report["execution"]["memory"]["samples"]] == list(
         benchmark.MEMORY_SAMPLE_PHASES
     )

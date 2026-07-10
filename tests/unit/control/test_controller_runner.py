@@ -55,6 +55,7 @@ class FakeEnv:
         self.actions: list[Any] = []
         self.closed = False
         self.reset_seeds: list[int | None] = []
+        self.reset_options: list[dict[str, Any] | None] = []
         self.debug_frames: list[tuple[DebugDrawCommand, ...]] = []
 
     @property
@@ -79,9 +80,15 @@ class FakeEnv:
             info.pop(key, None)
         return info
 
-    def reset(self, *, seed: int | None = None) -> tuple[dict[str, Any], dict[str, Any]]:
+    def reset(
+        self,
+        *,
+        seed: int | None = None,
+        options: dict[str, Any] | None = None,
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
         self.step_count = 0
         self.reset_seeds.append(seed)
+        self.reset_options.append(options)
         self.events.append("reset")
         return self._obs(), self._info()
 
@@ -261,6 +268,29 @@ def test_runner_constructs_fresh_controller_state_for_every_call(tmp_path: Path)
         ("episode_callback", 1),
         ("episode_callback", 1),
     ]
+
+
+def test_runner_forwards_trusted_reset_options_without_exposing_them_to_controller(
+    tmp_path: Path,
+) -> None:
+    plugin = _write_plugin(tmp_path / "plugin", ORDERED_PLUGIN)
+    env = FakeEnv(episode_steps=1)
+
+    run_controller_episode(
+        env,
+        plugin,
+        3,
+        reset_options={"track_index": np.int64(7)},
+    )
+
+    assert env.reset_options == [{"track_index": np.int64(7)}]
+    init_event = next(
+        event for event in env.events if isinstance(event, tuple) and event[0] == "init"
+    )
+    assert "track_index" not in init_event[1]
+
+    with pytest.raises(TypeError, match="mapping"):
+        run_controller_episode(env, plugin, 3, reset_options=[("track_index", 0)])  # type: ignore[arg-type]
 
 
 def test_render_callback_receives_only_writer_and_precedes_environment_render(

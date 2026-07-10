@@ -202,3 +202,53 @@ def test_pool_autoreset_selects_and_replaces_tracks_without_transfers() -> None:
         assert not bool(autoreset[3][1])
     finally:
         env.close()
+
+
+def test_pool_explicit_rows_reuse_one_gpu_backend_with_fresh_identity_reset() -> None:
+    project = load_project_config(PROJECT_ROOT)
+    tracks = _tracks(project, 3)
+    pool = TrackPool.from_tracks(
+        tracks,
+        benchmark_version=project.benchmark.version,
+        split="validation",
+    )
+    env = VecCarRacingEnv(
+        num_envs=1,
+        project_config=project,
+        level_id=1,
+        track_pool=pool,
+        backend="mjx_warp",
+    )
+    try:
+        identities = []
+        action = jax.numpy.zeros((1, 2), dtype=jax.numpy.float32)
+        for index in range(pool.size):
+            observation, info = env.reset(
+                seed=19,
+                options={"track_indices": np.asarray((index,), dtype=np.int32)},
+            )
+            step = env.step(action)
+            jax.block_until_ready((observation, info["track_id"], step[:4]))
+
+            assert int(info["track_id"][0]) == int(pool.batch.seed[index])
+            np.testing.assert_array_equal(
+                observation["centerline"][0], pool.batch.centerline_m[index]
+            )
+            np.testing.assert_allclose(
+                observation["position"][0],
+                pool.batch.start_pose[index, :2],
+                rtol=0.0,
+                atol=1.0e-6,
+            )
+            assert np.isfinite(np.asarray(step[1])).all()
+            assert not bool(step[2][0])
+            assert not bool(step[3][0])
+            identities.append(
+                (
+                    int(info["episode_seed"][0]),
+                    int(info["controller_seed"][0]),
+                )
+            )
+        assert len(set(identities)) == 1
+    finally:
+        env.close()

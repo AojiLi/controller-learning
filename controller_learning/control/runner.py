@@ -172,6 +172,8 @@ def run_controller_episode(
     reset_seed: int,
     render: bool = False,
     max_steps: int | None = None,
+    *,
+    reset_options: Mapping[str, Any] | None = None,
 ) -> EpisodeRunResult:
     """Run a fresh Controller instance until the environment ends one episode.
 
@@ -182,15 +184,21 @@ def run_controller_episode(
     ``max_steps`` is only a host-side safety guard: reaching it raises
     :class:`EpisodeStepLimitError` and does not synthesize a Challenge truncation or mutate
     environment state.
+
+    ``reset_options`` is owned by trusted evaluation code. It is forwarded only to ``env.reset``
+    and is never included in the public Controller configuration or callbacks.
     """
 
     _validate_max_steps(max_steps)
     if not isinstance(render, bool):
         raise TypeError("render must be a boolean")
+    if reset_options is not None and not isinstance(reset_options, Mapping):
+        raise TypeError("reset_options must be a mapping or None")
     unwrapped, project_config, level_id = _challenge_from_environment(env)
     render_debug_frame = _debug_frame_sink(unwrapped) if render else None
 
-    obs, reset_info_value = env.reset(seed=reset_seed)
+    reset_kwargs = {} if reset_options is None else {"options": dict(reset_options)}
+    obs, reset_info_value = env.reset(seed=reset_seed, **reset_kwargs)
     reset_info = _public_info(reset_info_value, source="reset")
 
     import_started_ns = time.perf_counter_ns()
