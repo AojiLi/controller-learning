@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import FrozenInstanceError, replace
 
+import jax
+import jax.numpy as jnp
 import numpy as np
 import pytest
 
@@ -12,8 +14,10 @@ from controller_learning.envs.episode import (
     EpisodeIdentity,
     build_reset_info,
     build_step_info,
+    episode_identity_to_device,
     initialize_episode_identities,
     masked_next_episode,
+    masked_next_episode_device,
     track_id_from_track,
     unbatch_public_info,
 )
@@ -128,6 +132,43 @@ def test_seed_contract_has_stable_known_values() -> None:
         3879327873,
         843055831,
     ]
+
+
+@pytest.mark.parametrize("root_seed", (0, 123456, np.iinfo(np.uint32).max))
+def test_device_identity_matches_host_seed_sequence_across_masked_updates(root_seed: int) -> None:
+    host = initialize_episode_identities(root_seed, 4)
+    device = episode_identity_to_device(host)
+
+    for field in (
+        "world_index",
+        "episode_counter",
+        "episode_seed",
+        "controller_seed",
+    ):
+        np.testing.assert_array_equal(np.asarray(getattr(device, field)), getattr(host, field))
+
+    advance_device = jax.jit(masked_next_episode_device)
+    masks = (
+        (True, False, True, True),
+        (False, True, False, True),
+        (True, True, True, True),
+        (False, False, False, False),
+        (True, False, False, False),
+    )
+    for values in masks:
+        mask = np.asarray(values, dtype=np.bool_)
+        host = masked_next_episode(host, mask)
+        device = advance_device(device, jnp.asarray(mask))
+        for field in (
+            "world_index",
+            "episode_counter",
+            "episode_seed",
+            "controller_seed",
+        ):
+            np.testing.assert_array_equal(
+                np.asarray(getattr(device, field)),
+                getattr(host, field),
+            )
 
 
 def test_identity_is_frozen_and_owns_read_only_arrays() -> None:

@@ -6,8 +6,10 @@ import math
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from numbers import Integral
-from typing import TypeAlias
+from typing import NamedTuple, TypeAlias
 
+import jax
+import jax.numpy as jnp
 import numpy as np
 from numpy.typing import NDArray
 
@@ -28,8 +30,14 @@ PUBLIC_INFO_KEYS = (
 _UINT32_MAX = int(np.iinfo(np.uint32).max)
 _EPISODE_DOMAIN = 0
 _CONTROLLER_DOMAIN = 1
+_UINT32_INIT_A = 0x43B0D7E5
+_UINT32_MULT_A = 0x931E8875
+_UINT32_INIT_B = 0x8B51F9DD
+_UINT32_MULT_B = 0x58F38DED
+_UINT32_MIX_LEFT = 0xCA01F9DD
+_UINT32_MIX_RIGHT = 0x4973F715
 
-PublicInfoArray: TypeAlias = NDArray[np.generic]
+PublicInfoArray: TypeAlias = NDArray[np.generic] | jax.Array
 PublicVectorInfo: TypeAlias = dict[str, PublicInfoArray]
 PublicScalarInfo: TypeAlias = dict[str, int | float | bool | str]
 
@@ -155,6 +163,131 @@ class EpisodeIdentity:
         """Return the fixed leading world count."""
 
         return int(self.world_index.shape[0])
+
+
+class DeviceEpisodeIdentity(NamedTuple):
+    """JAX leaves matching ``EpisodeIdentity`` for native vector autoreset."""
+
+    root_seed: jax.Array
+    world_index: jax.Array
+    episode_counter: jax.Array
+    episode_seed: jax.Array
+    controller_seed: jax.Array
+
+
+def _seed_sequence_word_device(
+    root_seed: jax.Array,
+    world_index: jax.Array,
+    episode_counter: jax.Array,
+    domain: int,
+) -> jax.Array:
+    """Return one bit-exact NumPy ``SeedSequence`` word using pure JAX.
+
+    This specializes NumPy's documented uint32 mixer to the project's fixed entropy and spawn-key
+    schema: ``root_seed`` and ``(world_index, episode_counter, domain)``. Keeping the derivation on
+    device prevents Gym NEXT_STEP identity updates from introducing a GPU-to-host synchronization.
+    """
+
+    uint32 = jnp.uint32
+    entropy = (
+        uint32(root_seed),
+        uint32(0),
+        uint32(0),
+        uint32(0),
+        uint32(world_index),
+        uint32(episode_counter),
+        uint32(domain),
+    )
+    hash_constant = uint32(_UINT32_INIT_A)
+
+    def hash_mix(value: jax.Array, constant: jax.Array) -> tuple[jax.Array, jax.Array]:
+        value = uint32(value) ^ constant
+        constant = constant * uint32(_UINT32_MULT_A)
+        value = value * constant
+        return value ^ (value >> uint32(16)), constant
+
+    def mix(left: jax.Array, right: jax.Array) -> jax.Array:
+        result = uint32(_UINT32_MIX_LEFT) * left - uint32(_UINT32_MIX_RIGHT) * right
+        return result ^ (result >> uint32(16))
+
+    pool: list[jax.Array] = []
+    for value in entropy[:4]:
+        mixed, hash_constant = hash_mix(value, hash_constant)
+        pool.append(mixed)
+    for source in range(4):
+        for destination in range(4):
+            if source != destination:
+                mixed, hash_constant = hash_mix(pool[source], hash_constant)
+                pool[destination] = mix(pool[destination], mixed)
+    for value in entropy[4:]:
+        for destination in range(4):
+            mixed, hash_constant = hash_mix(value, hash_constant)
+            pool[destination] = mix(pool[destination], mixed)
+
+    state = pool[0] ^ uint32(_UINT32_INIT_B)
+    output_constant = uint32(_UINT32_INIT_B) * uint32(_UINT32_MULT_B)
+    state = state * output_constant
+    return state ^ (state >> uint32(16))
+
+
+_seed_sequence_batch_device = jax.vmap(
+    _seed_sequence_word_device,
+    in_axes=(None, 0, 0, None),
+)
+
+
+def episode_identity_to_device(identity: EpisodeIdentity) -> DeviceEpisodeIdentity:
+    """Copy a validated host identity to JAX without changing any public seed."""
+
+    return DeviceEpisodeIdentity(
+        root_seed=jnp.asarray(identity.root_seed, dtype=jnp.uint32),
+        world_index=jnp.asarray(identity.world_index, dtype=jnp.uint32),
+        episode_counter=jnp.asarray(identity.episode_counter, dtype=jnp.uint32),
+        episode_seed=jnp.asarray(identity.episode_seed, dtype=jnp.uint32),
+        controller_seed=jnp.asarray(identity.controller_seed, dtype=jnp.uint32),
+    )
+
+
+def masked_next_episode_device(
+    identity: DeviceEpisodeIdentity,
+    mask: jax.Array,
+) -> DeviceEpisodeIdentity:
+    """Advance selected identities on device with host ``SeedSequence`` parity."""
+
+    reset_mask = jnp.asarray(mask, dtype=bool)
+
+    def advance(current: DeviceEpisodeIdentity) -> DeviceEpisodeIdentity:
+        counters = current.episode_counter + reset_mask.astype(jnp.uint32)
+        episode_candidate = _seed_sequence_batch_device(
+            current.root_seed,
+            current.world_index,
+            counters,
+            _EPISODE_DOMAIN,
+        )
+        controller_candidate = _seed_sequence_batch_device(
+            current.root_seed,
+            current.world_index,
+            counters,
+            _CONTROLLER_DOMAIN,
+        )
+        controller_candidate = jnp.where(
+            controller_candidate == episode_candidate,
+            controller_candidate ^ jnp.uint32(0xFFFFFFFF),
+            controller_candidate,
+        )
+        return DeviceEpisodeIdentity(
+            root_seed=current.root_seed,
+            world_index=current.world_index,
+            episode_counter=counters,
+            episode_seed=jnp.where(reset_mask, episode_candidate, current.episode_seed),
+            controller_seed=jnp.where(
+                reset_mask,
+                controller_candidate,
+                current.controller_seed,
+            ),
+        )
+
+    return jax.lax.cond(jnp.any(reset_mask), advance, lambda current: current, identity)
 
 
 def initialize_episode_identities(root_seed: int, num_envs: int) -> EpisodeIdentity:
@@ -403,13 +536,16 @@ def unbatch_public_info(info: Mapping[str, object], index: int = 0) -> PublicSca
 
 __all__ = [
     "PUBLIC_INFO_KEYS",
+    "DeviceEpisodeIdentity",
     "EpisodeIdentity",
     "PublicScalarInfo",
     "PublicVectorInfo",
     "build_reset_info",
     "build_step_info",
+    "episode_identity_to_device",
     "initialize_episode_identities",
     "masked_next_episode",
+    "masked_next_episode_device",
     "track_id_from_track",
     "unbatch_public_info",
 ]

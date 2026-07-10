@@ -8,7 +8,6 @@ import numpy as np
 
 from controller_learning.config import VehicleConfig
 from controller_learning.physics import CpuVehicle
-from controller_learning.physics.mjx_warp import MjxWarpVehicle
 
 VehicleBackend = Literal["cpu_reference", "mjx_warp"]
 
@@ -194,6 +193,9 @@ class _MjxWarpDriver:
     backend: VehicleBackend = "mjx_warp"
 
     def __init__(self, config: VehicleConfig, num_worlds: int) -> None:
+        # The CPU reference environment must not import or initialize the optional Warp backend.
+        from controller_learning.physics.mjx_warp import MjxWarpVehicle
+
         self._vehicle = MjxWarpVehicle.create(config, num_worlds=num_worlds)
         self.num_worlds = num_worlds
 

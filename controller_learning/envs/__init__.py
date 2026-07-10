@@ -1,5 +1,6 @@
 """Challenge and Gymnasium environments."""
 
+from controller_learning.envs.car_racing import CarRacingEnv
 from controller_learning.envs.configuration import race_core_config_from_project
 from controller_learning.envs.observation import (
     OBSERVATION_KEYS,
@@ -26,14 +27,21 @@ from controller_learning.envs.race_core import (
     world_to_body,
     wrap_angle,
 )
+from controller_learning.envs.registration import ENV_ID, register_environments
+from controller_learning.envs.vector_racing import VecCarRacingEnv
+
+register_environments()
 
 __all__ = [
+    "ENV_ID",
     "OBSERVATION_KEYS",
+    "CarRacingEnv",
     "RaceCoreConfig",
     "RaceState",
     "RaceStep",
     "RaceTermination",
     "TrackProjection",
+    "VecCarRacingEnv",
     "VehicleStateView",
     "action_space",
     "batched_action_space",
@@ -45,6 +53,7 @@ __all__ = [
     "observation_to_host",
     "project_to_track",
     "race_core_config_from_project",
+    "register_environments",
     "reset_race_state",
     "step_race_core",
     "unbatch_observation",
