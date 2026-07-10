@@ -305,11 +305,16 @@ class CenterlineReference:
 
         if hint_segment is None:
             candidates = np.arange(self.segment_count, dtype=np.int64)
+            tie_rank = candidates
         else:
             if isinstance(hint_segment, bool) or not isinstance(hint_segment, int):
                 raise TypeError("hint_segment must be an integer or None")
             offsets = np.arange(-backward_segments, forward_segments + 1, dtype=np.int64)
             candidates = np.mod(hint_segment + offsets, self.segment_count)
+            # Shared vertices (especially the explicit closure) create exact ties. Prefer the
+            # hinted segment, then a forward neighbor, then a backward neighbor so a stationary
+            # Controller does not jump across the seam.
+            tie_rank = 2 * np.abs(offsets) + (offsets < 0)
 
         starts = self.centerline_m[candidates]
         deltas = self.segment_delta_m[candidates]
@@ -321,7 +326,9 @@ class CenterlineReference:
         )
         points = starts + fractions[:, None] * deltas
         squared_distances = np.sum((position - points) ** 2, axis=1)
-        selected = int(np.argmin(squared_distances))
+        minimum_distance = float(np.min(squared_distances))
+        tied = squared_distances <= minimum_distance + 1.0e-12
+        selected = int(np.argmin(np.where(tied, tie_rank, np.iinfo(np.int64).max)))
         segment_index = int(candidates[selected])
         fraction = float(fractions[selected])
         point = points[selected]

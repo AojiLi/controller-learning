@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import inspect
 from dataclasses import FrozenInstanceError
 
 import numpy as np
 import pytest
 
+from controller_learning.control import geometry
 from controller_learning.control.geometry import (
     CenterlineReference,
     PathProjection,
@@ -142,6 +144,19 @@ def test_hint_search_is_local_and_wraps_modulo_seam() -> None:
     assert seam_projection.distance_m == pytest.approx(0.0, abs=1e-6)
 
 
+def test_hint_tie_prefers_current_segment_at_explicit_closure() -> None:
+    reference = CenterlineReference.from_observation(_observation())
+
+    projection = reference.project(
+        reference.centerline_m[0],
+        hint_segment=0,
+        backward_segments=2,
+        forward_segments=2,
+    )
+
+    assert projection.segment_index == 0
+
+
 def test_valid_prefix_is_owned_readonly_and_padding_is_ignored() -> None:
     observation = _observation()
     observation["centerline"][5:] = np.nan
@@ -207,3 +222,19 @@ def test_projection_value_object_copies_constructor_arrays() -> None:
     projection = PathProjection(0, 0.5, 0.5, point, np.asarray((1.0, 0.0)), 2.0, 2.0)
     point[0] = 9.0
     np.testing.assert_array_equal(projection.point_m, (1.0, 2.0))
+
+
+def test_public_geometry_source_has_no_challenge_or_backend_imports() -> None:
+    source = inspect.getsource(geometry)
+
+    for forbidden in (
+        "controller_learning.envs",
+        "race_core",
+        "controller_learning.tracks",
+        "TrackBatch",
+        "controller_learning.physics",
+        "import jax",
+        "import mujoco",
+        "import warp",
+    ):
+        assert forbidden not in source
