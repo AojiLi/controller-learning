@@ -78,10 +78,28 @@ DEFAULT_HEALTH_MAX_STEPS = 5_000
 DEFAULT_RESET_HEAVY_CYCLES = 64
 MINIMUM_POOL_TO_FIXED_THROUGHPUT_RATIO = 0.75
 PROCESS_VRAM_GROWTH_LIMIT_MIB = 64.0
+HOST_RSS_GROWTH_LIMIT_MIB = 64.0
+MEMORY_SLOPE_LIMIT_MIB_PER_EPOCH = 4.0
 LIVE_BYTES_GROWTH_LIMIT = 32 * 1024 * 1024
+LIVE_BYTES_MAX_WINDOW_GROWTH = 32 * 1024 * 1024
+LIVE_BYTES_SLOPE_LIMIT_PER_EPOCH = 4 * 1024 * 1024
+PEAK_BYTES_GROWTH_LIMIT = 64 * 1024 * 1024
 POOL_BYTES_GROWTH_TOLERANCE = 0
 MAXIMUM_PROCESS_VRAM_FRACTION = 0.80
 MINIMUM_GPU_FREE_MIB = 1024.0
+EXPECTED_MEMORY_SAMPLE_PHASES = (
+    "before_environment",
+    "after_environment_create",
+    "after_initial_compile_and_warmup",
+    "after_health_preflight",
+    "after_reset_heavy_preflight",
+    "before_allocator_stabilization",
+    "allocator_stabilized_E0",
+    "post_stabilization_E1",
+    "post_stabilization_E2",
+    "post_stabilization_E3",
+    "after_fixed_baseline",
+)
 DEFAULT_MANIFEST = Path("controller_learning/assets/tracks/v0.1/train.json")
 DEFAULT_CACHE = Path(".track-cache/v0.1/train_pool.npz")
 DEFAULT_ADMISSION_REPORT = Path("benchmarks/v0.1/m5_track_admission_report.json")
@@ -1164,6 +1182,17 @@ def _number(value: Any) -> float | None:
     return converted if math.isfinite(converted) else None
 
 
+def _linear_slope(values: Sequence[float]) -> float:
+    mean_x = (len(values) - 1) / 2.0
+    mean_y = sum(values) / len(values)
+    denominator = sum((index - mean_x) ** 2 for index in range(len(values)))
+    return (
+        sum((index - mean_x) * (value - mean_y) for index, value in enumerate(values)) / denominator
+        if denominator
+        else 0.0
+    )
+
+
 def _series_delta_evidence(
     samples: Mapping[str, Mapping[str, Any]],
     phases: Sequence[str],
@@ -1181,9 +1210,11 @@ def _series_delta_evidence(
             "cumulative_deltas_from_baseline": [],
             "max_growth_from_baseline": None,
             "end_growth_from_baseline": None,
-            "max_window_growth": None,
+            "max_positive_window_growth": None,
             "monotonic_non_decreasing_with_positive_growth": None,
             "linear_slope_per_epoch": None,
+            "measurement_end_growth_from_E1": None,
+            "measurement_linear_slope_per_epoch": None,
         }
 
     numeric = [float(value) for value in values if value is not None]
@@ -1207,15 +1238,6 @@ def _series_delta_evidence(
     ]
     cumulative_values = [item["delta"] for item in cumulative]
     window_values = [item["delta"] for item in windows]
-    mean_x = (len(numeric) - 1) / 2.0
-    mean_y = sum(numeric) / len(numeric)
-    denominator = sum((index - mean_x) ** 2 for index in range(len(numeric)))
-    slope = (
-        sum((index - mean_x) * (value - mean_y) for index, value in enumerate(numeric))
-        / denominator
-        if denominator
-        else 0.0
-    )
     return {
         "available": True,
         "values": labelled,
@@ -1223,12 +1245,14 @@ def _series_delta_evidence(
         "cumulative_deltas_from_baseline": cumulative,
         "max_growth_from_baseline": max(0.0, *cumulative_values),
         "end_growth_from_baseline": numeric[-1] - numeric[0],
-        "max_window_growth": max(window_values, default=0.0),
+        "max_positive_window_growth": max(0.0, *window_values),
         "monotonic_non_decreasing_with_positive_growth": bool(
             all(delta >= 0.0 for delta in window_values)
             and any(delta > 0.0 for delta in window_values)
         ),
-        "linear_slope_per_epoch": slope,
+        "linear_slope_per_epoch": _linear_slope(numeric),
+        "measurement_end_growth_from_E1": numeric[-1] - numeric[1],
+        "measurement_linear_slope_per_epoch": _linear_slope(numeric[1:]),
     }
 
 
@@ -1286,6 +1310,9 @@ def _stabilization_memory_delta(
 def _pool_memory_report(samples: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     """Build the fixed-E0 plateau evidence without adapting its baseline."""
 
+    phases = [sample.get("phase") for sample in samples]
+    if phases != list(EXPECTED_MEMORY_SAMPLE_PHASES):
+        raise ValueError("memory samples must match the exact ordered phase protocol")
     by_phase = {str(sample["phase"]): sample for sample in samples}
     plateau_phases = (
         "allocator_stabilized_E0",
@@ -1310,10 +1337,22 @@ def _pool_memory_report(samples: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         for field in ("bytes_in_use", "pool_bytes", "peak_bytes_in_use")
     }
     process["growth_limit_mib"] = PROCESS_VRAM_GROWTH_LIMIT_MIB
+    process["slope_limit_mib_per_epoch"] = MEMORY_SLOPE_LIMIT_MIB_PER_EPOCH
     process["passed"] = bool(
         process["available"]
         and process["max_growth_from_baseline"] <= PROCESS_VRAM_GROWTH_LIMIT_MIB
         and process["end_growth_from_baseline"] <= PROCESS_VRAM_GROWTH_LIMIT_MIB
+        and process["linear_slope_per_epoch"] <= MEMORY_SLOPE_LIMIT_MIB_PER_EPOCH
+        and process["measurement_linear_slope_per_epoch"] <= MEMORY_SLOPE_LIMIT_MIB_PER_EPOCH
+    )
+    host_rss["growth_limit_mib"] = HOST_RSS_GROWTH_LIMIT_MIB
+    host_rss["slope_limit_mib_per_epoch"] = MEMORY_SLOPE_LIMIT_MIB_PER_EPOCH
+    host_rss["passed"] = bool(
+        host_rss["available"]
+        and host_rss["max_growth_from_baseline"] <= HOST_RSS_GROWTH_LIMIT_MIB
+        and host_rss["end_growth_from_baseline"] <= HOST_RSS_GROWTH_LIMIT_MIB
+        and host_rss["linear_slope_per_epoch"] <= MEMORY_SLOPE_LIMIT_MIB_PER_EPOCH
+        and host_rss["measurement_linear_slope_per_epoch"] <= MEMORY_SLOPE_LIMIT_MIB_PER_EPOCH
     )
     pool_bytes = allocator["pool_bytes"]
     pool_bytes["growth_tolerance_bytes"] = POOL_BYTES_GROWTH_TOLERANCE
@@ -1321,15 +1360,28 @@ def _pool_memory_report(samples: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         pool_bytes["available"]
         and pool_bytes["max_growth_from_baseline"] <= POOL_BYTES_GROWTH_TOLERANCE
         and pool_bytes["end_growth_from_baseline"] <= POOL_BYTES_GROWTH_TOLERANCE
-        and pool_bytes["max_window_growth"] <= POOL_BYTES_GROWTH_TOLERANCE
     )
     live_bytes = allocator["bytes_in_use"]
     live_bytes["growth_limit_bytes"] = LIVE_BYTES_GROWTH_LIMIT
+    live_bytes["max_window_growth_limit_bytes"] = LIVE_BYTES_MAX_WINDOW_GROWTH
+    live_bytes["slope_limit_bytes_per_epoch"] = LIVE_BYTES_SLOPE_LIMIT_PER_EPOCH
     live_bytes["passed"] = bool(
         live_bytes["available"]
         and live_bytes["max_growth_from_baseline"] <= LIVE_BYTES_GROWTH_LIMIT
         and live_bytes["end_growth_from_baseline"] <= LIVE_BYTES_GROWTH_LIMIT
-        and live_bytes["monotonic_non_decreasing_with_positive_growth"] is False
+        and live_bytes["measurement_end_growth_from_E1"] <= LIVE_BYTES_GROWTH_LIMIT
+        and live_bytes["max_positive_window_growth"] <= LIVE_BYTES_MAX_WINDOW_GROWTH
+        and live_bytes["linear_slope_per_epoch"] <= LIVE_BYTES_SLOPE_LIMIT_PER_EPOCH
+        and live_bytes["measurement_linear_slope_per_epoch"] <= LIVE_BYTES_SLOPE_LIMIT_PER_EPOCH
+    )
+    peak_bytes = allocator["peak_bytes_in_use"]
+    peak_bytes["growth_limit_bytes"] = PEAK_BYTES_GROWTH_LIMIT
+    peak_bytes["max_window_growth_limit_bytes"] = PEAK_BYTES_GROWTH_LIMIT
+    peak_bytes["passed"] = bool(
+        peak_bytes["available"]
+        and peak_bytes["max_growth_from_baseline"] <= PEAK_BYTES_GROWTH_LIMIT
+        and peak_bytes["end_growth_from_baseline"] <= PEAK_BYTES_GROWTH_LIMIT
+        and peak_bytes["max_positive_window_growth"] <= PEAK_BYTES_GROWTH_LIMIT
     )
 
     process_values = [
@@ -1367,7 +1419,7 @@ def _pool_memory_report(samples: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         "minimum_gpu_free_mib": MINIMUM_GPU_FREE_MIB,
         "fraction_criterion_passed": fraction_passed,
         "free_criterion_passed": free_passed,
-        "passed": bool(fraction_passed or free_passed),
+        "passed": bool(fraction_passed and free_passed),
     }
     initial_compiled = by_phase.get("after_initial_compile_and_warmup", {})
     stabilized = by_phase.get("allocator_stabilized_E0", {})
@@ -1395,7 +1447,8 @@ def _pool_memory_report(samples: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
             process["passed"]
             and pool_bytes["passed"]
             and live_bytes["passed"]
-            and host_rss["available"]
+            and peak_bytes["passed"]
+            and host_rss["passed"]
             and headroom["passed"]
         ),
     }
@@ -1678,10 +1731,27 @@ def evaluate_report_gates(report: Mapping[str, Any]) -> list[dict[str, Any]]:
     )
     post_stabilization = memory["post_stabilization"]
     process_plateau = post_stabilization["process_vram_mib"]
+    host_plateau = post_stabilization["host_rss_mib"]
     pool_plateau = post_stabilization["jax_allocator_bytes"]["pool_bytes"]
     live_plateau = post_stabilization["jax_allocator_bytes"]["bytes_in_use"]
+    peak_plateau = post_stabilization["jax_allocator_bytes"]["peak_bytes_in_use"]
     headroom = memory["absolute_headroom"]
-    recomputed_memory = _pool_memory_report(memory["samples"])
+    sample_phases = [sample.get("phase") for sample in memory["samples"]]
+    epoch_memory_phases = [
+        stabilization.get("memory_sample_phase"),
+        *(epoch.get("memory_sample_phase") for epoch in measurement_epochs),
+    ]
+    expected_epoch_memory_phases = [
+        "allocator_stabilized_E0",
+        *(f"post_stabilization_{label}" for label, _ in MEASUREMENT_EPOCHS),
+    ]
+    memory_phase_protocol_passed = bool(
+        sample_phases == list(EXPECTED_MEMORY_SAMPLE_PHASES)
+        and epoch_memory_phases == expected_epoch_memory_phases
+    )
+    recomputed_memory = (
+        _pool_memory_report(memory["samples"]) if memory_phase_protocol_passed else None
+    )
     peak_process_fraction = _number(headroom["peak_process_vram_fraction"])
     minimum_sampled_gpu_free = _number(headroom["minimum_sampled_gpu_free_mib"])
     fraction_criterion = bool(
@@ -2132,9 +2202,17 @@ def evaluate_report_gates(report: Mapping[str, Any]) -> list[dict[str, Any]]:
         ),
         _check(
             "memory.raw_sample_binding",
-            memory == recomputed_memory,
-            memory == recomputed_memory,
-            True,
+            memory_phase_protocol_passed and memory == recomputed_memory,
+            {
+                "sample_phases": sample_phases,
+                "epoch_memory_phases": epoch_memory_phases,
+                "summary_matches_samples": memory == recomputed_memory,
+            },
+            {
+                "sample_phases": list(EXPECTED_MEMORY_SAMPLE_PHASES),
+                "epoch_memory_phases": expected_epoch_memory_phases,
+                "summary_matches_samples": True,
+            },
         ),
         _check(
             "memory.steady_growth",
@@ -2144,7 +2222,11 @@ def evaluate_report_gates(report: Mapping[str, Any]) -> list[dict[str, Any]]:
             and process_plateau["available"] is True
             and process_plateau["max_growth_from_baseline"] <= PROCESS_VRAM_GROWTH_LIMIT_MIB
             and process_plateau["end_growth_from_baseline"] <= PROCESS_VRAM_GROWTH_LIMIT_MIB
+            and process_plateau["linear_slope_per_epoch"] <= MEMORY_SLOPE_LIMIT_MIB_PER_EPOCH
+            and process_plateau["measurement_linear_slope_per_epoch"]
+            <= MEMORY_SLOPE_LIMIT_MIB_PER_EPOCH
             and process_plateau["growth_limit_mib"] == PROCESS_VRAM_GROWTH_LIMIT_MIB
+            and process_plateau["slope_limit_mib_per_epoch"] == MEMORY_SLOPE_LIMIT_MIB_PER_EPOCH
             and process_plateau["passed"] is True
             and memory["formal_comparison"]
             == "fixed E0 baseline through distinct-seed E1-E3 epochs",
@@ -2153,35 +2235,60 @@ def evaluate_report_gates(report: Mapping[str, Any]) -> list[dict[str, Any]]:
                 "process_vram_mib": process_plateau,
                 "formal_comparison": memory["formal_comparison"],
             },
-            "fixed E0, cumulative max/end process growth <=64 MiB through E3",
+            "fixed E0, max/end <=64 MiB and fitted slopes <=4 MiB/epoch",
         ),
         _check(
             "memory.allocator_pool_plateau",
             pool_plateau["available"] is True
             and pool_plateau["max_growth_from_baseline"] <= POOL_BYTES_GROWTH_TOLERANCE
             and pool_plateau["end_growth_from_baseline"] <= POOL_BYTES_GROWTH_TOLERANCE
-            and pool_plateau["max_window_growth"] <= POOL_BYTES_GROWTH_TOLERANCE
             and pool_plateau["growth_tolerance_bytes"] == POOL_BYTES_GROWTH_TOLERANCE
             and pool_plateau["passed"] is True,
             pool_plateau,
-            "no cumulative or per-window pool_bytes growth after E0",
+            "no max/end pool_bytes growth above fixed E0",
         ),
         _check(
             "memory.live_bytes_plateau",
             live_plateau["available"] is True
             and live_plateau["max_growth_from_baseline"] <= LIVE_BYTES_GROWTH_LIMIT
             and live_plateau["end_growth_from_baseline"] <= LIVE_BYTES_GROWTH_LIMIT
-            and live_plateau["monotonic_non_decreasing_with_positive_growth"] is False
+            and live_plateau["measurement_end_growth_from_E1"] <= LIVE_BYTES_GROWTH_LIMIT
+            and live_plateau["max_positive_window_growth"] <= LIVE_BYTES_MAX_WINDOW_GROWTH
+            and live_plateau["linear_slope_per_epoch"] <= LIVE_BYTES_SLOPE_LIMIT_PER_EPOCH
+            and live_plateau["measurement_linear_slope_per_epoch"]
+            <= LIVE_BYTES_SLOPE_LIMIT_PER_EPOCH
             and live_plateau["growth_limit_bytes"] == LIVE_BYTES_GROWTH_LIMIT
+            and live_plateau["max_window_growth_limit_bytes"] == LIVE_BYTES_MAX_WINDOW_GROWTH
+            and live_plateau["slope_limit_bytes_per_epoch"] == LIVE_BYTES_SLOPE_LIMIT_PER_EPOCH
             and live_plateau["passed"] is True,
             live_plateau,
-            "cumulative max/end <=32 MiB and no monotonic non-decreasing growth",
+            "max/end/E1-E3/window <=32 MiB and fitted slopes <=4 MiB/epoch",
         ),
         _check(
-            "memory.host_rss_observed",
-            memory["post_stabilization"]["host_rss_mib"]["available"] is True,
-            memory["post_stabilization"]["host_rss_mib"],
-            "current host RSS present at E0-E3 boundaries",
+            "memory.allocator_peak_plateau",
+            peak_plateau["available"] is True
+            and peak_plateau["max_growth_from_baseline"] <= PEAK_BYTES_GROWTH_LIMIT
+            and peak_plateau["end_growth_from_baseline"] <= PEAK_BYTES_GROWTH_LIMIT
+            and peak_plateau["max_positive_window_growth"] <= PEAK_BYTES_GROWTH_LIMIT
+            and peak_plateau["growth_limit_bytes"] == PEAK_BYTES_GROWTH_LIMIT
+            and peak_plateau["max_window_growth_limit_bytes"] == PEAK_BYTES_GROWTH_LIMIT
+            and peak_plateau["passed"] is True,
+            peak_plateau,
+            "max/end/window peak_bytes_in_use growth <=64 MiB",
+        ),
+        _check(
+            "memory.host_rss_plateau",
+            host_plateau["available"] is True
+            and host_plateau["max_growth_from_baseline"] <= HOST_RSS_GROWTH_LIMIT_MIB
+            and host_plateau["end_growth_from_baseline"] <= HOST_RSS_GROWTH_LIMIT_MIB
+            and host_plateau["linear_slope_per_epoch"] <= MEMORY_SLOPE_LIMIT_MIB_PER_EPOCH
+            and host_plateau["measurement_linear_slope_per_epoch"]
+            <= MEMORY_SLOPE_LIMIT_MIB_PER_EPOCH
+            and host_plateau["growth_limit_mib"] == HOST_RSS_GROWTH_LIMIT_MIB
+            and host_plateau["slope_limit_mib_per_epoch"] == MEMORY_SLOPE_LIMIT_MIB_PER_EPOCH
+            and host_plateau["passed"] is True,
+            host_plateau,
+            "host RSS max/end <=64 MiB and fitted slopes <=4 MiB/epoch",
         ),
         _check(
             "memory.absolute_headroom",
@@ -2190,10 +2297,10 @@ def evaluate_report_gates(report: Mapping[str, Any]) -> list[dict[str, Any]]:
             and headroom["fraction_criterion_passed"] == fraction_criterion
             and headroom["free_criterion_passed"] == free_criterion
             and headroom["passed"]
-            == (headroom["fraction_criterion_passed"] or headroom["free_criterion_passed"])
+            == (headroom["fraction_criterion_passed"] and headroom["free_criterion_passed"])
             and headroom["passed"] is True,
             headroom,
-            "peak process VRAM <=80% of total GPU VRAM or sampled free VRAM >=1 GiB",
+            "peak process VRAM <=80% of total GPU VRAM and sampled free VRAM >=1 GiB",
         ),
         _check(
             "source.revision_stable",

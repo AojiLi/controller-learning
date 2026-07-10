@@ -54,6 +54,7 @@ def _passing_report() -> dict:
             "environment_steps_per_second": 166.6,
             "transitions_per_second": 170_000.0,
             "reset_seed": seed,
+            "memory_sample_phase": f"post_stabilization_{label}",
             "per_step_host_synchronization": False,
             "full_final_tree_synchronized": True,
             "effects_barrier_before_memory_sample": True,
@@ -166,6 +167,7 @@ def _passing_report() -> dict:
             "environment_steps_per_second": 166.6,
             "transitions_per_second": 170_000.0,
             "reset_seed": benchmark.ALLOCATOR_STABILIZATION_SEED,
+            "memory_sample_phase": "allocator_stabilized_E0",
             "per_step_host_synchronization": False,
             "full_final_tree_synchronized": True,
             "effects_barrier_before_memory_sample": True,
@@ -282,12 +284,22 @@ def _memory_sample(
 
 def _plateau_samples() -> list[dict]:
     return [
+        _memory_sample("before_environment", 190.0, 700.0, 0.1, 2.0, 0.1),
+        _memory_sample("after_environment_create", 734.0, 900.0, 382.6, 538.97, 382.6),
         _memory_sample("after_initial_compile_and_warmup", 802.0, 1_000.0, 450.6, 538.97, 536.23),
+        _memory_sample("after_health_preflight", 802.0, 1_010.0, 451.0, 538.97, 536.23),
+        _memory_sample("after_reset_heavy_preflight", 802.0, 1_011.0, 451.0, 538.97, 536.23),
+        _memory_sample("before_allocator_stabilization", 802.0, 1_010.0, 450.6, 538.97, 536.23),
         _memory_sample("allocator_stabilized_E0", 1_326.0, 1_100.0, 480.0, 1_075.84, 621.83),
         _memory_sample("post_stabilization_E1", 1_326.0, 1_101.0, 481.0, 1_075.84, 622.0),
         _memory_sample("post_stabilization_E2", 1_326.0, 1_100.5, 479.0, 1_075.84, 622.0),
         _memory_sample("post_stabilization_E3", 1_326.0, 1_101.5, 480.0, 1_075.84, 622.5),
+        _memory_sample("after_fixed_baseline", 1_000.0, 1_050.0, 470.0, 1_075.84, 622.5),
     ]
+
+
+def _phase(samples: list[dict], name: str) -> dict:
+    return next(sample for sample in samples if sample["phase"] == name)
 
 
 def test_cli_defaults_lock_formal_manifest_cache_and_protocol() -> None:
@@ -340,14 +352,15 @@ def test_memory_report_separates_one_time_expansion_from_fixed_E0_plateau() -> N
     assert plateau["process_vram_mib"]["passed"] is True
     assert plateau["jax_allocator_bytes"]["pool_bytes"]["passed"] is True
     assert plateau["jax_allocator_bytes"]["bytes_in_use"]["passed"] is True
-    assert plateau["host_rss_mib"]["available"] is True
+    assert plateau["jax_allocator_bytes"]["peak_bytes_in_use"]["passed"] is True
+    assert plateau["host_rss_mib"]["passed"] is True
     assert report["absolute_headroom"]["passed"] is True
     assert report["passed"] is True
 
 
 def test_memory_report_rejects_cumulative_growth_pool_growth_and_live_trend() -> None:
     process_growth = _plateau_samples()
-    process_growth[-1]["process_vram_mib"] += 65.0
+    _phase(process_growth, "post_stabilization_E3")["process_vram_mib"] += 65.0
     assert (
         benchmark._pool_memory_report(process_growth)["post_stabilization"]["process_vram_mib"][
             "passed"
@@ -356,7 +369,7 @@ def test_memory_report_rejects_cumulative_growth_pool_growth_and_live_trend() ->
     )
 
     pool_growth = _plateau_samples()
-    pool_growth[3]["jax_allocator"]["pool_bytes"] += 1.0
+    _phase(pool_growth, "post_stabilization_E2")["jax_allocator"]["pool_bytes"] += 1.0
     assert (
         benchmark._pool_memory_report(pool_growth)["post_stabilization"]["jax_allocator_bytes"][
             "pool_bytes"
@@ -364,20 +377,100 @@ def test_memory_report_rejects_cumulative_growth_pool_growth_and_live_trend() ->
         is False
     )
 
-    monotonic_live_growth = _plateau_samples()
-    for index, sample in enumerate(monotonic_live_growth[1:]):
-        sample["jax_allocator"]["bytes_in_use"] = (480.0 + index) * 1024.0 * 1024.0
-    live = benchmark._pool_memory_report(monotonic_live_growth)["post_stabilization"][
+    noisy_live_growth = _plateau_samples()
+    for phase, live_mib in (
+        ("allocator_stabilized_E0", 500.0),
+        ("post_stabilization_E1", 480.0),
+        ("post_stabilization_E2", 474.0),
+        ("post_stabilization_E3", 494.0),
+    ):
+        _phase(noisy_live_growth, phase)["jax_allocator"]["bytes_in_use"] = (
+            live_mib * 1024.0 * 1024.0
+        )
+    live = benchmark._pool_memory_report(noisy_live_growth)["post_stabilization"][
         "jax_allocator_bytes"
     ]["bytes_in_use"]
     assert live["max_growth_from_baseline"] < benchmark.LIVE_BYTES_GROWTH_LIMIT
-    assert live["monotonic_non_decreasing_with_positive_growth"] is True
+    assert live["max_positive_window_growth"] < benchmark.LIVE_BYTES_MAX_WINDOW_GROWTH
+    assert live["measurement_linear_slope_per_epoch"] > (benchmark.LIVE_BYTES_SLOPE_LIMIT_PER_EPOCH)
     assert live["passed"] is False
 
-    low_headroom = _plateau_samples()
-    for sample in low_headroom:
-        sample["selected_gpu_memory_mib"].update(total_mib=1_500.0, free_mib=100.0)
-    assert benchmark._pool_memory_report(low_headroom)["absolute_headroom"]["passed"] is False
+    pool_rebound = _plateau_samples()
+    for phase, pool_mib in (
+        ("allocator_stabilized_E0", 1_075.84),
+        ("post_stabilization_E1", 1_070.0),
+        ("post_stabilization_E2", 1_072.0),
+        ("post_stabilization_E3", 1_072.0),
+    ):
+        _phase(pool_rebound, phase)["jax_allocator"]["pool_bytes"] = pool_mib * 1024.0 * 1024.0
+    assert (
+        benchmark._pool_memory_report(pool_rebound)["post_stabilization"]["jax_allocator_bytes"][
+            "pool_bytes"
+        ]["passed"]
+        is True
+    )
+
+    tiny_live_noise = _plateau_samples()
+    baseline_bytes = _phase(tiny_live_noise, "allocator_stabilized_E0")["jax_allocator"][
+        "bytes_in_use"
+    ]
+    for index, phase in enumerate(
+        ("post_stabilization_E1", "post_stabilization_E2", "post_stabilization_E3"),
+        start=1,
+    ):
+        _phase(tiny_live_noise, phase)["jax_allocator"]["bytes_in_use"] = (
+            baseline_bytes + index * 3 * 1024
+        )
+    assert (
+        benchmark._pool_memory_report(tiny_live_noise)["post_stabilization"]["jax_allocator_bytes"][
+            "bytes_in_use"
+        ]["passed"]
+        is True
+    )
+
+
+def test_memory_report_rejects_gpu_rss_trends_peak_growth_and_or_headroom() -> None:
+    for field, gate in (("process_vram_mib", "process_vram_mib"), ("host_rss_mib", "host_rss_mib")):
+        samples = _plateau_samples()
+        baseline = _phase(samples, "allocator_stabilized_E0")[field]
+        for index, phase in enumerate(
+            ("post_stabilization_E1", "post_stabilization_E2", "post_stabilization_E3"),
+            start=1,
+        ):
+            _phase(samples, phase)[field] = baseline + 5.0 * index
+        evidence = benchmark._pool_memory_report(samples)["post_stabilization"][gate]
+        assert evidence["max_growth_from_baseline"] < 64.0
+        assert evidence["linear_slope_per_epoch"] > benchmark.MEMORY_SLOPE_LIMIT_MIB_PER_EPOCH
+        assert evidence["passed"] is False
+
+    peak_growth = _plateau_samples()
+    _phase(peak_growth, "post_stabilization_E3")["jax_allocator"]["peak_bytes_in_use"] += (
+        65.0 * 1024.0 * 1024.0
+    )
+    assert (
+        benchmark._pool_memory_report(peak_growth)["post_stabilization"]["jax_allocator_bytes"][
+            "peak_bytes_in_use"
+        ]["passed"]
+        is False
+    )
+
+    one_headroom_condition = _plateau_samples()
+    for sample in one_headroom_condition:
+        sample["selected_gpu_memory_mib"].update(total_mib=2_000.0, free_mib=100.0)
+    headroom = benchmark._pool_memory_report(one_headroom_condition)["absolute_headroom"]
+    assert headroom["fraction_criterion_passed"] is True
+    assert headroom["free_criterion_passed"] is False
+    assert headroom["passed"] is False
+
+
+def test_report_validator_rejects_duplicate_memory_phase_before_recomputation() -> None:
+    report = _passing_report()
+    report["memory"]["samples"].insert(7, copy.deepcopy(report["memory"]["samples"][6]))
+
+    gate = _gate(report, "memory.raw_sample_binding")
+
+    assert gate["passed"] is False
+    assert gate["observed"]["summary_matches_samples"] is False
 
 
 def test_expected_track_ids_use_host_domain2_and_advanced_episode_counters() -> None:
@@ -525,6 +618,12 @@ def test_expected_track_ids_use_host_domain2_and_advanced_episode_counters() -> 
             lambda report: report["memory"].update(steady_process_vram_growth_mib=999.0),
         ),
         (
+            "memory.raw_sample_binding",
+            lambda report: report["measurement_epochs"][1].update(
+                memory_sample_phase="post_stabilization_E1"
+            ),
+        ),
+        (
             "memory.steady_growth",
             lambda report: report["memory"]["post_stabilization"]["process_vram_mib"].update(
                 max_growth_from_baseline=65.0
@@ -534,18 +633,26 @@ def test_expected_track_ids_use_host_domain2_and_advanced_episode_counters() -> 
             "memory.allocator_pool_plateau",
             lambda report: report["memory"]["post_stabilization"]["jax_allocator_bytes"][
                 "pool_bytes"
-            ].update(max_window_growth=1.0),
+            ].update(max_growth_from_baseline=1.0),
         ),
         (
             "memory.live_bytes_plateau",
             lambda report: report["memory"]["post_stabilization"]["jax_allocator_bytes"][
                 "bytes_in_use"
-            ].update(monotonic_non_decreasing_with_positive_growth=True),
+            ].update(
+                measurement_linear_slope_per_epoch=benchmark.LIVE_BYTES_SLOPE_LIMIT_PER_EPOCH + 1
+            ),
         ),
         (
-            "memory.host_rss_observed",
+            "memory.allocator_peak_plateau",
+            lambda report: report["memory"]["post_stabilization"]["jax_allocator_bytes"][
+                "peak_bytes_in_use"
+            ].update(max_growth_from_baseline=benchmark.PEAK_BYTES_GROWTH_LIMIT + 1),
+        ),
+        (
+            "memory.host_rss_plateau",
             lambda report: report["memory"]["post_stabilization"]["host_rss_mib"].update(
-                available=False
+                linear_slope_per_epoch=benchmark.MEMORY_SLOPE_LIMIT_MIB_PER_EPOCH + 1.0
             ),
         ),
         (
