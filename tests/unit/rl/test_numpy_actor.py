@@ -82,7 +82,9 @@ def test_numpy_actor_is_owned_immutable_batched_and_seed_reproducible() -> None:
 
     single = actor.deterministic(observations[0])
     assert single.action.shape == single.pre_tanh.shape == (NUMPY_ACTOR_ACTION_DIM,)
-    np.testing.assert_allclose(single.action, result.action[0], rtol=2.0e-7, atol=2.0e-8)
+    # BLAS implementations may choose different reduction kernels for vector and matrix inputs.
+    # Keep the shape contract strict while allowing only a handful of float32 rounding steps.
+    np.testing.assert_array_max_ulp(single.action, result.action[0], maxulp=8)
 
 
 def test_numpy_actor_rejects_wrong_shapes_dtypes_bounds_and_observations() -> None:
