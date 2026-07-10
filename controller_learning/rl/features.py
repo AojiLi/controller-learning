@@ -42,7 +42,11 @@ LOCAL_TRACK_FEATURE_DIM = 100
 _MIN_CAPACITY = 4
 _CLOSURE_ATOL_M = 0.0
 _LENGTH_ATOL_M = 1.0e-4
-_LENGTH_RTOL = 3.0e-5
+# The public length is accumulated by the batched float32 Track pipeline, while the defensive
+# single-world check below deliberately recomputes in float64.  A 5e-5 relative tolerance covers
+# the measured worst official Train discrepancy (3.204019e-5) and the wider Train seed-namespace
+# audit (3.746095e-5) without accepting a geometry-scale mismatch.
+_LENGTH_RTOL = 5.0e-5
 
 
 def _positive_integer(value: object, *, name: str, minimum: int = 1) -> int:

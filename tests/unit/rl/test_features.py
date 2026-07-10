@@ -12,6 +12,7 @@ import pytest
 from gymnasium.vector import AutoresetMode
 
 from controller_learning.config import load_project_config
+from controller_learning.envs.car_racing import CarRacingEnv
 from controller_learning.envs.observation import OBSERVATION_KEYS
 from controller_learning.envs.vector_racing import VecCarRacingEnv
 from controller_learning.rl.configuration import PpoObservationConfig
@@ -257,6 +258,29 @@ def test_numpy_and_jax_encoders_have_close_batched_parity() -> None:
     assert actual.dtype == np.float32
     assert np.isfinite(actual).all()
     np.testing.assert_allclose(actual, expected, rtol=2.0e-6, atol=2.0e-6)
+
+
+@pytest.mark.parametrize("track_seed", [3317, 8297])
+def test_numpy_encoder_accepts_measured_official_train_length_rounding(track_seed: int) -> None:
+    project = load_project_config(PROJECT_ROOT)
+    track = pack_track(
+        generate_track_candidate(track_seed, generation_spec_from_project(project)),
+        track_capacity_from_project(project),
+    )
+    env = CarRacingEnv(
+        project_config=project,
+        level_id=1,
+        track=track,
+        backend="cpu_reference",
+    )
+    try:
+        observation, _info = env.reset(seed=track_seed)
+        features = _numpy_features(observation)
+    finally:
+        env.close()
+
+    assert features.shape == (LOCAL_TRACK_FEATURE_DIM,)
+    assert np.isfinite(features).all()
 
 
 def test_wrapper_runs_compiled_encoder_on_cpu_reference_environment() -> None:

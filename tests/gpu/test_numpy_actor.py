@@ -79,6 +79,7 @@ def test_converted_numpy_actor_matches_cuda_deterministic_policy_and_round_trip(
         rtol=1.0e-5,
         atol=2.0e-6,
     )
+    assert np.max(np.abs(actual.action - expected.action.cpu().numpy())) <= 1.0e-5
     artifact_path = tmp_path / "actor.npz"
     evidence = numpy_actor.save_numpy_actor_npz(actor, artifact_path)
     loaded = numpy_actor.load_numpy_actor_npz(
