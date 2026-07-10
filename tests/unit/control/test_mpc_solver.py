@@ -53,6 +53,7 @@ def _solver():
         limits=limits,
         weights=parameters.weights,
         options=replace(parameters.solver, maximum_wall_time_s=1.0),
+        feedback=parameters.feedback,
     )
     return solver_module, solver
 
@@ -74,6 +75,32 @@ def _request(
         target_speed_mps=np.full(steps + 1, target_speed_mps, dtype=np.float64),
         effective_half_width_m=np.full(steps + 1, 2.35, dtype=np.float64),
         previous_action=np.asarray((previous_steering_rad, 0.0), dtype=np.float64),
+    )
+
+
+class _SolverOutcome:
+    def __init__(self, decision, constraint, *, status: str, success: bool) -> None:
+        self._decision = np.array(decision, copy=True)
+        self._constraint = np.array(constraint, copy=True)
+        self._status = status
+        self._success = success
+
+    def __call__(self, **_kwargs):
+        return {"x": self._decision, "g": self._constraint}
+
+    def stats(self):
+        return {"return_status": self._status, "success": self._success}
+
+
+def _feasible_raw_solution(solver, request):
+    states, controls = solver._cold_start(request)
+    return solver._solver(
+        x0=solver._flatten_guess(states, controls),
+        p=solver._parameters(request),
+        lbx=solver._lower_variables,
+        ubx=solver._upper_variables,
+        lbg=solver._lower_constraints,
+        ubg=solver._upper_constraints,
     )
 
 
@@ -107,6 +134,57 @@ def test_tiny_straight_problem_returns_one_finite_feasible_plan() -> None:
     assert result.controls is not None and result.controls.shape == (20, 2)
     assert np.isfinite(result.states).all()
     assert np.isfinite(result.controls).all()
+
+
+def test_bounded_iteration_primal_is_accepted_only_after_feasibility_check() -> None:
+    solver_module, solver = _solver()
+
+    result = solver.solve(_request(solver_module))
+
+    assert result.status == "Maximum_Iterations_Exceeded"
+    assert result.success is True
+    assert result.feasible is True
+    assert result.timed_out is False
+    assert result.maximum_violation <= solver.options.feasibility_tolerance
+
+
+def test_iteration_limited_primal_is_rejected_when_a_hard_bound_is_violated() -> None:
+    solver_module, solver = _solver()
+    request = _request(solver_module)
+    raw = _feasible_raw_solution(solver, request)
+    decision = np.asarray(raw["x"], dtype=np.float64).reshape(-1)
+    decision[2] = -2.0 * solver.options.feasibility_tolerance
+    solver._solver = _SolverOutcome(
+        decision,
+        raw["g"],
+        status="Maximum_Iterations_Exceeded",
+        success=False,
+    )
+
+    result = solver.solve(request)
+
+    assert result.status == "Maximum_Iterations_Exceeded"
+    assert result.success is False
+    assert result.feasible is False
+    assert result.maximum_violation > solver.options.feasibility_tolerance
+
+
+def test_feasible_wall_time_primal_is_not_accepted_for_the_current_action() -> None:
+    solver_module, solver = _solver()
+    request = _request(solver_module)
+    raw = _feasible_raw_solution(solver, request)
+    solver._solver = _SolverOutcome(
+        raw["x"],
+        raw["g"],
+        status="Maximum_WallTime_Exceeded",
+        success=False,
+    )
+
+    result = solver.solve(request)
+
+    assert result.feasible is True
+    assert result.timed_out is True
+    assert result.success is False
 
 
 def test_constant_curve_solution_respects_track_action_speed_and_rate_constraints() -> None:
@@ -158,6 +236,35 @@ def test_second_solve_uses_shifted_primal_without_rebuilding_the_graph() -> None
     assert second.success is True, second.status
     assert second.used_warm_start is True
     assert solver.build_count == 1
+
+
+def test_warm_start_is_rerolled_from_the_new_measured_state() -> None:
+    solver_module, solver = _solver()
+    first = solver.solve(_request(solver_module))
+    assert first.success is True
+    next_request = _request(
+        solver_module,
+        lateral_error_m=-0.12,
+        heading_error_rad=0.06,
+        speed_mps=solver.limits.maximum_speed_mps,
+        curvature_1pm=0.015,
+        target_speed_mps=solver.limits.maximum_speed_mps,
+        previous_steering_rad=0.04,
+    )
+
+    states, controls, used_warm_start = solver._initial_guess(next_request)
+
+    assert used_warm_start is True
+    np.testing.assert_array_equal(states[:, 0], next_request.initial_state)
+    assert np.all(states[2] >= 0.0)
+    assert np.all(states[2] <= solver.limits.maximum_speed_mps)
+    for index in range(solver.steps):
+        expected = solver._integrate_numeric(
+            states[:, index],
+            controls[index],
+            float(next_request.curvature_1pm[index]),
+        )
+        np.testing.assert_allclose(states[:, index + 1], expected, atol=1.0e-12, rtol=0.0)
 
 
 def test_request_rejects_shapes_or_targets_outside_public_speed_bounds() -> None:

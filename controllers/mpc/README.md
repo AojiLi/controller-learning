@@ -11,10 +11,13 @@ The 20-step horizon covers one second at the public 20 Hz control rate.
 
 CasADi constructs one fixed nonlinear program per episode and IPOPT solves it with new numerical
 parameters at every control step. RK4 dynamics and hard speed, action, steering-rate, and future
-Track-boundary constraints are enforced. A successful primal solution is shifted to warm-start the
-next call. If IPOPT fails or reaches its wall-time limit, the Controller first consumes the
-remaining controls from the last feasible plan, then uses a deterministic curvature-feedforward
-feedback action derived from the same public geometry.
+Track-boundary constraints are enforced. IPOPT is capped at three iterations; an iteration-limited
+primal is used only after an independent hard-constraint check. This is bounded-iteration NMPC, not
+an SQP real-time-iteration claim. An accepted primal is shifted to warm-start the next call. If
+IPOPT fails or reaches its wall-time limit, the Controller first consumes the remaining controls
+from the last feasible plan, then uses deterministic curvature-feedforward feedback derived from
+the same public geometry. The same `[feedback]` gains define that fallback, the initial guesses,
+and the stabilizing steering reference in the objective.
 
 `DebugDraw` shows the sampled centerline reference and the most recent predicted path. Headless
 evaluation does not invoke rendering. The included values are one Controller-wide configuration;

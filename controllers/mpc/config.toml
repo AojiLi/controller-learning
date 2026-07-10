@@ -7,7 +7,7 @@ steps = 20
 
 [planning]
 minimum_speed_mps = 2.5
-maximum_speed_mps = 5.0
+maximum_speed_mps = 4.3
 maximum_lateral_acceleration_mps2 = 1.5
 braking_deceleration_mps2 = 3.0
 speed_preview_distance_m = 40.0
@@ -20,7 +20,7 @@ projection_forward_segments = 32
 lateral_error = 40.0
 heading_error = 15.0
 speed_error = 2.0
-steering_feedforward = 0.5
+steering_reference = 100.0
 acceleration = 0.04
 steering_change = 6.0
 acceleration_change = 0.02
@@ -29,14 +29,14 @@ terminal_heading_error = 30.0
 terminal_speed_error = 4.0
 
 [solver]
-maximum_iterations = 60
+maximum_iterations = 3
 tolerance = 0.00001
 acceptable_tolerance = 0.0001
 acceptable_iterations = 3
 maximum_wall_time_s = 0.045
 feasibility_tolerance = 0.001
 
-[fallback]
+[feedback]
 lateral_error_gain = 0.45
 heading_error_gain = 1.4
 speed_error_gain = 1.5

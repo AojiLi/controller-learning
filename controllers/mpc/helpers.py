@@ -84,7 +84,7 @@ class WeightConfig:
     lateral_error: float
     heading_error: float
     speed_error: float
-    steering_feedforward: float
+    steering_reference: float
     acceleration: float
     steering_change: float
     acceleration_change: float
@@ -106,8 +106,8 @@ class SolverConfig:
 
 
 @dataclass(frozen=True, slots=True)
-class FallbackConfig:
-    """Deterministic public-geometry fallback gains."""
+class FeedbackConfig:
+    """Shared public-geometry feedback gains for references, guesses, and fallback."""
 
     lateral_error_gain: float
     heading_error_gain: float
@@ -129,7 +129,7 @@ class MpcControllerConfig:
     planning: PlanningConfig
     weights: WeightConfig
     solver: SolverConfig
-    fallback: FallbackConfig
+    feedback: FeedbackConfig
     debug: DebugConfig
 
     @classmethod
@@ -148,7 +148,7 @@ class MpcControllerConfig:
                 "planning",
                 "weights",
                 "solver",
-                "fallback",
+                "feedback",
                 "debug",
             },
             "controller",
@@ -211,7 +211,7 @@ class MpcControllerConfig:
             "lateral_error",
             "heading_error",
             "speed_error",
-            "steering_feedforward",
+            "steering_reference",
             "acceleration",
             "steering_change",
             "acceleration_change",
@@ -250,11 +250,11 @@ class MpcControllerConfig:
         if solver_config.tolerance > solver_config.acceptable_tolerance:
             raise MpcConfigurationError("solver.tolerance cannot exceed acceptable_tolerance")
 
-        fallback = _mapping(plugin["fallback"], "controller.fallback")
-        fallback_keys = {"lateral_error_gain", "heading_error_gain", "speed_error_gain"}
-        _exact_keys(fallback, fallback_keys, "controller.fallback")
-        fallback_config = FallbackConfig(
-            **{key: _number(fallback, key, "fallback") for key in fallback_keys}
+        feedback = _mapping(plugin["feedback"], "controller.feedback")
+        feedback_keys = {"lateral_error_gain", "heading_error_gain", "speed_error_gain"}
+        _exact_keys(feedback, feedback_keys, "controller.feedback")
+        feedback_config = FeedbackConfig(
+            **{key: _number(feedback, key, "feedback") for key in feedback_keys}
         )
 
         debug = _mapping(plugin["debug"], "controller.debug")
@@ -264,7 +264,7 @@ class MpcControllerConfig:
             planning=planning_config,
             weights=weight_config,
             solver=solver_config,
-            fallback=fallback_config,
+            feedback=feedback_config,
             debug=DebugConfig(
                 prediction_stride=_positive_integer(debug, "prediction_stride", "debug")
             ),
@@ -369,7 +369,7 @@ def deterministic_fallback_action(
     curvature_1pm: float,
     target_speed_mps: float,
     wheelbase_m: float,
-    config: FallbackConfig,
+    config: FeedbackConfig,
 ) -> NDArray[np.float64]:
     """Return an unconstrained kinematic feedforward/feedback fallback request."""
 
@@ -397,7 +397,7 @@ def deterministic_fallback_action(
 
 __all__ = [
     "DebugConfig",
-    "FallbackConfig",
+    "FeedbackConfig",
     "HorizonConfig",
     "HorizonReference",
     "MpcConfigurationError",

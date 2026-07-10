@@ -97,6 +97,7 @@ class MpcController(Controller):
             limits=self._limits,
             weights=self._parameters.weights,
             options=self._parameters.solver,
+            feedback=self._parameters.feedback,
         )
         self._segment_hint: int | None = None
         self._previous_acceleration_mps2 = 0.0
@@ -167,7 +168,10 @@ class MpcController(Controller):
             if controls.shape != (self._parameters.horizon.steps, 2):
                 raise RuntimeError("successful MPC result has the wrong control shape")
             self._fallback_plan = np.array(controls[1:], copy=True)
-            return self._bounded_action(controls[0], measured_steering), "mpc"
+            mode = (
+                "mpc-bounded" if result.status == "Maximum_Iterations_Exceeded" else "mpc-converged"
+            )
+            return self._bounded_action(controls[0], measured_steering), mode
 
         if self._fallback_plan.shape[0] > 0:
             requested = np.array(self._fallback_plan[0], copy=True)
@@ -181,7 +185,7 @@ class MpcController(Controller):
             curvature_1pm=float(horizon.curvature_1pm[0]),
             target_speed_mps=float(horizon.target_speed_mps[0]),
             wheelbase_m=self._limits.wheelbase_m,
-            config=self._parameters.fallback,
+            config=self._parameters.feedback,
         )
         return self._bounded_action(requested, measured_steering), "feedback-fallback"
 

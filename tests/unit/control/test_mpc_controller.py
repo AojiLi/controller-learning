@@ -225,7 +225,7 @@ def test_debug_draw_contains_reference_prediction_and_solver_mode(monkeypatch) -
     assert len(commands) == 4
     assert sum(isinstance(command, PointsCommand) for command in commands) == 2
     text = next(command for command in commands if isinstance(command, TextCommand))
-    assert "mpc (Solve_Succeeded)" in text.text
+    assert "mpc-converged (Solve_Succeeded)" in text.text
 
 
 def test_mpc_source_does_not_import_challenge_or_simulator_internals() -> None:

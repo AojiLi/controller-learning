@@ -9,7 +9,7 @@ import casadi as ca
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
-from .helpers import SolverConfig, WeightConfig
+from .helpers import FeedbackConfig, SolverConfig, WeightConfig
 
 STATE_COUNT = 3
 CONTROL_COUNT = 2
@@ -69,7 +69,7 @@ class MpcRequest:
 
 @dataclass(frozen=True, slots=True)
 class MpcSolveResult:
-    """One solver outcome; only successful feasible arrays are retained for control."""
+    """One solver outcome; ``success`` means the primal is safe to use for control."""
 
     success: bool
     feasible: bool
@@ -138,6 +138,7 @@ class FrenetMpcSolver:
         limits: MpcLimits,
         weights: WeightConfig,
         options: SolverConfig,
+        feedback: FeedbackConfig,
     ) -> None:
         if isinstance(steps, bool) or not isinstance(steps, int) or steps < 1:
             raise ValueError("steps must be a positive integer")
@@ -148,6 +149,7 @@ class FrenetMpcSolver:
         self.limits = limits
         self.weights = weights
         self.options = options
+        self.feedback = feedback
         self.build_count = 1
         self._last_states: NDArray[np.float64] | None = None
         self._last_controls: NDArray[np.float64] | None = None
@@ -212,12 +214,16 @@ class FrenetMpcSolver:
 
             prior_control = previous_action if index == 0 else controls[:, index - 1]
             control_change = control - prior_control
-            steering_feedforward = ca.atan(self.limits.wheelbase_m * reference_curvature)
+            steering_reference = (
+                ca.atan(self.limits.wheelbase_m * reference_curvature)
+                - self.feedback.lateral_error_gain * state[0]
+                - self.feedback.heading_error_gain * state[1]
+            )
             objective += (
                 self.weights.lateral_error * state[0] ** 2
                 + self.weights.heading_error * state[1] ** 2
                 + self.weights.speed_error * (state[2] - target_speed[index]) ** 2
-                + self.weights.steering_feedforward * (control[0] - steering_feedforward) ** 2
+                + self.weights.steering_reference * (control[0] - steering_reference) ** 2
                 + self.weights.acceleration * control[1] ** 2
                 + self.weights.steering_change * control_change[0] ** 2
                 + self.weights.acceleration_change * control_change[1] ** 2
@@ -349,9 +355,7 @@ class FrenetMpcSolver:
         second = self._dynamics_numeric(state + 0.5 * self.dt_s * first, control, curvature)
         third = self._dynamics_numeric(state + 0.5 * self.dt_s * second, control, curvature)
         fourth = self._dynamics_numeric(state + self.dt_s * third, control, curvature)
-        result = state + self.dt_s * (first + 2 * second + 2 * third + fourth) / 6.0
-        result[2] = np.clip(result[2], 0.0, self.limits.maximum_speed_mps)
-        return result
+        return state + self.dt_s * (first + 2 * second + 2 * third + fourth) / 6.0
 
     def _cold_start(self, request: MpcRequest) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
         states = np.zeros((STATE_COUNT, self.steps + 1), dtype=np.float64)
@@ -361,9 +365,13 @@ class FrenetMpcSolver:
         steering_step = self.limits.maximum_steering_rate_rad_s * self.dt_s
         for index in range(self.steps):
             feedforward = math.atan(self.limits.wheelbase_m * request.curvature_1pm[index])
+            feedback = (
+                -self.feedback.lateral_error_gain * states[0, index]
+                - self.feedback.heading_error_gain * states[1, index]
+            )
             steering = float(
                 np.clip(
-                    feedforward,
+                    feedforward + feedback,
                     previous_steering - steering_step,
                     previous_steering + steering_step,
                 )
@@ -375,11 +383,20 @@ class FrenetMpcSolver:
                     self.limits.maximum_steering_rad,
                 )
             )
+            minimum_acceleration = max(
+                -self.limits.maximum_deceleration_mps2,
+                -float(states[2, index]) / self.dt_s,
+            )
+            maximum_acceleration = min(
+                self.limits.maximum_acceleration_mps2,
+                (self.limits.maximum_speed_mps - float(states[2, index])) / self.dt_s,
+            )
             acceleration = float(
                 np.clip(
-                    request.target_speed_mps[index] - states[2, index],
-                    -self.limits.maximum_deceleration_mps2,
-                    self.limits.maximum_acceleration_mps2,
+                    self.feedback.speed_error_gain
+                    * (request.target_speed_mps[index] - states[2, index]),
+                    minimum_acceleration,
+                    maximum_acceleration,
                 )
             )
             controls[index] = (steering, acceleration)
@@ -395,12 +412,15 @@ class FrenetMpcSolver:
         if self._last_states is None or self._last_controls is None:
             states, controls = self._cold_start(request)
             return states, controls, False
-        states, controls = shift_primal_warm_start(
+        states, shifted_controls = shift_primal_warm_start(
             self._last_states,
             self._last_controls,
             request.initial_state,
         )
+        _, feedback_controls = self._cold_start(request)
+        controls = 0.25 * shifted_controls + 0.75 * feedback_controls
         steering_step = self.limits.maximum_steering_rate_rad_s * self.dt_s
+        states[:, 0] = request.initial_state
         prior = float(request.previous_action[0])
         for index in range(self.steps):
             controls[index, 0] = np.clip(
@@ -408,12 +428,23 @@ class FrenetMpcSolver:
                 max(-self.limits.maximum_steering_rad, prior - steering_step),
                 min(self.limits.maximum_steering_rad, prior + steering_step),
             )
-            controls[index, 1] = np.clip(
-                controls[index, 1],
+            minimum_acceleration = max(
                 -self.limits.maximum_deceleration_mps2,
+                -float(states[2, index]) / self.dt_s,
+            )
+            maximum_acceleration = min(
                 self.limits.maximum_acceleration_mps2,
+                (self.limits.maximum_speed_mps - float(states[2, index])) / self.dt_s,
+            )
+            controls[index, 1] = np.clip(
+                controls[index, 1], minimum_acceleration, maximum_acceleration
             )
             prior = float(controls[index, 0])
+            states[:, index + 1] = self._integrate_numeric(
+                states[:, index],
+                controls[index],
+                float(request.curvature_1pm[index]),
+            )
         return states, controls, True
 
     @staticmethod
@@ -469,7 +500,13 @@ class FrenetMpcSolver:
         return max(0.0, *violations)
 
     def solve(self, request: MpcRequest) -> MpcSolveResult:
-        """Solve once and retain only a successful independently feasible primal solution."""
+        """Solve once and independently validate any primal accepted for control.
+
+        The small iteration cap bounds each nonlinear solve. IPOPT may report
+        ``Maximum_Iterations_Exceeded`` even though its current primal satisfies every hard
+        constraint within the independent feasibility tolerance; that bounded iterate is accepted.
+        A wall-time exit is never accepted for the current action.
+        """
 
         if not isinstance(request, MpcRequest):
             raise TypeError("request must be an MpcRequest")
@@ -505,7 +542,12 @@ class FrenetMpcSolver:
         feasible = bool(finite and maximum_violation <= self.options.feasibility_tolerance)
         status = str(statistics.get("return_status", "unknown"))
         timed_out = "WallTime" in status or "CpuTime" in status
-        success = bool(statistics.get("success", False)) and feasible and not timed_out
+        iteration_limited = status == "Maximum_Iterations_Exceeded"
+        success = (
+            (bool(statistics.get("success", False)) or iteration_limited)
+            and feasible
+            and not timed_out
+        )
 
         state_values: NDArray[np.float64] | None = None
         control_values: NDArray[np.float64] | None = None
