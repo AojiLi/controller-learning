@@ -1,0 +1,25 @@
+{
+  "asset_file": "level0.npz",
+  "asset_sha256": "caf5c2396f0e6c20785b080064662414f8a489f653fd8afc34775dbf795ea73e",
+  "benchmark_version": "0.1",
+  "capacity": {
+    "max_checkpoints": 48,
+    "max_track_points": 640
+  },
+  "driveability_protocol_version": "m5-driveability-v1",
+  "generator_version": "v0.1",
+  "geometry_validation_version": "m3-geometry-v1",
+  "level_id": 0,
+  "schema_version": 1,
+  "split": "level0",
+  "track_count": 1,
+  "track_width_m": 7.0,
+  "tracks": [
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "89b206e4c4985a328056e39d5cb863016372befdd0e05aa2f62857e2506204fc",
+      "geometry_validation": "passed",
+      "seed": 4294967295
+    }
+  ]
+}

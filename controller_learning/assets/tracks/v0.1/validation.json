@@ -1,0 +1,619 @@
+{
+  "asset_file": "validation.npz",
+  "asset_sha256": "ddebf720fb532f0cc4ad854621988de9e96b9daa196b99e2271fae6e24984bbd",
+  "benchmark_version": "0.1",
+  "capacity": {
+    "max_checkpoints": 48,
+    "max_track_points": 640
+  },
+  "driveability_protocol_version": "m5-driveability-v1",
+  "generator_version": "v0.1",
+  "geometry_validation_version": "m3-geometry-v1",
+  "level_id": 1,
+  "schema_version": 1,
+  "split": "validation",
+  "track_count": 100,
+  "track_width_m": 7.0,
+  "tracks": [
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "2dca50e76f6bd16e61e1d0e909dc277ebe30dbd004522146bc5cbe7b351c83db",
+      "geometry_validation": "passed",
+      "seed": 1000000
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "780a905638ff84ae6dc24bf43a06f3392c86365f88062cbe932a42a047495d83",
+      "geometry_validation": "passed",
+      "seed": 1000001
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "4df0ac4839fc1a77e08feb3cbee30be083819585502883a1780c0db7a2a7920f",
+      "geometry_validation": "passed",
+      "seed": 1000002
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "6129e61b998f23bd4bd64b52b06bf00128178b28d12d61d7ac83935083a85554",
+      "geometry_validation": "passed",
+      "seed": 1000003
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "d851a9eca7fbb572df2862e03596b9505cf528edc35a4aebdbaa584ed1ba3605",
+      "geometry_validation": "passed",
+      "seed": 1000004
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "60338f883c470301c3acc09417678cc6da83f55816bbff44669d6b76bef81697",
+      "geometry_validation": "passed",
+      "seed": 1000006
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "4e05fffc55d2f982c0ae3c31558c54e714418f64aada0dc8057404251f0d4bec",
+      "geometry_validation": "passed",
+      "seed": 1000007
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "65a5089ea9b213974271ec540ff0382b4031ecc556ba6b87ae563af0a5a2d8ef",
+      "geometry_validation": "passed",
+      "seed": 1000008
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "f7d21c1efbc47ee3a629a749a1eb900f1ca7618824b22596c73ef09181d02032",
+      "geometry_validation": "passed",
+      "seed": 1000009
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "825e092aaedc91596776209201851d16b58c01790c159c2edcac1be26132e615",
+      "geometry_validation": "passed",
+      "seed": 1000010
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "1cc1e4eb2d70993805789b7d9ece3a17c19d71390e7584db344466a7b5cb3999",
+      "geometry_validation": "passed",
+      "seed": 1000011
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "ab40b44ea51adeb4ff28d0fcb2ce39a669c6ecd8ea612526d653d8fa82f07618",
+      "geometry_validation": "passed",
+      "seed": 1000012
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "09d5842a27ad89dbd177cb4dc658828e29a46ae95890d2a038bacebe629f7d3b",
+      "geometry_validation": "passed",
+      "seed": 1000013
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "bc021f58759623a901d573cad48e68a1b198d54a31b9efb04dbd3ea379b21581",
+      "geometry_validation": "passed",
+      "seed": 1000014
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "1c1e6376527bafccf4395ca9212ef2967ce37ef2d518e460035731d3dda61cfb",
+      "geometry_validation": "passed",
+      "seed": 1000015
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "7290cc003e3cc09edc6a642803c8e119e6c58f67f871e7968cffc521b448214d",
+      "geometry_validation": "passed",
+      "seed": 1000016
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "4f48cd6421fe122d2b94e623d0de2201ee591b1ba97289eba9a2d53f5c489b52",
+      "geometry_validation": "passed",
+      "seed": 1000018
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "ad7b87a6136bf24ab9feaa53ac0fdf9bf5479e2e841fb10dfc214b27fc758f3a",
+      "geometry_validation": "passed",
+      "seed": 1000020
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "334f467623f057b9fb4b3adce0e159b8b35b6a09b3bf8f9b8cf5b75dcea6c01c",
+      "geometry_validation": "passed",
+      "seed": 1000021
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "4ec91008010b5b775a9a3af17ec6f8931fb54c8793855720cbd8c797ffb9969d",
+      "geometry_validation": "passed",
+      "seed": 1000022
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "680cb79b84ee488e75faf744f86614f4e37aac2ee8c021d9e8871922e58dc127",
+      "geometry_validation": "passed",
+      "seed": 1000023
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "11fa6127024755b3208fbe06ac1b6c6f888f83219f66cb86d1d89e493fa992b8",
+      "geometry_validation": "passed",
+      "seed": 1000024
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "48b322fcbcceb9c21190d9123e8fff8098f4a03ae3444ca87d5a8df4a6501fb6",
+      "geometry_validation": "passed",
+      "seed": 1000025
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "291f717e892d14f1ab1007478788587937e3a91ee4b320705a47c8753cd96af0",
+      "geometry_validation": "passed",
+      "seed": 1000026
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "f66869286a3980c85082d141489106da7910244b1dc5e282eb82acffe99ead77",
+      "geometry_validation": "passed",
+      "seed": 1000027
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "23efb777c8b9b53bae3390947c11ab2cd2b0b0c67d77d10cd66cd7f42ca761ae",
+      "geometry_validation": "passed",
+      "seed": 1000028
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "08e354979b00e4f9364a14717fd53ef6f9141689e97acf6d0d3cfe01ba3c8888",
+      "geometry_validation": "passed",
+      "seed": 1000030
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "daa0a6dfb8d7b518aceaaa1d4fe20f8eafb24d0f77c531526b8ada9a94c29c38",
+      "geometry_validation": "passed",
+      "seed": 1000031
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "92431e56acb3cddace5c7ee7bbc487936dc4eed18e32aee0782f462730dddce3",
+      "geometry_validation": "passed",
+      "seed": 1000032
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "1141942597cf1d7f61be80685c3d3cce1598e19f15acf5705e0b252b84345ed1",
+      "geometry_validation": "passed",
+      "seed": 1000033
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "68b217ddafbbca50c5f4f77b91b49a2cbaa29e8d2db509e2db919d31e26715f3",
+      "geometry_validation": "passed",
+      "seed": 1000034
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "99300ffceda57facfd739506784c651d99616687414fc20bcdf7d49b5769434f",
+      "geometry_validation": "passed",
+      "seed": 1000035
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "48b1c247871b2c7fc770a3b6ed199b24ea7a2e2fa425a4b6dbf5c1d7453aa54a",
+      "geometry_validation": "passed",
+      "seed": 1000036
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "2c3d4dc2dfd0df9ba91973ecedd0db9c2813b960b64dc635fc6056c2093c88da",
+      "geometry_validation": "passed",
+      "seed": 1000037
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "d634d7d7429691ed6fbe2ac768cb2ee53f7499f1cd9f5f33e0e98ccc3d1977db",
+      "geometry_validation": "passed",
+      "seed": 1000038
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "03488074e68b4f51960f59be464d52b411921d287723378d2c8f261ba872c9c6",
+      "geometry_validation": "passed",
+      "seed": 1000039
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "20708d3efedcc1d4b3a6670e0a14d7ab102a0e1d8783517061370a57f3e8c1c2",
+      "geometry_validation": "passed",
+      "seed": 1000040
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "62ae86d285adf0dcdea127b638f28f58cb508ddddfac2b8052c10bfd85e6b3dd",
+      "geometry_validation": "passed",
+      "seed": 1000041
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "aa795602689cd1dc29b1636fe253b86f91dc3ba4bc240f7db17b6ade529a4b12",
+      "geometry_validation": "passed",
+      "seed": 1000043
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "bf38f773cdf9738ee3f92aee9541a43ce7ab06438d80a2e8679c6a79254f4163",
+      "geometry_validation": "passed",
+      "seed": 1000044
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "8943ae309f5e33ace1bb244b57f8331552b2bf9f24815819772dffd6c7185752",
+      "geometry_validation": "passed",
+      "seed": 1000045
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "b116e96d23e6c8a3f9f36d05295cadb63988662eb70fb0de3c7c96fd264880b7",
+      "geometry_validation": "passed",
+      "seed": 1000046
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "ba644172ae2fffc855846ef4b7543cc1edd8e06f73ebb35632053ea320a252bb",
+      "geometry_validation": "passed",
+      "seed": 1000047
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "5697232d074bbe16ecce5fa52a0c1b02296130a9ff46f87cbf66686d75e1fe46",
+      "geometry_validation": "passed",
+      "seed": 1000048
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "3c7239706b2ef41500d7722e9358b4280732685b930d65366af2522bd8f90b6e",
+      "geometry_validation": "passed",
+      "seed": 1000049
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "197a669cf4eeddf4a5b41d622d22ab60f1eee0c37c5e61c9c94461d696a2cecb",
+      "geometry_validation": "passed",
+      "seed": 1000050
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "7ee23219513ad729e9cb211ad03eacb8928f436f4bd10c051493a0ca2e0b73ac",
+      "geometry_validation": "passed",
+      "seed": 1000051
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "6b0387787d1bf8c9424291a0fadb56b8aac17b5638a0c4f631646f4eb105d230",
+      "geometry_validation": "passed",
+      "seed": 1000054
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "ce1613010591354f95f8424818f55a1306ad7a4b1ae3fe9b2aa522982af9fa61",
+      "geometry_validation": "passed",
+      "seed": 1000056
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "f8243faaff5c617362c89731f029a7d5ecadccbb7d296938a1ec753269f88003",
+      "geometry_validation": "passed",
+      "seed": 1000057
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "21a48dd83096b750090427acf526ce14a06302ff904c2c39523221c28ae1b0fd",
+      "geometry_validation": "passed",
+      "seed": 1000059
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "56422058799b397fd00a08be29d448357d9fcdc3722c3233c698304893f2e38a",
+      "geometry_validation": "passed",
+      "seed": 1000060
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "900098503feb72aa7bcaaf4437f9e14b9570b313ba4b7b0ed9ec4c34c6256c55",
+      "geometry_validation": "passed",
+      "seed": 1000061
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "9d1a3df8d514de4a475895fff39cda60975efaa698d050b29768e6742fe40378",
+      "geometry_validation": "passed",
+      "seed": 1000062
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "88aee4dcf9344414bfc8fb5f614c80e5fba931e93bb4fa7c7ed783d5607f3294",
+      "geometry_validation": "passed",
+      "seed": 1000063
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "e5051935a4c98d2a9ab7ed95147bd281258f91736343e001df728ff6be17de5a",
+      "geometry_validation": "passed",
+      "seed": 1000064
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "adc41aa8e90b31fe17839e120ff48796fd15a24ab7ad74e4de8e06cdec901ad0",
+      "geometry_validation": "passed",
+      "seed": 1000065
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "7a915f633360952c77155577edef74f11539aa63f3f1b8399fe6200999fe65a0",
+      "geometry_validation": "passed",
+      "seed": 1000066
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "27bb83d2f601f12d675fe12e8c8df68307267debe949dcd844d44e6201411ac3",
+      "geometry_validation": "passed",
+      "seed": 1000068
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "17767d185c917c518fc40190dcf1ad1cec7cedcdd7e980b251e2ae66d1542dcb",
+      "geometry_validation": "passed",
+      "seed": 1000069
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "c3dfe6575bbe3b7d6d1753a14e58bc5f9e84c81dd6e76477921c870f02b58c6c",
+      "geometry_validation": "passed",
+      "seed": 1000070
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "ea99b8561030c347a7be072133a1e952a1c2130f7ea1a1c3c93c5e9383b70a8f",
+      "geometry_validation": "passed",
+      "seed": 1000071
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "71e38e9a38e331609f7ecb462da9317e6cbb9faea36afea2faffa962cbe9d98b",
+      "geometry_validation": "passed",
+      "seed": 1000072
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "41df4637a4e4f315f2aaaff5689b9428448d330a67b621ae948120bae6470fe2",
+      "geometry_validation": "passed",
+      "seed": 1000073
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "02fc897e7390d54b93ba185aae8591bf8f719420cb8460398c38ef2efa49bcd3",
+      "geometry_validation": "passed",
+      "seed": 1000074
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "d5eca1df31fc35e3f31e076c83f864a81b91e8c5293325f26ee7f93f0c35ffba",
+      "geometry_validation": "passed",
+      "seed": 1000075
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "64758028f59220d70f0f7e8443a85cf938c0951ba73da2e9fecdf5484920e45d",
+      "geometry_validation": "passed",
+      "seed": 1000076
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "e51a95a60281ddfa26543d74e4d27664158252d54d25c28bd1e90bfdc5ba8ad6",
+      "geometry_validation": "passed",
+      "seed": 1000077
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "02dc18c8a9e740fc2dc1516dade2dbb70881daa4032c6676ac95e7e35b2ea2b1",
+      "geometry_validation": "passed",
+      "seed": 1000078
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "0623e784d5121b1cc7d52f3870008e6b8db1003cfa2736cdb23a910fc31435a0",
+      "geometry_validation": "passed",
+      "seed": 1000079
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "4210b7562d110a149ddf3f73c62f89734a30c2d70e978428f52a439550906379",
+      "geometry_validation": "passed",
+      "seed": 1000080
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "dd496eea2a824243fd73379b15251ed8bab32d1e5389816adf56965bc0168dd9",
+      "geometry_validation": "passed",
+      "seed": 1000081
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "056fc40179139e5dd88b10f1800398877520bb2c5867c7000b9267d30ea39d37",
+      "geometry_validation": "passed",
+      "seed": 1000083
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "e7ec1e15e9c32795707e9425095ce908597c1c139ec8c32881a49fa13812592d",
+      "geometry_validation": "passed",
+      "seed": 1000084
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "617f1e6c235a96c2a48d507e461ec3daa142e5bf6d6fe06836947f1380aef16a",
+      "geometry_validation": "passed",
+      "seed": 1000085
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "1ac6fcfe4279ec7df888b922286ca4ff27d7d7be4e1fb66b10b846bca1c58db5",
+      "geometry_validation": "passed",
+      "seed": 1000086
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "763cae30f4496ec04f731a22c8a7053de0eb21ae1bf790c250e3f6a784ea4d0a",
+      "geometry_validation": "passed",
+      "seed": 1000087
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "d378119e70440fe77369d3ce57ec836ac8ad85b2e36b2860ee8a6e6900faf83f",
+      "geometry_validation": "passed",
+      "seed": 1000088
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "6019ead5347953806e9d6da0fbc11166288a6d41174ea57b7e53a75cc4d4f847",
+      "geometry_validation": "passed",
+      "seed": 1000089
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "1d729e64e6a885fd3f3fc4cda212dae63a24445d7b685b159499be5235092161",
+      "geometry_validation": "passed",
+      "seed": 1000091
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "1c5b8d632a9d93afad65db4ba240f91df64a5420d6a9aac064ee3a8e3cbfa77a",
+      "geometry_validation": "passed",
+      "seed": 1000092
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "54618a4aae7b50a2272be5cdcb94386b1933f714881995414fc5ea4814ea7d80",
+      "geometry_validation": "passed",
+      "seed": 1000093
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "999589c1e30993561893cb4717e9b6a03b7b428b1b3e707d1711f81b805720c3",
+      "geometry_validation": "passed",
+      "seed": 1000094
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "fd30c237c60c035b55f6e461541b3f0f0019cd8dbaea9071d2516c1818d5411c",
+      "geometry_validation": "passed",
+      "seed": 1000095
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "9ecf5cd394e7d3f29d25dbb6e24c2e6d4f5bb8dc1e170088c450faa140e103ad",
+      "geometry_validation": "passed",
+      "seed": 1000096
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "5d238302be09d113ceb4aa33aef9a690fb4cf0aa2c2ba547fa29a60bd349d06b",
+      "geometry_validation": "passed",
+      "seed": 1000097
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "f1e55bcf4875e81fa6a4b08bef95ce9dbce4d6a5bbdec92a9c872d3aab18e80d",
+      "geometry_validation": "passed",
+      "seed": 1000098
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "218fb1cc557b6a285f26b38bd52944eb6809e2af10e37a2b69e453e4cceeaace",
+      "geometry_validation": "passed",
+      "seed": 1000099
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "8c5ed90dabb2632f7c6681e16d938bc7683446171817cc7d83404f5eb3bf088b",
+      "geometry_validation": "passed",
+      "seed": 1000100
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "b7c1b733a5dd01aa2bfd5bc054130b46835ac323670fa0a3dc5773ab985fdf3f",
+      "geometry_validation": "passed",
+      "seed": 1000101
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "b3085f519d0803de6a23fdc882221211ae3cd27cfc065d1f1d47f0c82e703283",
+      "geometry_validation": "passed",
+      "seed": 1000102
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "50d79ccc30ea86d396bfae41ddf13c95ba5fa14bcc49487e371f75639329e90c",
+      "geometry_validation": "passed",
+      "seed": 1000103
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "3228ea0df2868fb08202646ff608e01fceda19e25bbf6c305bbb00bd8a1ebd63",
+      "geometry_validation": "passed",
+      "seed": 1000104
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "64299fd3fdc1cbb4ebf285075d2f16196ca030cbdf93adc9830b6e398420fb56",
+      "geometry_validation": "passed",
+      "seed": 1000105
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "bcf6d79c3be28d596baaa5872bac951c1898d2e97ad85c085bd1127031804e76",
+      "geometry_validation": "passed",
+      "seed": 1000106
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "1326471637c79dd71be0450abd4f30b09ad30475d3c5e519d4cfc31550b4873f",
+      "geometry_validation": "passed",
+      "seed": 1000107
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "4bbb323d08b8fcb6d6651d970b7bb9b1d3bb8f30361d2031d32705655f62afca",
+      "geometry_validation": "passed",
+      "seed": 1000108
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "15dc1ccfda7d9ed1f728d162b972501d5299a1cbfb0cba178a8b997b377eb09a",
+      "geometry_validation": "passed",
+      "seed": 1000110
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "6e9b5adfc5663f33d122698a95974b58c1b3243aeb3bd6a50d1e906d3748194f",
+      "geometry_validation": "passed",
+      "seed": 1000111
+    },
+    {
+      "driveability_validation": "passed",
+      "geometry_sha256": "1ed161cc3029a73d6a72e3c1e960f5714dac91e0c8ed23f660c4bb59f59783df",
+      "geometry_validation": "passed",
+      "seed": 1000112
+    }
+  ]
+}
