@@ -83,14 +83,28 @@ def _report(verification: OfficialAssetVerification) -> dict[str, Any]:
 
 
 def _run(options: VerifyTrackAssetsOptions) -> dict[str, Any]:
-    config = load_project_config(options.project_root)
+    project_root = options.project_root.expanduser().resolve()
+    asset_directory = (
+        None
+        if options.asset_directory is None
+        else _project_path(project_root, options.asset_directory)
+    )
+    train_cache = _project_path(project_root, options.train_cache)
+    config = load_project_config(project_root)
     verification = verify_official_track_assets(
         config,
-        asset_directory=options.asset_directory,
-        train_cache_path=options.train_cache,
+        asset_directory=asset_directory,
+        train_cache_path=train_cache,
         require_train_cache=options.require_train_cache,
     )
     return _report(verification)
+
+
+def _project_path(project_root: Path, path: Path) -> Path:
+    """Resolve a user path relative to the selected project root."""
+
+    expanded = path.expanduser()
+    return expanded.resolve() if expanded.is_absolute() else (project_root / expanded).resolve()
 
 
 def main() -> None:

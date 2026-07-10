@@ -68,11 +68,18 @@ def _run(
     *,
     progress: ProgressCallback | None = None,
 ) -> dict[str, Any]:
-    config = load_project_config(options.project_root)
+    project_root = options.project_root.expanduser().resolve()
+    asset_directory = (
+        None
+        if options.asset_directory is None
+        else _project_path(project_root, options.asset_directory)
+    )
+    output = _project_path(project_root, options.output)
+    config = load_project_config(project_root)
     result = materialize_official_train_cache(
         config,
-        asset_directory=options.asset_directory,
-        output=options.output,
+        asset_directory=asset_directory,
+        output=output,
         force=options.force,
         progress=progress,
     )
@@ -82,6 +89,13 @@ def _run(
         "sha256": result.sha256,
         "track_count": result.track_count,
     }
+
+
+def _project_path(project_root: Path, path: Path) -> Path:
+    """Resolve a user path relative to the selected project root."""
+
+    expanded = path.expanduser()
+    return expanded.resolve() if expanded.is_absolute() else (project_root / expanded).resolve()
 
 
 def _progress(completed: int, total: int, seed: int) -> None:

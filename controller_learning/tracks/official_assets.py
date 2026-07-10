@@ -6,6 +6,7 @@ import os
 import tempfile
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from itertools import pairwise
 from pathlib import Path
 from types import MappingProxyType
 
@@ -20,6 +21,7 @@ from controller_learning.tracks.assets import (
     load_track_asset_manifest,
     load_track_batch_npz,
     save_track_batch_npz,
+    sha256_file,
     validate_track_batch,
 )
 from controller_learning.tracks.generator import (
@@ -237,6 +239,14 @@ def validate_official_manifest(
     if outside:
         raise TrackAssetError(
             f"{manifest.split} manifest contains seeds outside its locked namespace"
+        )
+    seeds = tuple(record.seed for record in manifest.tracks)
+    if manifest.split == "level0":
+        if seeds != (LEVEL0_TRACK_SEED,):
+            raise TrackAssetError("the official Level 0 manifest must use its reserved singleton")
+    elif any(left >= right for left, right in pairwise(seeds)):
+        raise TrackAssetError(
+            f"{manifest.split} manifest records must be strictly increasing by seed"
         )
 
 
@@ -489,7 +499,10 @@ def write_verified_manifest_cache(
     finally:
         if temporary is not None:
             temporary.unlink(missing_ok=True)
-    load_verified_manifest_batch(manifest, destination)
+    # The fully verified temporary file is renamed atomically. Re-hash the destination to catch
+    # an I/O fault without allocating a second 260 MiB TrackBatch after the rename.
+    if sha256_file(destination) != manifest.asset_sha256:
+        raise TrackAssetError("materialized training cache SHA-256 changed after atomic replace")
     return manifest.asset_sha256
 
 

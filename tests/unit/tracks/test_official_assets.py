@@ -152,6 +152,12 @@ def test_official_manifest_checks_counts_files_and_seed_namespace(project_config
     )
     validate_official_manifest(project_config, level0_manifest)
 
+    with pytest.raises(TrackAssetError, match="reserved Level 0 seed"):
+        replace(
+            level0_manifest,
+            tracks=(replace(level0_manifest.tracks[0], seed=0),),
+        )
+
     with pytest.raises(TrackAssetError, match="wrong asset filename"):
         validate_official_manifest(
             project_config,
@@ -167,6 +173,16 @@ def test_official_manifest_checks_counts_files_and_seed_namespace(project_config
         asset_file="validation.npz",
     )
     validate_official_manifest(project_config, validation_manifest)
+    reordered = (
+        validation_records[1],
+        validation_records[0],
+        *validation_records[2:],
+    )
+    with pytest.raises(TrackAssetError, match="strictly increasing by seed"):
+        validate_official_manifest(
+            project_config,
+            replace(validation_manifest, tracks=reordered),
+        )
     outside_namespace = (
         _record(999_999, 99),
         *validation_records[1:],
