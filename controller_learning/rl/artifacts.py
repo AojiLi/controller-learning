@@ -37,7 +37,7 @@ ARTIFACT_SCHEMA_VERSION: Final = 1
 RUN_IDENTITY_SCHEMA_VERSION: Final = 1
 TRAINING_CHECKPOINT_SCHEMA_VERSION: Final = 1
 TRAINING_CONTINUATION_SCHEMA_VERSION: Final = 2
-LATEST_CHECKPOINT_SCHEMA_VERSION: Final = 1
+LATEST_CHECKPOINT_SCHEMA_VERSION: Final = 2
 RESUME_SEMANTICS: Final = "optimizer_continuation_with_environment_reset"
 M7_FEATURE_SCHEMA_VERSION: Final = LOCAL_TRACK_FEATURE_SCHEMA_VERSION
 M7_REWARD_SCHEMA_VERSION: Final = PUBLIC_REWARD_SCHEMA_VERSION
@@ -325,7 +325,7 @@ class ArtifactRecord:
         relative = _safe_relative_path(self.relative_path, field="artifact.relative_path")
         digest = _require_sha256(self.sha256, field="artifact.sha256")
         size = _require_plain_integer(self.size_bytes, field="artifact.size_bytes")
-        if self.schema_version != ARTIFACT_SCHEMA_VERSION:
+        if type(self.schema_version) is not int or self.schema_version != ARTIFACT_SCHEMA_VERSION:
             raise ArtifactValidationError(
                 f"artifact.schema_version must be {ARTIFACT_SCHEMA_VERSION}"
             )
@@ -550,7 +550,10 @@ class TrainingRunIdentity:
     schema_version: int = RUN_IDENTITY_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
-        if self.schema_version != RUN_IDENTITY_SCHEMA_VERSION:
+        if (
+            type(self.schema_version) is not int
+            or self.schema_version != RUN_IDENTITY_SCHEMA_VERSION
+        ):
             raise ArtifactValidationError(
                 f"run_identity.schema_version must be {RUN_IDENTITY_SCHEMA_VERSION}"
             )
@@ -688,7 +691,10 @@ class TrainingCheckpointMetadata:
             raise ArtifactValidationError(
                 "checkpoint_metadata.run_identity must be a TrainingRunIdentity"
             )
-        if self.schema_version != TRAINING_CHECKPOINT_SCHEMA_VERSION:
+        if (
+            type(self.schema_version) is not int
+            or self.schema_version != TRAINING_CHECKPOINT_SCHEMA_VERSION
+        ):
             raise ArtifactValidationError(
                 f"checkpoint_metadata.schema_version must be {TRAINING_CHECKPOINT_SCHEMA_VERSION}"
             )
@@ -798,7 +804,10 @@ class TrainingContinuationState:
     schema_version: int = TRAINING_CONTINUATION_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
-        if self.schema_version != TRAINING_CONTINUATION_SCHEMA_VERSION:
+        if (
+            type(self.schema_version) is not int
+            or self.schema_version != TRAINING_CONTINUATION_SCHEMA_VERSION
+        ):
             raise ArtifactValidationError(
                 f"continuation.schema_version must be {TRAINING_CONTINUATION_SCHEMA_VERSION}"
             )
@@ -1048,12 +1057,16 @@ class LatestCheckpointPointer:
     run_identity_sha256: str
     update_index: int
     published_updates: tuple[int, ...]
+    published_checkpoints: tuple[ArtifactRecord, ...]
     checkpoint: ArtifactRecord
     resume_semantics: str = RESUME_SEMANTICS
     schema_version: int = LATEST_CHECKPOINT_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
-        if self.schema_version != LATEST_CHECKPOINT_SCHEMA_VERSION:
+        if (
+            type(self.schema_version) is not int
+            or self.schema_version != LATEST_CHECKPOINT_SCHEMA_VERSION
+        ):
             raise ArtifactValidationError(
                 f"latest.schema_version must be {LATEST_CHECKPOINT_SCHEMA_VERSION}"
             )
@@ -1090,12 +1103,35 @@ class LatestCheckpointPointer:
                 "latest.published_updates must be strictly increasing and end at update_index"
             )
         object.__setattr__(self, "published_updates", published_updates)
+        if not isinstance(self.published_checkpoints, (tuple, list)) or not all(
+            isinstance(record, ArtifactRecord) for record in self.published_checkpoints
+        ):
+            raise ArtifactValidationError(
+                "latest.published_checkpoints must contain ArtifactRecord values"
+            )
+        published_checkpoints = tuple(self.published_checkpoints)
+        if len(published_checkpoints) != len(published_updates):
+            raise ArtifactValidationError(
+                "latest.published_checkpoints must align one-to-one with published_updates"
+            )
+        for update, record in zip(published_updates, published_checkpoints, strict=True):
+            expected_name = f"update_{update:08d}.pt"
+            if PurePosixPath(record.relative_path).name != expected_name:
+                raise ArtifactValidationError(
+                    "latest.published_checkpoints must use canonical filenames aligned with "
+                    "published_updates"
+                )
+        object.__setattr__(self, "published_checkpoints", published_checkpoints)
         if not isinstance(self.checkpoint, ArtifactRecord):
             raise ArtifactValidationError("latest.checkpoint must be an ArtifactRecord")
         checkpoint_name = PurePosixPath(self.checkpoint.relative_path).name
         if checkpoint_name != f"update_{self.update_index:08d}.pt":
             raise ArtifactValidationError(
                 "latest checkpoint filename must match latest.update_index"
+            )
+        if self.checkpoint != published_checkpoints[-1]:
+            raise ArtifactValidationError(
+                "latest checkpoint must equal the final published checkpoint record"
             )
         if self.resume_semantics != RESUME_SEMANTICS:
             raise ArtifactValidationError(f"latest.resume_semantics must be {RESUME_SEMANTICS!r}")
@@ -1105,6 +1141,7 @@ class LatestCheckpointPointer:
 
         return {
             "checkpoint": self.checkpoint.to_dict(),
+            "published_checkpoints": [record.to_dict() for record in self.published_checkpoints],
             "published_updates": list(self.published_updates),
             "resume_semantics": self.resume_semantics,
             "run_id": self.run_id,
@@ -1121,6 +1158,7 @@ class LatestCheckpointPointer:
             raise ArtifactValidationError("latest pointer must be an object")
         expected = {
             "checkpoint",
+            "published_checkpoints",
             "published_updates",
             "resume_semantics",
             "run_id",
@@ -1139,6 +1177,22 @@ class LatestCheckpointPointer:
             field="latest.checkpoint",
         )
         fields["checkpoint"] = ArtifactRecord(**dict(checkpoint))
+        published_checkpoints = fields["published_checkpoints"]
+        if not isinstance(published_checkpoints, list):
+            raise ArtifactValidationError("latest.published_checkpoints must be an array")
+        records: list[ArtifactRecord] = []
+        for index, record in enumerate(published_checkpoints):
+            if not isinstance(record, Mapping):
+                raise ArtifactValidationError(
+                    f"latest.published_checkpoints[{index}] must be an object"
+                )
+            _require_exact_keys(
+                record,
+                {"relative_path", "schema_version", "sha256", "size_bytes"},
+                field=f"latest.published_checkpoints[{index}]",
+            )
+            records.append(ArtifactRecord(**dict(record)))
+        fields["published_checkpoints"] = tuple(records)
         return cls(**fields)
 
 
@@ -1184,6 +1238,28 @@ class LoadedTrainingCheckpoint:
         self.continuation_state.validate_checkpoint_metadata(self.metadata)
         if not isinstance(self.payload, Mapping):
             raise ArtifactValidationError("loaded checkpoint payload must be a mapping")
+        object.__setattr__(self, "payload", MappingProxyType(dict(self.payload)))
+
+
+@dataclass(frozen=True, slots=True)
+class LoadedCandidateCheckpoint:
+    """One retained, explicitly selected checkpoint verified against its published record."""
+
+    record: ArtifactRecord
+    metadata: TrainingCheckpointMetadata
+    continuation_state: TrainingContinuationState
+    payload: Mapping[str, Any]
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.record, ArtifactRecord):
+            raise ArtifactValidationError("loaded candidate requires an ArtifactRecord")
+        if not isinstance(self.metadata, TrainingCheckpointMetadata):
+            raise ArtifactValidationError("loaded candidate requires validated metadata")
+        if not isinstance(self.continuation_state, TrainingContinuationState):
+            raise ArtifactValidationError("loaded candidate requires validated continuation state")
+        self.continuation_state.validate_checkpoint_metadata(self.metadata)
+        if not isinstance(self.payload, Mapping):
+            raise ArtifactValidationError("loaded candidate payload must be a mapping")
         object.__setattr__(self, "payload", MappingProxyType(dict(self.payload)))
 
 
@@ -1278,8 +1354,13 @@ def read_latest_checkpoint_pointer(
     pointer = LatestCheckpointPointer.from_dict(
         read_strict_json(root, latest_relative, require_canonical=True)
     )
-    if PurePosixPath(pointer.checkpoint.relative_path).parent != directory:
-        raise ArtifactValidationError("latest checkpoint must remain inside checkpoint_directory")
+    if any(
+        PurePosixPath(record.relative_path).parent != directory
+        for record in pointer.published_checkpoints
+    ):
+        raise ArtifactValidationError(
+            "published checkpoints must remain inside checkpoint_directory"
+        )
     return pointer
 
 
@@ -1313,7 +1394,10 @@ def _validated_loaded_checkpoint(
         "schema_version",
     }
     _require_exact_keys(value, expected_keys, field="Torch checkpoint")
-    if value["schema_version"] != TRAINING_CHECKPOINT_SCHEMA_VERSION:
+    if (
+        type(value["schema_version"]) is not int
+        or value["schema_version"] != TRAINING_CHECKPOINT_SCHEMA_VERSION
+    ):
         raise ArtifactValidationError("Torch checkpoint schema version differs")
     loaded_metadata = TrainingCheckpointMetadata.from_dict(value["metadata"])
     continuation_state = TrainingContinuationState.from_dict(value["continuation_state"])
@@ -1375,6 +1459,46 @@ def _record_for_checkpoint(relative_path: str, payload: bytes) -> ArtifactRecord
     )
 
 
+def _load_checkpoint_record_locked(
+    root: Path,
+    record: ArtifactRecord,
+    backend: _TorchCompatible,
+    *,
+    expected_identity: TrainingRunIdentity | None,
+    expected_update: int,
+) -> LoadedCandidateCheckpoint:
+    destination, relative, _root_directory = _resolve_destination_for_read(
+        root,
+        record.relative_path,
+    )
+    if destination is None:
+        raise ArtifactValidationError("published checkpoint is pruned or missing")
+    checkpoint_bytes = _read_regular_checkpoint(destination)
+    computed_record = _record_for_checkpoint(relative, checkpoint_bytes)
+    if computed_record.size_bytes != record.size_bytes:
+        raise ArtifactValidationError("published checkpoint size differs from its record")
+    if computed_record.sha256 != record.sha256:
+        raise ArtifactValidationError("published checkpoint SHA-256 differs from its record")
+    if computed_record.relative_path != record.relative_path:
+        raise ArtifactValidationError("published checkpoint path is not canonical")
+
+    metadata, continuation, payload = _verify_checkpoint_bytes(backend, checkpoint_bytes)
+    if metadata.update_index != expected_update:
+        raise ArtifactValidationError(
+            "published checkpoint metadata update differs from requested update"
+        )
+    if expected_identity is not None and metadata.run_identity != expected_identity:
+        raise ArtifactValidationError(
+            "published checkpoint run identity differs from expected_identity"
+        )
+    return LoadedCandidateCheckpoint(
+        record=computed_record,
+        metadata=metadata,
+        continuation_state=continuation,
+        payload=payload,
+    )
+
+
 def _load_published_checkpoint_locked(
     root: Path,
     pointer: LatestCheckpointPointer,
@@ -1382,35 +1506,23 @@ def _load_published_checkpoint_locked(
     *,
     expected_identity: TrainingRunIdentity | None,
 ) -> LoadedTrainingCheckpoint:
-    destination, relative, _root_directory = _resolve_destination_for_read(
+    candidate = _load_checkpoint_record_locked(
         root,
-        pointer.checkpoint.relative_path,
+        pointer.checkpoint,
+        backend,
+        expected_identity=expected_identity,
+        expected_update=pointer.update_index,
     )
-    if destination is None:
-        raise ArtifactValidationError("latest checkpoint target does not exist")
-    checkpoint_bytes = _read_regular_checkpoint(destination)
-    if len(checkpoint_bytes) != pointer.checkpoint.size_bytes:
-        raise ArtifactValidationError("latest checkpoint size differs from its pointer")
-    if sha256_bytes(checkpoint_bytes) != pointer.checkpoint.sha256:
-        raise ArtifactValidationError("latest checkpoint SHA-256 differs from its pointer")
-    if relative != pointer.checkpoint.relative_path:
-        raise ArtifactValidationError("latest checkpoint path is not canonical")
-
-    metadata, continuation, payload = _verify_checkpoint_bytes(backend, checkpoint_bytes)
-    identity = metadata.run_identity
-    if metadata.update_index != pointer.update_index:
-        raise ArtifactValidationError("checkpoint metadata update differs from latest pointer")
+    identity = candidate.metadata.run_identity
     if identity.run_id != pointer.run_id:
         raise ArtifactValidationError("checkpoint run_id differs from latest pointer")
     if run_identity_sha256(identity) != pointer.run_identity_sha256:
         raise ArtifactValidationError("checkpoint run identity differs from latest pointer")
-    if expected_identity is not None and identity != expected_identity:
-        raise ArtifactValidationError("checkpoint run identity differs from expected_identity")
     return LoadedTrainingCheckpoint(
         pointer=pointer,
-        metadata=metadata,
-        continuation_state=continuation,
-        payload=payload,
+        metadata=candidate.metadata,
+        continuation_state=candidate.continuation_state,
+        payload=candidate.payload,
     )
 
 
@@ -1530,11 +1642,73 @@ def load_training_checkpoint(
             raise ArtifactValidationError(
                 "latest checkpoint run identity differs from expected_identity"
             )
+        if pointer.run_id != expected_identity.run_id:
+            raise ArtifactValidationError("latest checkpoint run_id differs from expected_identity")
         return _load_published_checkpoint_locked(
             root_directory,
             pointer,
             backend,
             expected_identity=expected_identity,
+        )
+
+
+def load_published_training_checkpoint(
+    root: Path,
+    *,
+    expected_identity: TrainingRunIdentity,
+    update_index: int,
+    checkpoint_directory: str | Path = "checkpoints",
+    torch_module: _TorchCompatible | None = None,
+) -> LoadedCandidateCheckpoint:
+    """Load one explicit retained checkpoint proven by the latest publication ledger.
+
+    Selection may inspect only updates recorded in ``latest.published_updates``.  The shared lock
+    spans ledger resolution, retained-file size/SHA verification, Torch deserialization, exact
+    payload validation, and full run-identity/update checks.  This read path never creates files or
+    directories.
+    """
+
+    if not isinstance(expected_identity, TrainingRunIdentity):
+        raise ArtifactValidationError("expected_identity must be TrainingRunIdentity")
+    update_index = _require_plain_integer(
+        update_index,
+        field="update_index",
+        minimum=1,
+    )
+    directory = _safe_relative_path(checkpoint_directory, field="checkpoint_directory")
+    root_directory = _checked_existing_directory(root)
+    if root_directory is None:
+        raise ArtifactValidationError("artifact root does not exist")
+    absolute_directory = _checked_existing_directory(root_directory.joinpath(*directory.parts))
+    if absolute_directory is None:
+        raise ArtifactValidationError("checkpoint directory does not exist")
+    backend = _torch_backend(torch_module)
+    with _checkpoint_lock(absolute_directory, exclusive=False, create=False):
+        pointer = read_latest_checkpoint_pointer(
+            root_directory,
+            checkpoint_directory=checkpoint_directory,
+        )
+        if pointer is None:
+            raise ArtifactValidationError("latest checkpoint pointer does not exist")
+        if pointer.run_identity_sha256 != run_identity_sha256(expected_identity):
+            raise ArtifactValidationError(
+                "latest checkpoint run identity differs from expected_identity"
+            )
+        if pointer.run_id != expected_identity.run_id:
+            raise ArtifactValidationError("latest checkpoint run_id differs from expected_identity")
+        try:
+            record_index = pointer.published_updates.index(update_index)
+        except ValueError as error:
+            raise ArtifactValidationError(
+                f"checkpoint update {update_index} was not published"
+            ) from error
+        record = pointer.published_checkpoints[record_index]
+        return _load_checkpoint_record_locked(
+            root_directory,
+            record,
+            backend,
+            expected_identity=expected_identity,
+            expected_update=update_index,
         )
 
 
@@ -1716,6 +1890,10 @@ def save_training_checkpoint(
                 (prior_pointer.published_updates if prior_pointer is not None else ())
                 + (metadata.update_index,)
             ),
+            published_checkpoints=(
+                (prior_pointer.published_checkpoints if prior_pointer is not None else ())
+                + (checkpoint_record,)
+            ),
             checkpoint=checkpoint_record,
         )
         # A verified checkpoint intentionally remains as a recognizable orphan if pointer
@@ -1760,6 +1938,7 @@ __all__ = [
     "ArtifactValidationError",
     "ArtifactWriteError",
     "LatestCheckpointPointer",
+    "LoadedCandidateCheckpoint",
     "LoadedTrainingCheckpoint",
     "TrainingCheckpointArtifact",
     "TrainingCheckpointMetadata",
@@ -1768,6 +1947,7 @@ __all__ = [
     "atomic_write_bytes",
     "atomic_write_json",
     "canonical_json_bytes",
+    "load_published_training_checkpoint",
     "load_training_checkpoint",
     "read_latest_checkpoint_pointer",
     "read_strict_json",

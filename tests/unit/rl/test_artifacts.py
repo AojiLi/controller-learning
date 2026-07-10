@@ -836,6 +836,11 @@ def test_latest_pointer_rejects_checkpoint_path_or_update_tampering(tmp_path: Pa
 
     pointer["checkpoint"]["relative_path"] = "other/update_00000001.pt"
     artifacts.atomic_write_json(tmp_path, latest_relative, pointer)
+    with pytest.raises(ArtifactValidationError, match="final published checkpoint"):
+        artifacts.read_latest_checkpoint_pointer(tmp_path)
+
+    pointer["published_checkpoints"][-1]["relative_path"] = "other/update_00000001.pt"
+    artifacts.atomic_write_json(tmp_path, latest_relative, pointer)
     with pytest.raises(ArtifactValidationError, match="checkpoint_directory"):
         artifacts.read_latest_checkpoint_pointer(tmp_path)
 
@@ -1091,6 +1096,252 @@ def test_load_rejects_pointer_identity_digest_tampering(tmp_path: Path) -> None:
         )
 
 
+def test_load_explicit_retained_published_checkpoint(tmp_path: Path) -> None:
+    backend = PickleTorch()
+    identity = _identity()
+    first = _save(tmp_path, 1, backend=backend, keep_last=3, identity=identity)
+    _save(tmp_path, 2, backend=backend, keep_last=3, identity=identity)
+    _save(tmp_path, 3, backend=backend, keep_last=3, identity=identity)
+
+    loaded = artifacts.load_published_training_checkpoint(
+        tmp_path,
+        expected_identity=identity,
+        update_index=1,
+        torch_module=backend,
+    )
+    pointer = artifacts.read_latest_checkpoint_pointer(tmp_path)
+
+    assert pointer is not None
+    assert pointer.published_updates == (1, 2, 3)
+    assert tuple(record.relative_path for record in pointer.published_checkpoints) == (
+        "checkpoints/update_00000001.pt",
+        "checkpoints/update_00000002.pt",
+        "checkpoints/update_00000003.pt",
+    )
+    assert loaded.record == first.checkpoint == pointer.published_checkpoints[0]
+    assert loaded.metadata == _metadata(1, identity=identity)
+    assert loaded.continuation_state == _continuation(1)
+    assert loaded.payload["model_state_dict"] == {"weight": [1, 2]}
+    with pytest.raises(TypeError):
+        loaded.payload["unexpected"] = True  # type: ignore[index]
+
+
+def test_explicit_checkpoint_loader_rejects_ledger_run_id_tampering(tmp_path: Path) -> None:
+    backend = PickleTorch()
+    identity = _identity()
+    saved = _save(tmp_path, 1, backend=backend, keep_last=1, identity=identity)
+    pointer = artifacts.read_strict_json(tmp_path, saved.latest_pointer.relative_path)
+    pointer["run_id"] = "different-run"
+    artifacts.atomic_write_json(tmp_path, saved.latest_pointer.relative_path, pointer)
+
+    with pytest.raises(ArtifactValidationError, match="run_id differs"):
+        artifacts.load_published_training_checkpoint(
+            tmp_path,
+            expected_identity=identity,
+            update_index=1,
+            torch_module=backend,
+        )
+
+
+@pytest.mark.parametrize("filename", ["update_1.pt", "update_000000001.pt"])
+def test_latest_pointer_rejects_noncanonical_published_checkpoint_filename(
+    tmp_path: Path,
+    filename: str,
+) -> None:
+    backend = PickleTorch()
+    saved = _save(tmp_path, 1, backend=backend, keep_last=1)
+    pointer = artifacts.read_strict_json(tmp_path, saved.latest_pointer.relative_path)
+    pointer["published_checkpoints"][0]["relative_path"] = f"checkpoints/{filename}"
+    artifacts.atomic_write_json(tmp_path, saved.latest_pointer.relative_path, pointer)
+
+    with pytest.raises(ArtifactValidationError, match="canonical filenames"):
+        artifacts.read_latest_checkpoint_pointer(tmp_path)
+
+
+@pytest.mark.parametrize("extra_record", [False, True])
+def test_latest_pointer_rejects_published_checkpoint_cardinality_mismatch(
+    tmp_path: Path,
+    extra_record: bool,
+) -> None:
+    backend = PickleTorch()
+    saved = _save(tmp_path, 1, backend=backend, keep_last=1)
+    pointer = artifacts.read_strict_json(tmp_path, saved.latest_pointer.relative_path)
+    if extra_record:
+        pointer["published_checkpoints"].append(dict(pointer["published_checkpoints"][0]))
+    else:
+        pointer["published_checkpoints"].clear()
+    artifacts.atomic_write_json(tmp_path, saved.latest_pointer.relative_path, pointer)
+
+    with pytest.raises(ArtifactValidationError, match="one-to-one"):
+        artifacts.read_latest_checkpoint_pointer(tmp_path)
+
+
+@pytest.mark.parametrize("schema_version", [True, 2.0])
+def test_latest_pointer_rejects_noninteger_schema_aliases(
+    tmp_path: Path,
+    schema_version: object,
+) -> None:
+    saved = _save(tmp_path, 1, backend=PickleTorch(), keep_last=1)
+    pointer = artifacts.read_strict_json(tmp_path, saved.latest_pointer.relative_path)
+    pointer["schema_version"] = schema_version
+    artifacts.atomic_write_json(tmp_path, saved.latest_pointer.relative_path, pointer)
+
+    with pytest.raises(ArtifactValidationError, match=r"latest\.schema_version"):
+        artifacts.read_latest_checkpoint_pointer(tmp_path)
+
+
+@pytest.mark.parametrize("schema_version", [True, 1.0])
+def test_latest_pointer_rejects_noninteger_artifact_record_schema(
+    tmp_path: Path,
+    schema_version: object,
+) -> None:
+    saved = _save(tmp_path, 1, backend=PickleTorch(), keep_last=1)
+    pointer = artifacts.read_strict_json(tmp_path, saved.latest_pointer.relative_path)
+    pointer["published_checkpoints"][0]["schema_version"] = schema_version
+    pointer["checkpoint"]["schema_version"] = schema_version
+    artifacts.atomic_write_json(tmp_path, saved.latest_pointer.relative_path, pointer)
+
+    with pytest.raises(ArtifactValidationError, match=r"artifact\.schema_version"):
+        artifacts.read_latest_checkpoint_pointer(tmp_path)
+
+
+def test_explicit_checkpoint_loader_rejects_pruned_missing_and_unpublished(
+    tmp_path: Path,
+) -> None:
+    backend = PickleTorch()
+    identity = _identity()
+    _save(tmp_path, 1, backend=backend, keep_last=1, identity=identity)
+    second = _save(tmp_path, 2, backend=backend, keep_last=1, identity=identity)
+
+    with pytest.raises(ArtifactValidationError, match="pruned or missing"):
+        artifacts.load_published_training_checkpoint(
+            tmp_path,
+            expected_identity=identity,
+            update_index=1,
+            torch_module=backend,
+        )
+
+    latest_path = tmp_path / second.checkpoint.relative_path
+    unpublished = tmp_path / "checkpoints/update_00000099.pt"
+    unpublished.write_bytes(latest_path.read_bytes())
+    with pytest.raises(ArtifactValidationError, match="was not published"):
+        artifacts.load_published_training_checkpoint(
+            tmp_path,
+            expected_identity=identity,
+            update_index=99,
+            torch_module=backend,
+        )
+
+    latest_path.unlink()
+    with pytest.raises(ArtifactValidationError, match="pruned or missing"):
+        artifacts.load_published_training_checkpoint(
+            tmp_path,
+            expected_identity=identity,
+            update_index=2,
+            torch_module=backend,
+        )
+
+
+def test_explicit_checkpoint_loader_rejects_content_tampering(tmp_path: Path) -> None:
+    backend = PickleTorch()
+    identity = _identity()
+    first = _save(tmp_path, 1, backend=backend, keep_last=2, identity=identity)
+    _save(tmp_path, 2, backend=backend, keep_last=2, identity=identity)
+    candidate = tmp_path / first.checkpoint.relative_path
+    original = candidate.read_bytes()
+
+    candidate.write_bytes(original + b"tamper")
+    with pytest.raises(ArtifactValidationError, match="size differs"):
+        artifacts.load_published_training_checkpoint(
+            tmp_path,
+            expected_identity=identity,
+            update_index=1,
+            torch_module=backend,
+        )
+
+    candidate.write_bytes(b"x" * len(original))
+    with pytest.raises(ArtifactValidationError, match="SHA-256 differs"):
+        artifacts.load_published_training_checkpoint(
+            tmp_path,
+            expected_identity=identity,
+            update_index=1,
+            torch_module=backend,
+        )
+
+    external = tmp_path / "retained-external.pt"
+    external.write_bytes(original)
+    candidate.unlink()
+    candidate.symlink_to(external)
+    with pytest.raises(ArtifactValidationError, match="symbolic link"):
+        artifacts.load_published_training_checkpoint(
+            tmp_path,
+            expected_identity=identity,
+            update_index=1,
+            torch_module=backend,
+        )
+
+
+def test_explicit_checkpoint_loader_rejects_update_and_cross_run_payloads(
+    tmp_path: Path,
+) -> None:
+    backend = PickleTorch()
+    identity = _identity()
+    first = _save(tmp_path, 1, backend=backend, keep_last=2, identity=identity)
+    second = _save(tmp_path, 2, backend=backend, keep_last=2, identity=identity)
+    first_path = tmp_path / first.checkpoint.relative_path
+    second_bytes = (tmp_path / second.checkpoint.relative_path).read_bytes()
+    first_path.write_bytes(second_bytes)
+    pointer_path = second.latest_pointer.relative_path
+    pointer = artifacts.read_strict_json(tmp_path, pointer_path)
+    pointer["published_checkpoints"][0]["sha256"] = artifacts.sha256_bytes(second_bytes)
+    pointer["published_checkpoints"][0]["size_bytes"] = len(second_bytes)
+    artifacts.atomic_write_json(tmp_path, pointer_path, pointer)
+
+    with pytest.raises(ArtifactValidationError, match="requested update"):
+        artifacts.load_published_training_checkpoint(
+            tmp_path,
+            expected_identity=identity,
+            update_index=1,
+            torch_module=backend,
+        )
+
+    other_root = tmp_path / "other-run"
+    other_identity = replace(identity, train_cache_sha256="9" * 64)
+    other = _save(
+        other_root,
+        1,
+        backend=backend,
+        keep_last=1,
+        identity=other_identity,
+    )
+    other_bytes = (other_root / other.checkpoint.relative_path).read_bytes()
+    first_path.write_bytes(other_bytes)
+    pointer = artifacts.read_strict_json(tmp_path, pointer_path)
+    pointer["published_checkpoints"][0]["sha256"] = artifacts.sha256_bytes(other_bytes)
+    pointer["published_checkpoints"][0]["size_bytes"] = len(other_bytes)
+    artifacts.atomic_write_json(tmp_path, pointer_path, pointer)
+
+    with pytest.raises(ArtifactValidationError, match="run identity"):
+        artifacts.load_published_training_checkpoint(
+            tmp_path,
+            expected_identity=identity,
+            update_index=1,
+            torch_module=backend,
+        )
+
+
+def test_explicit_checkpoint_read_does_not_create_missing_paths(tmp_path: Path) -> None:
+    missing = tmp_path / "never-create-candidate"
+    with pytest.raises(ArtifactValidationError, match="root does not exist"):
+        artifacts.load_published_training_checkpoint(
+            missing,
+            expected_identity=_identity(),
+            update_index=1,
+            torch_module=PickleTorch(),
+        )
+    assert not missing.exists()
+
+
 @pytest.mark.gpu
 def test_real_torch_checkpoint_round_trip_in_gpu_environment(tmp_path: Path) -> None:
     import torch
@@ -1115,6 +1366,12 @@ def test_real_torch_checkpoint_round_trip_in_gpu_environment(tmp_path: Path) -> 
         expected_identity=identity,
         torch_module=torch,
     )
+    candidate = artifacts.load_published_training_checkpoint(
+        tmp_path,
+        expected_identity=identity,
+        update_index=1,
+        torch_module=torch,
+    )
 
     assert saved.checkpoint.size_bytes > 0
     assert loaded.continuation_state == _continuation(1)
@@ -1123,3 +1380,5 @@ def test_real_torch_checkpoint_round_trip_in_gpu_environment(tmp_path: Path) -> 
         torch.tensor([1.0, -2.0]),
     )
     assert torch.equal(loaded.payload["policy_rng_state"], rng_state)
+    assert candidate.record == saved.checkpoint
+    assert torch.equal(candidate.payload["policy_rng_state"], rng_state)
