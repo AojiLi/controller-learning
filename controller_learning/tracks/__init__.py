@@ -16,6 +16,11 @@ from controller_learning.tracks.geometry import (
     segments_intersect,
     signed_area,
 )
+from controller_learning.tracks.specs import (
+    generation_spec_from_project,
+    track_capacity_from_project,
+    validation_spec_from_project,
+)
 from controller_learning.tracks.types import (
     Track,
     TrackBatch,
@@ -43,6 +48,7 @@ __all__ = [
     "closed_polyline_self_intersections",
     "cross_2d",
     "generate_track_candidate",
+    "generation_spec_from_project",
     "minimum_nonlocal_clearance",
     "pack_track",
     "point_segment_distance",
@@ -51,5 +57,7 @@ __all__ = [
     "signed_area",
     "stack_tracks",
     "track_array_bytes",
+    "track_capacity_from_project",
     "validate_track_candidate",
+    "validation_spec_from_project",
 ]
