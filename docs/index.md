@@ -6,8 +6,9 @@ tracks, pluggable Controllers, and reproducible evaluation.
 The project is being implemented through explicit milestone gates. Published documentation will
 only claim features and performance that have passed their corresponding tests and benchmarks.
 
-M2 is complete: the physical four-wheel model passed native MJX-Warp validation through 1,024
-worlds and a 10,000-step endurance run. M3 batched tracks and Race Core are now active.
+M3 is complete: deterministic fixed-capacity tracks, batched Race Core state, 1,024-world isolation,
+and low-speed four-wheel driveability have passed their gates. M4 Gymnasium environments and the
+Controller platform are now active; neither interface is available yet.
 
 ## Design Principles
 
@@ -18,3 +19,6 @@ worlds and a 10,000-step endurance run. M3 batched tracks and Race Core are now 
 - A narrow Controller interface with no simulator-internal shortcuts.
 
 See the repository README for the current implementation status and verified commands.
+
+The measured M3 representation and Challenge semantics are documented in
+[Tracks and Race Core](tracks.md).

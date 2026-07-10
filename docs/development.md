@@ -59,3 +59,39 @@ The command launches a fresh process for every scale and writes
 change during the run, any numerical or physical gate fails, memory does not stabilize, or the
 CPU/GPU comparison exceeds its tolerances. See [MJX-Warp GPU Vehicle](gpu.md) for the frozen protocol
 and reviewed measurements.
+
+## M3 Track Capacity Workflow
+
+Run the deterministic offline capacity sweep in the default environment:
+
+```bash
+pixi run benchmark-track-capacity
+```
+
+The command generates one candidate per seed for 10,000 contiguous seeds at each configured arc
+spacing and writes `benchmarks/v0.1/track_capacity_report.json`. It records generation and validation
+rejections, distribution percentiles, reproducibility samples, theoretical capacity bounds, and
+runtime-array memory estimates. The reviewed result locks 1.0 m arc spacing, 640 track points, and 48
+checkpoints.
+
+## M3 Race Core and Driveability Workflow
+
+The complete local GPU suite includes the vehicle, 1,024-track Race Core, masked-reset isolation,
+and generated-track driveability tests:
+
+```bash
+pixi run -e gpu gpu-tests
+```
+
+Run the formal low-speed admission protocol separately:
+
+```bash
+pixi run -e gpu validate-track-driveability
+```
+
+The command uses the formal MJX-Warp four-wheel backend, the production Race Core, and a private
+conservative 4 m/s reference policy. It writes
+`benchmarks/v0.1/track_driveability_report.json` and fails if any accepted track does not complete a
+lap or if a numerical, contact-capacity, unexpected-contact, invalid-action, off-track, or timeout
+gate fails. This reference policy is an offline track-admission tool, not a public Controller or a
+performance baseline. See [Tracks and Race Core](tracks.md) for the reviewed measurements.

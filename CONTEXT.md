@@ -88,6 +88,13 @@ The reference project's useful pattern is its Challenge layering, not its drone 
 - Physics runs on a uniform plane; track truth is fixed-capacity JAX geometry, not a random physical road mesh.
 - Level 0 uses a fixed track. Level 1 is the formal v0.1 benchmark and randomizes only closed-loop track geometry.
 - Track generation uses deterministic seeds and a generator version, geometry validation, and conservative four-wheel driveability validation.
+- The v0.1 Track representation is locked at 1.0 m nominal arc spacing, 640 points including an
+  explicit closure point, 15 m checkpoint spacing, and 48 checkpoints. The corresponding 600 m
+  theoretical requirements are 601 points and 40 checkpoints.
+- Runtime Track arrays occupy 26.640625 MiB for 1,024 worlds and 260.162 MiB for a 10,000-track pool.
+- Track projection is topology-local to the prior segment, with four backward and twelve forward
+  candidates in v0.1. Race Core owns ordered checkpoint progress, effective boundary, reward,
+  timeout, termination priority, and per-world masked reset independently from the physics backend.
 - Training uses a large pre-generated pool; validation and test geometry are fixed, public, versioned, and disjoint.
 - Published benchmark geometry and protocol are immutable within a benchmark version.
 
@@ -165,11 +172,13 @@ pixi install
 pixi run tests
 pixi run ci
 pixi run benchmark-cpu-vehicle
+pixi run benchmark-track-capacity
 pixi run view-cpu-vehicle -- --scenario demo --duration 12
 
 pixi install -e gpu
 pixi run -e gpu gpu-tests
 pixi run -e gpu benchmark-gpu
+pixi run -e gpu validate-track-driveability
 ```
 
 `train-ppo` is a confirmed future task name and must be added in M7. CPU CI currently checks
@@ -187,13 +196,21 @@ contact agreement, capacity headroom, physical gates, compile/throughput/VRAM me
 warnings, masked resets, runtime versions, and stable pre/post Git and source hashes. The persisted
 report redacts GPU UUIDs and machine-specific filesystem paths.
 
+Reviewed M3 capacity evidence is stored at `benchmarks/v0.1/track_capacity_report.json`. It records
+10,000 contiguous seeds at each of 0.75/1.0/1.25 m spacing, generation and validation rejections,
+distribution percentiles, reproducibility, theoretical bounds, capacity selection, and TrackBatch
+memory. Reviewed low-speed physical admission evidence is stored at
+`benchmarks/v0.1/track_driveability_report.json`; 16/16 generated tracks completed on the formal
+four-wheel backend at a 4 m/s target with no recorded failure outcome or numerical/buffer fault.
+
 ## Experimental Decisions
 
-M1 fixed the CPU candidate physics timestep at 0.005 seconds and proved the standardized actuator
-mapping on CPU. M2 may revise that timestep if MJX-Warp stability, consistency, buffer capacity, or
-throughput requires it. Solver/contact capacities, track array capacity/resolution, track scale
-bounds, stable world count, PPO hyperparameters, MPC horizon/weights, and CPU/GPU consistency
-tolerance remain experimental decisions for M2–M3 or their later implementation milestones.
+M1 fixed the physics timestep at 0.005 seconds and proved the standardized actuator mapping on CPU;
+M2 retained that timestep on MJX-Warp and locked the reviewed flat-ground contact/constraint
+capacities. M3 fixed 1.0 m Track sampling, 640 points, 48 checkpoints, the current generator and
+validation ranges, and the 4/12 local projection window from measured evidence. PPO hyperparameters,
+MPC horizon/weights, and later Controller-specific tuning remain experimental decisions for their
+implementation milestones.
 
 ## External Reference
 

@@ -7,6 +7,7 @@ nav:
   - Home: index.md
   - CPU Vehicle: vehicle.md
   - GPU Vehicle: gpu.md
+  - Tracks and Race Core: tracks.md
   - Development: development.md
 markdown_extensions:
   - admonition

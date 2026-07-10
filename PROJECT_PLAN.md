@@ -271,7 +271,9 @@ checkpoints:    (max_checkpoints, ...)
 - 超过容量的赛道在生成阶段拒绝。
 - 不采用每条赛道相同点数但不同空间分辨率的方案。
 
-max_track_points、采样间距和 max_checkpoints 由赛道尺度 spike 确定。
+M3 的正式 10,000-seed/spacing spike 已选定 1.0 m 采样间距、640 个赛道点和 48 个
+checkpoint。600 m 赛道的理论需求为 601 点和 40 个 checkpoint；测量证据见
+`benchmarks/v0.1/track_capacity_report.json`。
 
 ### 7.3 程序化生成
 
@@ -1261,7 +1263,7 @@ v0.1 之后再考虑：
 - MuJoCo solver 与 contact 参数。
 - MJX-Warp naconmax/njmax。
 - 驱动/制动力矩映射。
-- max_track_points 与采样间距。
+- max_track_points 与采样间距（M3 已通过正式报告锁定为 640 与 1.0 m）。
 - 精确赛道长度、宽度和曲率范围。
 - 单张 GPU 的最大稳定 world 数量。
 - PPO 超参数。
@@ -1269,3 +1271,6 @@ v0.1 之后再考虑：
 - CPU/MJX-Warp 一致性容差。
 
 这些参数必须通过 benchmark 和测试确定，不能只凭主观选择写死。
+
+其中 M1/M2 已锁定 physics/contact 基础参数，M3 已锁定 Track 容量与采样间距；
+仍未锁定的项目将在对应后续 milestone 通过同样的证据流程确定。
