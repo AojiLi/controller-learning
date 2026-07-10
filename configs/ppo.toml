@@ -1,5 +1,5 @@
-# Initial M7 Train-only candidate. These feature, reward, optimizer, and budget values may be
-# adjusted using Train evidence, but the complete file must be frozen before Validation access.
+# Frozen M7 configuration selected after Train-only smoke evidence. Do not change this file after
+# the first Validation access for benchmark 0.1.
 schema_version = 1
 
 [environment]
@@ -60,6 +60,7 @@ memory_sample_interval_updates = 10
 
 [checkpoint]
 interval_updates = 10
-keep_last = 3
+# Preserve every predeclared Validation candidate at updates 10, 20, ..., 80.
+keep_last = 8
 save_optimizer_state = true
 public_checkpoint_max_bytes = 5242880

@@ -31,6 +31,9 @@ def test_repository_ppo_config_is_strict_cross_validated_and_immutable() -> None
     assert config.environment.level_id == 1
     assert config.environment.backend == "mjx_warp"
     assert config.environment.num_envs == 1024
+    assert config.checkpoint.interval_updates == 10
+    assert config.checkpoint.keep_last == 8
+    assert config.update_count == 80
     assert config.environment.environment_seed == 7
     assert config.environment.train_cache == ".track-cache/v0.1/train_pool.npz"
     assert config.observation.preview_points == 16
