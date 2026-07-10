@@ -29,7 +29,7 @@ def test_default_spec_records_the_spike_distribution() -> None:
     assert spec.arc_spacing_m == 1.0
     assert spec.checkpoint_spacing_m == 15.0
     assert (spec.min_length_m, spec.max_length_m) == (300.0, 600.0)
-    assert spec.generator_version == "spike-v1"
+    assert spec.generator_version == "v0.1"
 
 
 def test_generation_is_exactly_deterministic_and_float64(candidate) -> None:

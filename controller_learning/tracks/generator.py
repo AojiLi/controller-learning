@@ -39,7 +39,7 @@ class TrackGenerationSpec:
     max_length_m: float = 600.0
     start_window_m: float = 25.0
     start_max_curvature_1pm: float = 1.0 / 40.0
-    generator_version: str = "spike-v1"
+    generator_version: str = "v0.1"
     dense_samples_per_control_point: int = 1024
     arc_length_convergence_m: float = 2.0e-3
     tail_merge_fraction: float = 0.5

@@ -31,7 +31,7 @@ def test_repository_configuration_is_cross_validated() -> None:
     assert config.track.representation.max_checkpoints == 48
     assert config.track.required_track_points == 601
     assert config.track.required_checkpoints == 40
-    assert config.track.generator.generator_version == "spike-v1"
+    assert config.track.generator.generator_version == "v0.1"
     assert config.track.validation.max_abs_curvature_1pm == pytest.approx(1.0 / 15.0)
     assert config.track.race.projection_backward_segments == 4
     assert config.track.race.projection_forward_segments == 12

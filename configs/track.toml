@@ -7,7 +7,7 @@ checkpoint_spacing_m = 15.0
 max_checkpoints = 48
 
 [generator]
-generator_version = "spike-v1"
+generator_version = "v0.1"
 min_control_points = 8
 max_control_points = 16
 min_radius_m = 52.0
