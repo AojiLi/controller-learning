@@ -73,12 +73,15 @@ The reference project's useful pattern is its Challenge layering, not its drone 
   is 0.05 seconds and advances an integer number of MuJoCo physics substeps.
 - The standardized actuator layer clips and rate-limits steering targets, applies equal positive
   drive torque to all four wheels, and makes negative acceleration a non-reversing brake command.
-- M1 selected 0.005 seconds as the largest passing CPU physics timestep candidate. This is the M2
-  starting point, not a claim that MJX-Warp has accepted the same timestep.
+- M1 selected 0.005 seconds as the largest passing CPU physics timestep, and M2 subsequently
+  validated the same timestep in MJX-Warp through 1024 native worlds and 10,000 environment steps.
+- The reviewed M2 flat-ground vehicle capacities are 16 global contact entries per world and 64
+  constraints per world; observed peak usage was 50% and 37.5%, respectively.
 - Controllers may use a simplified kinematic or bicycle prediction model internally.
 - Formal v0.1 training and evaluation use MJX-Warp; CPU MuJoCo is for development and bounded consistency tests.
 - Native leading-dimension GPU batching and independent masked autoreset are hard requirements.
-- The M2 go/no-go precedes Track/Controller/RL expansion. If contact tuning and vehicle simplification fail, the allowed fallback is pure-JAX planar four-wheel tire-force dynamics, not CPU multiprocessing or a bicycle-model simulation truth.
+- The M2 go/no-go passed on the MJX-Warp path. The pure-JAX planar four-wheel fallback was not
+  activated; CPU multiprocessing and a bicycle-model simulation truth remain invalid fallbacks.
 
 ### Track and Benchmark
 
@@ -166,16 +169,23 @@ pixi run view-cpu-vehicle -- --scenario demo --duration 12
 
 pixi install -e gpu
 pixi run -e gpu gpu-tests
+pixi run -e gpu benchmark-gpu
 ```
 
-`benchmark-gpu` and `train-ppo` are confirmed future task names and must be added only in their
-respective milestones. CPU CI currently checks formatting, lint, CPU tests, installed wheel
+`train-ppo` is a confirmed future task name and must be added in M7. CPU CI currently checks
+formatting, lint, CPU tests, installed wheel
 contents, strict docs, GitHub Actions syntax, and package metadata. GPU verification remains local
-for v0.1 and will produce `benchmarks/v0.1/gpu_report.json`.
+for v0.1 and produces `benchmarks/v0.1/gpu_report.json`.
 
 Reviewed M1 CPU evidence is stored at `benchmarks/v0.1/m1_cpu_report.json`. The report records the
 source revision, dirty-worktree gate, dependency lock, model/config/protocol hashes, runtime, all
 candidate results, and the selected M2 candidate.
+
+Reviewed M2 GPU evidence is stored at `benchmarks/v0.1/gpu_report.json`. It records fresh-process
+1/64/256/1024-world results, the 1024-world × 10,000-step endurance run, CPU/GPU numerical and
+contact agreement, capacity headroom, physical gates, compile/throughput/VRAM measurements, native
+warnings, masked resets, runtime versions, and stable pre/post Git and source hashes. The persisted
+report redacts GPU UUIDs and machine-specific filesystem paths.
 
 ## Experimental Decisions
 
