@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 import copy
+import hashlib
+import json
 from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
 
+import numpy as np
 import pytest
 
 from controller_learning.config import load_project_config
@@ -52,11 +56,42 @@ def _passing_report() -> dict:
             "track_count": benchmark.FORMAL_TRAIN_TRACK_COUNT,
             "configured_track_count": benchmark.FORMAL_TRAIN_TRACK_COUNT,
             "cache_matches_manifest_sha256": True,
+            "cache_sha256": digest,
             "unique_seed_count": benchmark.FORMAL_TRAIN_TRACK_COUNT,
             "geometry_hash_count": benchmark.FORMAL_TRAIN_TRACK_COUNT,
             "geometry_admission_pass_count": benchmark.FORMAL_TRAIN_TRACK_COUNT,
             "driveability_admission_pass_count": benchmark.FORMAL_TRAIN_TRACK_COUNT,
             "allowed_seed_uint32_sha256": digest,
+        },
+        "official_assets": {"passed": True},
+        "admission": {
+            "formal_report_location": True,
+            "passed": True,
+            "status": "pass",
+            "schema_version": benchmark.ADMISSION_REPORT_SCHEMA_VERSION,
+            "protocol_version": benchmark.ADMISSION_PROTOCOL_VERSION,
+            "all_recomputed_gates_passed": True,
+            "source_evidence_passed": True,
+            "manifest_sha256_matches": {
+                "level0": True,
+                "train": True,
+                "validation": True,
+                "test": True,
+            },
+            "artifact_names_match": {
+                "level0": True,
+                "train": True,
+                "validation": True,
+                "test": True,
+            },
+            "manifest_asset_sha256_matches": {
+                "level0": True,
+                "train": True,
+                "validation": True,
+                "test": True,
+            },
+            "train_cache_sha256_matches": True,
+            "train_cache_sha256": digest,
         },
         "pool_residency": {
             "track_count": benchmark.FORMAL_TRAIN_TRACK_COUNT,
@@ -68,7 +103,13 @@ def _passing_report() -> dict:
         "deterministic_reset": {"passed": True},
         "transfer_guard": {
             "active_step": {"passed": True},
-            "mixed_next_step_autoreset": {"passed": True},
+            "mixed_next_step_autoreset": {
+                "passed": True,
+                "terminal_track_ids_match_host_domain2_reference": True,
+                "reset_track_ids_match_advanced_host_domain2_reference": True,
+                "selected_expected_unique_track_id_count": 11,
+                "selected_actual_unique_track_id_count": 11,
+            },
         },
         "timing": {
             "environment_create_seconds": 1.0,
@@ -93,6 +134,10 @@ def _passing_report() -> dict:
         "reset_heavy": {
             "seconds": 2.0,
             "reset_events_per_second": 10_000.0,
+            "final_expected_unique_track_id_count": 970,
+            "final_actual_unique_track_id_count": 970,
+            "preflight_track_ids_match_host_domain2_reference": True,
+            "final_track_ids_match_advanced_host_domain2_reference": True,
             "passed": True,
         },
         "health": {
@@ -137,6 +182,7 @@ def test_cli_defaults_lock_formal_manifest_cache_and_protocol() -> None:
     assert options == benchmark.BenchmarkOptions()
     assert options.manifest == Path("controller_learning/assets/tracks/v0.1/train.json")
     assert options.cache == Path(".track-cache/v0.1/train_pool.npz")
+    assert options.admission_report == Path("benchmarks/v0.1/m5_track_admission_report.json")
     assert options.environment_steps == 10_000
     assert options.health_max_steps == 5_000
     assert options.reset_heavy_cycles == 64
@@ -165,6 +211,27 @@ def test_complete_fake_report_passes_every_formal_gate() -> None:
     assert all(check["passed"] for check in checks)
 
 
+def test_expected_track_ids_use_host_domain2_and_advanced_episode_counters() -> None:
+    pool = SimpleNamespace(
+        size=3,
+        batch=SimpleNamespace(seed=np.asarray((10, 20, 30), dtype=np.uint32)),
+    )
+    initial = benchmark.initialize_episode_identities(123456, 4)
+
+    np.testing.assert_array_equal(
+        benchmark._expected_track_ids(pool, initial),
+        (20, 30, 30, 30),
+    )
+    advanced = benchmark.masked_next_episode(
+        initial,
+        np.asarray((True, False, True, False), dtype=np.bool_),
+    )
+    np.testing.assert_array_equal(
+        benchmark._expected_track_ids(pool, advanced),
+        (10, 30, 10, 30),
+    )
+
+
 @pytest.mark.parametrize(
     ("gate_id", "mutate"),
     (
@@ -180,6 +247,22 @@ def test_complete_fake_report_passes_every_formal_gate() -> None:
             "assets.driveability_admission",
             lambda report: report["assets"].update(driveability_admission_pass_count=9_999),
         ),
+        (
+            "official_assets.complete",
+            lambda report: report["official_assets"].update(passed=False),
+        ),
+        (
+            "admission.protocol_and_source",
+            lambda report: report["admission"].update(source_evidence_passed=False),
+        ),
+        (
+            "admission.manifest_binding",
+            lambda report: report["admission"]["manifest_sha256_matches"].update(train=False),
+        ),
+        (
+            "admission.train_cache_binding",
+            lambda report: report["admission"].update(train_cache_sha256_matches=False),
+        ),
         ("pool.resident", lambda report: report["pool_residency"].update(all_leaves_on_gpu=False)),
         ("reset.deterministic", lambda report: report["deterministic_reset"].update(passed=False)),
         (
@@ -193,10 +276,32 @@ def test_complete_fake_report_passes_every_formal_gate() -> None:
             ),
         ),
         (
+            "transfer.mixed_reset",
+            lambda report: report["transfer_guard"]["mixed_next_step_autoreset"].update(
+                reset_track_ids_match_advanced_host_domain2_reference=False
+            ),
+        ),
+        (
+            "transfer.mixed_diversity",
+            lambda report: report["transfer_guard"]["mixed_next_step_autoreset"].update(
+                selected_actual_unique_track_id_count=1
+            ),
+        ),
+        (
             "timing.pool_ratio",
             lambda report: report["timing"].update(pool_to_fixed_throughput_ratio=0.749),
         ),
         ("reset_heavy.protocol", lambda report: report["reset_heavy"].update(passed=False)),
+        (
+            "reset_heavy.protocol",
+            lambda report: report["reset_heavy"].update(
+                final_track_ids_match_advanced_host_domain2_reference=False
+            ),
+        ),
+        (
+            "reset_heavy.diversity",
+            lambda report: report["reset_heavy"].update(final_actual_unique_track_id_count=1),
+        ),
         (
             "health.autoreset",
             lambda report: report["health"].update(all_worlds_observed_autoreset=False),
@@ -281,6 +386,197 @@ def test_source_snapshot_hashes_relative_files_and_requires_clean_tracked_state(
     assert snapshot["relevant_source_clean"] is True
     assert snapshot["tracked_worktree_clean"] is True
     assert tuple(snapshot["source_files_sha256"]) == ("source.py",)
+
+
+def test_official_asset_verifier_requires_complete_set_and_train_cache(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    project = load_project_config(PROJECT_ROOT)
+    expected_splits = {spec.split for spec in benchmark.OFFICIAL_TRACK_SPLITS}
+    expected_fixed = {spec.split for spec in benchmark.OFFICIAL_TRACK_SPLITS if spec.package_asset}
+    verification = SimpleNamespace(
+        manifests={split: object() for split in expected_splits},
+        fixed_batches={split: object() for split in expected_fixed},
+        train_cache_verified=True,
+    )
+    calls = []
+
+    def verify(config, **kwargs):
+        calls.append((config, kwargs))
+        return verification
+
+    monkeypatch.setattr(benchmark, "verify_official_track_assets", verify)
+    result, evidence = benchmark._verify_official_asset_set(
+        project,
+        asset_directory=tmp_path / "assets",
+        train_cache_path=tmp_path / "train_pool.npz",
+    )
+
+    assert result is verification
+    assert evidence["passed"] is True
+    assert calls == [
+        (
+            project,
+            {
+                "asset_directory": tmp_path / "assets",
+                "train_cache_path": tmp_path / "train_pool.npz",
+                "require_train_cache": True,
+            },
+        )
+    ]
+
+
+def test_admission_report_is_strict_and_bound_to_all_manifests_and_train_cache(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    project = load_project_config(PROJECT_ROOT)
+    asset_directory = tmp_path / "assets"
+    asset_directory.mkdir()
+    cache_path = tmp_path / "train_pool.npz"
+    cache_path.write_bytes(b"formal train cache")
+    cache_sha256 = hashlib.sha256(cache_path.read_bytes()).hexdigest()
+    manifests = {}
+    artifacts = {}
+    for index, spec in enumerate(benchmark.OFFICIAL_TRACK_SPLITS):
+        manifest_path = asset_directory / spec.manifest_file
+        manifest_path.write_text(f"{spec.split} manifest\n", encoding="utf-8")
+        manifest_sha256 = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+        asset_sha256 = cache_sha256 if spec.split == "train" else f"{index + 1:064x}"
+        manifests[spec.split] = SimpleNamespace(asset_sha256=asset_sha256)
+        artifacts[spec.split] = {
+            "manifest_file": spec.manifest_file,
+            "manifest_sha256": manifest_sha256,
+            "asset_file": spec.asset_file,
+            "asset_sha256": asset_sha256,
+        }
+    checks = ({"id": "all.formal", "passed": True},)
+    admission = {
+        "schema_version": benchmark.ADMISSION_REPORT_SCHEMA_VERSION,
+        "protocol_version": benchmark.ADMISSION_PROTOCOL_VERSION,
+        "status": "pass",
+        "protocol": {
+            "benchmark_version": project.benchmark.version,
+            "generator_version": project.track.generator.generator_version,
+            "driveability_protocol_version": benchmark.DRIVEABILITY_PROTOCOL_VERSION,
+            "formal_physics_backend": "MJX-Warp",
+            "admission_worlds": benchmark.FORMAL_ADMISSION_WORLDS,
+        },
+        "checks": list(checks),
+        "source_evidence": {
+            "before": {
+                "git_revision": "a" * 40,
+                "relevant_source_clean": True,
+                "source_files_sha256": {"source.py": "b" * 64},
+            },
+            "after": {
+                "git_revision": "a" * 40,
+                "relevant_source_clean": True,
+                "source_files_sha256": {"source.py": "b" * 64},
+            },
+        },
+        "artifacts": artifacts,
+    }
+    report_path = tmp_path / "m5_track_admission_report.json"
+    report_path.write_text(json.dumps(admission), encoding="utf-8")
+    monkeypatch.setattr(benchmark, "evaluate_admission_report", lambda report: checks)
+    verification = SimpleNamespace(manifests=manifests)
+
+    evidence = benchmark._load_verified_admission_evidence(
+        report_path,
+        config=project,
+        asset_directory=asset_directory,
+        train_cache_path=cache_path,
+        official_verification=verification,
+    )
+
+    assert evidence["passed"] is True
+    assert evidence["source_evidence_passed"] is True
+    assert evidence["train_cache_sha256"] == cache_sha256
+    assert all(evidence["manifest_sha256_matches"].values())
+
+    (asset_directory / "test.json").write_text("changed\n", encoding="utf-8")
+    with pytest.raises(RuntimeError, match="does not identify the current Track artifacts"):
+        benchmark._load_verified_admission_evidence(
+            report_path,
+            config=project,
+            asset_directory=asset_directory,
+            train_cache_path=cache_path,
+            official_verification=verification,
+        )
+
+
+def test_admission_report_loader_rejects_duplicate_json_keys(tmp_path: Path) -> None:
+    project = load_project_config(PROJECT_ROOT)
+    report_path = tmp_path / "duplicate.json"
+    report_path.write_text('{"status":"pass","status":"pass"}', encoding="utf-8")
+
+    with pytest.raises(ValueError, match="duplicate JSON key"):
+        benchmark._load_verified_admission_evidence(
+            report_path,
+            config=project,
+            asset_directory=tmp_path,
+            train_cache_path=tmp_path / "train_pool.npz",
+            official_verification=SimpleNamespace(manifests={}),
+        )
+
+
+def test_admission_report_loader_rejects_status_protocol_and_source_claims(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    project = load_project_config(PROJECT_ROOT)
+    report_path = tmp_path / "admission.json"
+    report_path.write_text("{}", encoding="utf-8")
+
+    def invoke(payload):
+        monkeypatch.setattr(benchmark.json, "loads", lambda *args, **kwargs: payload)
+        return benchmark._load_verified_admission_evidence(
+            report_path,
+            config=project,
+            asset_directory=tmp_path,
+            train_cache_path=tmp_path / "train_pool.npz",
+            official_verification=SimpleNamespace(manifests={}),
+        )
+
+    with pytest.raises(RuntimeError, match="status must be 'pass'"):
+        invoke({"status": "fail"})
+
+    protocol_mismatch = {
+        "status": "pass",
+        "schema_version": benchmark.ADMISSION_REPORT_SCHEMA_VERSION,
+        "protocol_version": benchmark.ADMISSION_PROTOCOL_VERSION,
+        "protocol": {
+            "benchmark_version": "wrong",
+            "generator_version": project.track.generator.generator_version,
+            "driveability_protocol_version": benchmark.DRIVEABILITY_PROTOCOL_VERSION,
+            "formal_physics_backend": "MJX-Warp",
+            "admission_worlds": benchmark.FORMAL_ADMISSION_WORLDS,
+        },
+    }
+    with pytest.raises(RuntimeError, match="protocol does not match"):
+        invoke(protocol_mismatch)
+
+    checks = ({"id": "all.formal", "passed": True},)
+    dirty_source = copy.deepcopy(protocol_mismatch)
+    dirty_source["protocol"]["benchmark_version"] = project.benchmark.version
+    dirty_source["checks"] = list(checks)
+    dirty_source["source_evidence"] = {
+        "before": {
+            "git_revision": "a" * 40,
+            "relevant_source_clean": False,
+            "source_files_sha256": {},
+        },
+        "after": {
+            "git_revision": "a" * 40,
+            "relevant_source_clean": True,
+            "source_files_sha256": {},
+        },
+    }
+    monkeypatch.setattr(benchmark, "evaluate_admission_report", lambda report: checks)
+    with pytest.raises(RuntimeError, match="source evidence is not clean"):
+        invoke(dirty_source)
 
 
 def test_verified_cache_loader_binds_manifest_records_to_track_pool(

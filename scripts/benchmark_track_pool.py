@@ -16,6 +16,7 @@ os.environ.setdefault("CUDA_DEVICE_ORDER", "PCI_BUS_ID")
 import argparse
 import gc
 import hashlib
+import json
 import math
 import re
 import sys
@@ -31,7 +32,15 @@ import numpy as np
 from controller_learning.config import ProjectConfig, load_project_config
 from controller_learning.envs.episode import (
     initialize_episode_identities,
+    masked_next_episode,
     track_pool_seeds,
+)
+from controller_learning.tracks.admission import (
+    ADMISSION_PROTOCOL_VERSION,
+    ADMISSION_REPORT_SCHEMA_VERSION,
+    DRIVEABILITY_PROTOCOL_VERSION,
+    FORMAL_ADMISSION_WORLDS,
+    evaluate_admission_report,
 )
 from controller_learning.tracks.assets import (
     TrackAssetManifest,
@@ -40,6 +49,11 @@ from controller_learning.tracks.assets import (
     sha256_file,
 )
 from controller_learning.tracks.hashing import track_batch_geometry_sha256
+from controller_learning.tracks.official_assets import (
+    OFFICIAL_TRACK_SPLITS,
+    OfficialAssetVerification,
+    verify_official_track_assets,
+)
 from controller_learning.tracks.pool import TrackPool
 from controller_learning.tracks.types import Track, TrackBatch
 from scripts import benchmark_racing_env as m4_benchmark
@@ -57,6 +71,7 @@ DEFAULT_RESET_HEAVY_CYCLES = 64
 MINIMUM_POOL_TO_FIXED_THROUGHPUT_RATIO = 0.75
 DEFAULT_MANIFEST = Path("controller_learning/assets/tracks/v0.1/train.json")
 DEFAULT_CACHE = Path(".track-cache/v0.1/train_pool.npz")
+DEFAULT_ADMISSION_REPORT = Path("benchmarks/v0.1/m5_track_admission_report.json")
 DEFAULT_OUTPUT = Path("benchmarks/v0.1/m5_track_pool_report.json")
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 TERMINATION_NAMES = ("none", "success", "off_track", "invalid_action", "timeout")
@@ -76,6 +91,7 @@ RELEVANT_SOURCE_PATHS = (
     "configs/levels/level1.toml",
     "configs/track.toml",
     "configs/vehicle.toml",
+    "benchmarks/v0.1/m5_track_admission_report.json",
     "controller_learning/assets/tracks/v0.1/train.json",
     "controller_learning/assets/vehicle/car.xml",
     "controller_learning/config/loader.py",
@@ -118,6 +134,7 @@ class BenchmarkOptions:
     output: Path = DEFAULT_OUTPUT
     manifest: Path = DEFAULT_MANIFEST
     cache: Path = DEFAULT_CACHE
+    admission_report: Path = DEFAULT_ADMISSION_REPORT
     environment_steps: int = DEFAULT_ENVIRONMENT_STEPS
     warmup_steps: int = DEFAULT_WARMUP_STEPS
     health_max_steps: int = DEFAULT_HEALTH_MAX_STEPS
@@ -133,7 +150,7 @@ class BenchmarkOptions:
             value = getattr(self, name)
             if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
                 raise ValueError(f"{name} must be a positive integer")
-        for name in ("output", "manifest", "cache"):
+        for name in ("output", "manifest", "cache", "admission_report"):
             if not isinstance(getattr(self, name), Path):
                 raise TypeError(f"{name} must be a pathlib.Path")
 
@@ -153,6 +170,12 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
     parser.add_argument("--cache", type=Path, default=DEFAULT_CACHE)
+    parser.add_argument(
+        "--admission-report",
+        type=Path,
+        default=DEFAULT_ADMISSION_REPORT,
+        help="Committed formal M5 admission evidence bound to every Track artifact",
+    )
     parser.add_argument(
         "--steps",
         dest="environment_steps",
@@ -184,6 +207,7 @@ def _parse_args(argv: list[str] | None = None) -> BenchmarkOptions:
         output=values.output,
         manifest=values.manifest,
         cache=values.cache,
+        admission_report=values.admission_report,
         environment_steps=values.environment_steps,
         warmup_steps=values.warmup_steps,
         health_max_steps=values.health_max_steps,
@@ -225,9 +249,193 @@ def _source_snapshot(project_root: Path) -> dict[str, Any]:
     }
 
 
+def _reject_duplicate_json_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    value: dict[str, Any] = {}
+    for key, item in pairs:
+        if key in value:
+            raise ValueError(f"duplicate JSON key in admission report: {key}")
+        value[key] = item
+    return value
+
+
+def _reject_nonfinite_json(value: str) -> None:
+    raise ValueError(f"non-finite JSON value in admission report: {value}")
+
+
+def _verify_official_asset_set(
+    config: ProjectConfig,
+    *,
+    asset_directory: Path,
+    train_cache_path: Path,
+) -> tuple[OfficialAssetVerification, dict[str, Any]]:
+    """Verify all official splits and require the manifest-bound local train cache."""
+
+    verification = verify_official_track_assets(
+        config,
+        asset_directory=asset_directory,
+        train_cache_path=train_cache_path,
+        require_train_cache=True,
+    )
+    expected_splits = {spec.split for spec in OFFICIAL_TRACK_SPLITS}
+    manifest_splits = set(verification.manifests)
+    fixed_splits = set(verification.fixed_batches)
+    expected_fixed = {spec.split for spec in OFFICIAL_TRACK_SPLITS if spec.package_asset}
+    evidence = {
+        "manifest_splits": sorted(manifest_splits),
+        "fixed_package_asset_splits": sorted(fixed_splits),
+        "complete_manifest_set_verified": manifest_splits == expected_splits,
+        "fixed_package_assets_verified": fixed_splits == expected_fixed,
+        "train_cache_verified": verification.train_cache_verified,
+        "split_namespaces_and_protocols_verified": True,
+    }
+    evidence["passed"] = bool(
+        evidence["complete_manifest_set_verified"]
+        and evidence["fixed_package_assets_verified"]
+        and evidence["train_cache_verified"]
+    )
+    if not evidence["passed"]:
+        raise RuntimeError("official Track asset verification returned incomplete evidence")
+    return verification, evidence
+
+
+def _load_verified_admission_evidence(
+    report_path: Path,
+    *,
+    config: ProjectConfig,
+    asset_directory: Path,
+    train_cache_path: Path,
+    official_verification: OfficialAssetVerification,
+) -> dict[str, Any]:
+    """Bind a strict passing admission report to all current manifests and the train cache."""
+
+    try:
+        report = json.loads(
+            report_path.read_text(encoding="utf-8"),
+            object_pairs_hook=_reject_duplicate_json_keys,
+            parse_constant=_reject_nonfinite_json,
+        )
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise RuntimeError("cannot load the formal M5 admission report") from error
+    if not isinstance(report, dict):
+        raise RuntimeError("formal M5 admission report root must be an object")
+    if report.get("status") != "pass":
+        raise RuntimeError("formal M5 admission report status must be 'pass'")
+    if report.get("schema_version") != ADMISSION_REPORT_SCHEMA_VERSION:
+        raise RuntimeError("formal M5 admission report schema version is not supported")
+    if report.get("protocol_version") != ADMISSION_PROTOCOL_VERSION:
+        raise RuntimeError("formal M5 admission protocol version is not supported")
+
+    protocol = report.get("protocol")
+    if not isinstance(protocol, dict):
+        raise RuntimeError("formal M5 admission report protocol must be an object")
+    required_protocol = {
+        "benchmark_version": config.benchmark.version,
+        "generator_version": config.track.generator.generator_version,
+        "driveability_protocol_version": DRIVEABILITY_PROTOCOL_VERSION,
+        "formal_physics_backend": "MJX-Warp",
+        "admission_worlds": FORMAL_ADMISSION_WORLDS,
+    }
+    if any(protocol.get(key) != value for key, value in required_protocol.items()):
+        raise RuntimeError("formal M5 admission report protocol does not match the benchmark")
+
+    recomputed_checks = tuple(evaluate_admission_report(report))
+    actual_checks = report.get("checks")
+    if actual_checks != list(recomputed_checks) or not all(
+        check.get("passed") is True for check in recomputed_checks
+    ):
+        raise RuntimeError("formal M5 admission report gates are missing, stale, or failing")
+    source = report.get("source_evidence")
+    if not isinstance(source, dict):
+        raise RuntimeError("formal M5 admission report source evidence is missing")
+    before = source.get("before")
+    after = source.get("after")
+    if not isinstance(before, dict) or not isinstance(after, dict):
+        raise RuntimeError("formal M5 admission report source snapshots are missing")
+    source_passed = bool(
+        before.get("git_revision") is not None
+        and before.get("git_revision") == after.get("git_revision")
+        and before.get("relevant_source_clean") is True
+        and after.get("relevant_source_clean") is True
+        and before.get("source_files_sha256") == after.get("source_files_sha256")
+    )
+    if not source_passed:
+        raise RuntimeError("formal M5 admission report source evidence is not clean and stable")
+
+    artifacts = report.get("artifacts")
+    expected_splits = {spec.split for spec in OFFICIAL_TRACK_SPLITS}
+    if not isinstance(artifacts, dict) or set(artifacts) != expected_splits:
+        raise RuntimeError("formal M5 admission report artifact set is incomplete")
+    current_manifest_sha256 = {
+        spec.split: sha256_file(asset_directory / spec.manifest_file)
+        for spec in OFFICIAL_TRACK_SPLITS
+    }
+    manifest_sha256_matches = {
+        spec.split: artifacts[spec.split].get("manifest_sha256")
+        == current_manifest_sha256[spec.split]
+        for spec in OFFICIAL_TRACK_SPLITS
+    }
+    artifact_names_match = {
+        spec.split: artifacts[spec.split].get("manifest_file") == spec.manifest_file
+        and artifacts[spec.split].get("asset_file") == spec.asset_file
+        for spec in OFFICIAL_TRACK_SPLITS
+    }
+    manifest_asset_sha256_matches = {
+        spec.split: artifacts[spec.split].get("asset_sha256")
+        == official_verification.manifests[spec.split].asset_sha256
+        for spec in OFFICIAL_TRACK_SPLITS
+    }
+    train_cache_sha256 = sha256_file(train_cache_path)
+    train_cache_matches = (
+        artifacts["train"].get("asset_sha256") == train_cache_sha256
+        and train_cache_sha256 == official_verification.manifests["train"].asset_sha256
+    )
+    if not (
+        all(manifest_sha256_matches.values())
+        and all(artifact_names_match.values())
+        and all(manifest_asset_sha256_matches.values())
+        and train_cache_matches
+    ):
+        raise RuntimeError(
+            "formal M5 admission report does not identify the current Track artifacts"
+        )
+    return {
+        "report_sha256": sha256_file(report_path),
+        "status": report["status"],
+        "schema_version": report["schema_version"],
+        "protocol_version": report["protocol_version"],
+        "protocol": required_protocol,
+        "recomputed_gate_count": len(recomputed_checks),
+        "all_recomputed_gates_passed": True,
+        "source_evidence_passed": source_passed,
+        "source_git_revision": before["git_revision"],
+        "manifest_sha256_matches": manifest_sha256_matches,
+        "artifact_names_match": artifact_names_match,
+        "manifest_asset_sha256_matches": manifest_asset_sha256_matches,
+        "train_cache_sha256": train_cache_sha256,
+        "train_cache_sha256_matches": train_cache_matches,
+        "passed": True,
+    }
+
+
 def _uint32_digest(values: Any) -> str:
     array = np.ascontiguousarray(np.asarray(values, dtype="<u4"))
     return hashlib.sha256(array.tobytes(order="C")).hexdigest()
+
+
+def _expected_track_ids(pool: TrackPool, identity: Any) -> np.ndarray:
+    """Return exact host-reference Track IDs for one episode-identity snapshot."""
+
+    selection_seeds = track_pool_seeds(identity)
+    indices = np.remainder(selection_seeds, np.uint32(pool.size)).astype(np.int64)
+    return np.asarray(pool.batch.seed[indices], dtype=np.uint32)
+
+
+def _advance_all_episodes(identity: Any, count: int) -> Any:
+    mask = np.ones(identity.num_envs, dtype=np.bool_)
+    current = identity
+    for _ in range(count):
+        current = masked_next_episode(current, mask)
+    return current
 
 
 def _load_verified_train_pool(
@@ -525,6 +733,7 @@ def _track_observation_matches(
 def _run_transfer_and_mixed_reset_checks(
     env: Any,
     action: Any,
+    pool: TrackPool,
     sorted_allowed_ids: Any,
 ) -> dict[str, Any]:
     """Check transfer guards plus old-terminal/new-reset Track identity and row isolation."""
@@ -577,9 +786,16 @@ def _run_transfer_and_mixed_reset_checks(
     reset_truncated = np.asarray(autoreset[3], dtype=np.bool_)
     old_ids = np.asarray(before_tracks.seed, dtype=np.uint32)
     current_ids = np.asarray(after_tracks.seed, dtype=np.uint32)
+    initial_identity = initialize_episode_identities(FORMAL_RESET_SEED, FORMAL_NUM_WORLDS)
+    expected_terminal_ids = _expected_track_ids(pool, initial_identity)
+    advanced_identity = masked_next_episode(initial_identity, selected)
+    expected_reset_ids = _expected_track_ids(pool, advanced_identity)
+    terminal_ids_exact = np.array_equal(terminal_ids, expected_terminal_ids)
+    reset_ids_exact = np.array_equal(reset_ids, expected_reset_ids)
 
     terminal_contract = bool(
         np.array_equal(terminal_ids, old_ids)
+        and terminal_ids_exact
         and np.all(terminal_flags[selected])
         and not np.any(terminal_flags[~selected])
         and not np.any(terminal_truncated)
@@ -589,6 +805,7 @@ def _run_transfer_and_mixed_reset_checks(
     )
     reset_contract = bool(
         np.array_equal(reset_ids, current_ids)
+        and reset_ids_exact
         and np.all(reset_reward[selected] == 0.0)
         and not np.any(reset_terminated[selected])
         and not np.any(reset_truncated[selected])
@@ -623,10 +840,21 @@ def _run_transfer_and_mixed_reset_checks(
             "selected_world_count": int(np.count_nonzero(selected)),
             "terminal_reports_old_track": terminal_contract,
             "next_step_reports_current_reset_track": reset_contract,
+            "terminal_track_ids_match_host_domain2_reference": terminal_ids_exact,
+            "reset_track_ids_match_advanced_host_domain2_reference": reset_ids_exact,
+            "expected_reset_track_id_uint32_sha256": _uint32_digest(expected_reset_ids),
+            "actual_reset_track_id_uint32_sha256": _uint32_digest(reset_ids),
             "unselected_track_rows_bit_exact": unselected_preserved,
             "all_result_track_ids_allowed": allowed,
             "selected_track_id_changed_count": int(
                 np.count_nonzero(reset_ids[selected] != terminal_ids[selected])
+            ),
+            "selected_expected_unique_track_id_count": int(
+                np.unique(expected_reset_ids[selected]).size
+            ),
+            "selected_actual_unique_track_id_count": int(np.unique(reset_ids[selected]).size),
+            "selected_world_diversity_ratio": (
+                float(np.unique(reset_ids[selected]).size) / float(np.count_nonzero(selected))
             ),
             "same_track_can_be_resampled": True,
         },
@@ -776,6 +1004,7 @@ def _measure_steady_steps(
 def _run_reset_heavy_measurement(
     env: Any,
     action: Any,
+    pool: TrackPool,
     sorted_allowed_ids: Any,
     *,
     cycles: int,
@@ -791,6 +1020,16 @@ def _run_reset_heavy_measurement(
     preflight_terminal = env.step(invalid)
     preflight_reset = env.step(action)
     _block_public_step(jax, preflight_reset)
+    initial_identity = initialize_episode_identities(FORMAL_RESET_SEED, FORMAL_NUM_WORLDS)
+    expected_initial_ids = _expected_track_ids(pool, initial_identity)
+    one_reset_identity = _advance_all_episodes(initial_identity, 1)
+    expected_preflight_reset_ids = _expected_track_ids(pool, one_reset_identity)
+    preflight_terminal_ids = np.asarray(preflight_terminal[4]["track_id"], dtype=np.uint32)
+    preflight_reset_ids = np.asarray(preflight_reset[4]["track_id"], dtype=np.uint32)
+    preflight_ids_exact = bool(
+        np.array_equal(preflight_terminal_ids, expected_initial_ids)
+        and np.array_equal(preflight_reset_ids, expected_preflight_reset_ids)
+    )
     terminal_ok = bool(
         np.all(np.asarray(preflight_terminal[2], dtype=np.bool_))
         and not np.any(np.asarray(preflight_terminal[3], dtype=np.bool_))
@@ -816,6 +1055,10 @@ def _run_reset_heavy_measurement(
     final_allowed = bool(
         np.asarray(jnp.all(_ids_allowed(jnp, final[4]["track_id"], sorted_allowed_ids)))
     )
+    final_ids = np.asarray(final[4]["track_id"], dtype=np.uint32)
+    final_identity = _advance_all_episodes(initial_identity, cycles)
+    expected_final_ids = _expected_track_ids(pool, final_identity)
+    final_ids_exact = np.array_equal(final_ids, expected_final_ids)
     final_semantics = bool(
         np.all(np.asarray(final[1]) == 0.0)
         and not np.any(np.asarray(final[2], dtype=np.bool_))
@@ -834,10 +1077,26 @@ def _run_reset_heavy_measurement(
         "reset_events_per_second": reset_events / elapsed,
         "preflight_all_invalid_terminals": terminal_ok,
         "preflight_all_next_step_resets": reset_ok,
+        "preflight_track_ids_match_host_domain2_reference": preflight_ids_exact,
         "final_reset_semantics_passed": final_semantics,
         "final_track_ids_allowed": final_allowed,
+        "final_track_ids_match_advanced_host_domain2_reference": final_ids_exact,
+        "expected_final_track_id_uint32_sha256": _uint32_digest(expected_final_ids),
+        "actual_final_track_id_uint32_sha256": _uint32_digest(final_ids),
+        "initial_unique_track_id_count": int(np.unique(expected_initial_ids).size),
+        "final_expected_unique_track_id_count": int(np.unique(expected_final_ids).size),
+        "final_actual_unique_track_id_count": int(np.unique(final_ids).size),
+        "changed_track_id_count": int(np.count_nonzero(final_ids != expected_initial_ids)),
+        "final_world_diversity_ratio": float(np.unique(final_ids).size) / FORMAL_NUM_WORLDS,
         "per_step_host_synchronization": False,
-        "passed": bool(terminal_ok and reset_ok and final_semantics and final_allowed),
+        "passed": bool(
+            terminal_ok
+            and reset_ok
+            and preflight_ids_exact
+            and final_semantics
+            and final_allowed
+            and final_ids_exact
+        ),
     }
 
 
@@ -973,6 +1232,8 @@ def evaluate_report_gates(report: Mapping[str, Any]) -> list[dict[str, Any]]:
 
     protocol = report["protocol"]
     assets = report["assets"]
+    official_assets = report["official_assets"]
+    admission = report["admission"]
     residency = report["pool_residency"]
     timing = report["timing"]
     baseline = report["fixed_track_baseline"]
@@ -1119,6 +1380,50 @@ def evaluate_report_gates(report: Mapping[str, Any]) -> list[dict[str, Any]]:
             FORMAL_TRAIN_TRACK_COUNT,
         ),
         _check(
+            "official_assets.complete",
+            official_assets["passed"],
+            official_assets,
+            {"passed": True},
+        ),
+        _check(
+            "admission.formal_report",
+            admission["formal_report_location"],
+            admission["formal_report_location"],
+            True,
+        ),
+        _check(
+            "admission.protocol_and_source",
+            admission["passed"]
+            and admission["status"] == "pass"
+            and admission["schema_version"] == ADMISSION_REPORT_SCHEMA_VERSION
+            and admission["protocol_version"] == ADMISSION_PROTOCOL_VERSION
+            and admission["all_recomputed_gates_passed"]
+            and admission["source_evidence_passed"],
+            admission,
+            "passing strict protocol and clean stable source evidence",
+        ),
+        _check(
+            "admission.manifest_binding",
+            set(admission["manifest_sha256_matches"])
+            == {spec.split for spec in OFFICIAL_TRACK_SPLITS}
+            and all(admission["manifest_sha256_matches"].values())
+            and all(admission["artifact_names_match"].values())
+            and all(admission["manifest_asset_sha256_matches"].values()),
+            {
+                "manifest_sha256_matches": admission["manifest_sha256_matches"],
+                "artifact_names_match": admission["artifact_names_match"],
+                "manifest_asset_sha256_matches": admission["manifest_asset_sha256_matches"],
+            },
+            "all four official artifacts match the admission report",
+        ),
+        _check(
+            "admission.train_cache_binding",
+            admission["train_cache_sha256_matches"]
+            and admission["train_cache_sha256"] == assets["cache_sha256"],
+            [admission["train_cache_sha256_matches"], admission["train_cache_sha256"]],
+            [True, assets["cache_sha256"]],
+        ),
+        _check(
             "pool.resident",
             residency["track_count"] == FORMAL_TRAIN_TRACK_COUNT
             and residency["leaf_count"] == len(TrackBatch._fields)
@@ -1147,9 +1452,30 @@ def evaluate_report_gates(report: Mapping[str, Any]) -> list[dict[str, Any]]:
         ),
         _check(
             "transfer.mixed_reset",
-            transfer["mixed_next_step_autoreset"]["passed"],
+            transfer["mixed_next_step_autoreset"]["passed"]
+            and transfer["mixed_next_step_autoreset"][
+                "terminal_track_ids_match_host_domain2_reference"
+            ]
+            and transfer["mixed_next_step_autoreset"][
+                "reset_track_ids_match_advanced_host_domain2_reference"
+            ],
             transfer["mixed_next_step_autoreset"],
             {"passed": True},
+        ),
+        _check(
+            "transfer.mixed_diversity",
+            transfer["mixed_next_step_autoreset"]["selected_actual_unique_track_id_count"]
+            == transfer["mixed_next_step_autoreset"]["selected_expected_unique_track_id_count"]
+            and transfer["mixed_next_step_autoreset"]["selected_actual_unique_track_id_count"] > 1,
+            {
+                "expected": transfer["mixed_next_step_autoreset"][
+                    "selected_expected_unique_track_id_count"
+                ],
+                "actual": transfer["mixed_next_step_autoreset"][
+                    "selected_actual_unique_track_id_count"
+                ],
+            },
+            "equal and greater than one",
         ),
         _check(
             "timing.finite_positive",
@@ -1173,7 +1499,25 @@ def evaluate_report_gates(report: Mapping[str, Any]) -> list[dict[str, Any]]:
             baseline,
             "same step/transition count, finite, no per-step synchronization",
         ),
-        _check("reset_heavy.protocol", reset_heavy["passed"], reset_heavy, {"passed": True}),
+        _check(
+            "reset_heavy.protocol",
+            reset_heavy["passed"]
+            and reset_heavy["preflight_track_ids_match_host_domain2_reference"]
+            and reset_heavy["final_track_ids_match_advanced_host_domain2_reference"],
+            reset_heavy,
+            {"passed": True, "host_domain2_references": True},
+        ),
+        _check(
+            "reset_heavy.diversity",
+            reset_heavy["final_actual_unique_track_id_count"]
+            == reset_heavy["final_expected_unique_track_id_count"]
+            and reset_heavy["final_actual_unique_track_id_count"] > 1,
+            {
+                "expected": reset_heavy["final_expected_unique_track_id_count"],
+                "actual": reset_heavy["final_actual_unique_track_id_count"],
+            },
+            "equal and greater than one",
+        ),
         _check(
             "health.bound",
             health["bound_sufficient"],
@@ -1293,11 +1637,31 @@ def run_benchmark(
 
     manifest_path = _resolve(root, options.manifest)
     cache_path = _resolve(root, options.cache)
+    admission_report_path = _resolve(root, options.admission_report)
+    official_verification, official_asset_evidence = _verify_official_asset_set(
+        config,
+        asset_directory=manifest_path.parent,
+        train_cache_path=cache_path,
+    )
+    admission_evidence = _load_verified_admission_evidence(
+        admission_report_path,
+        config=config,
+        asset_directory=manifest_path.parent,
+        train_cache_path=cache_path,
+        official_verification=official_verification,
+    )
+    admission_evidence["formal_report_location"] = _same_path(
+        root,
+        options.admission_report,
+        DEFAULT_ADMISSION_REPORT,
+    )
     _manifest, pool, asset_evidence = _load_verified_train_pool(
         config,
         manifest_path,
         cache_path,
     )
+    if _manifest != official_verification.manifests["train"]:
+        raise RuntimeError("train manifest changed after official asset-set verification")
     asset_evidence.update(
         {
             "formal_manifest_location": _same_path(root, options.manifest, DEFAULT_MANIFEST),
@@ -1381,6 +1745,7 @@ def run_benchmark(
         transfer_guard = _run_transfer_and_mixed_reset_checks(
             env,
             action,
+            pool,
             allowed_ids_device,
         )
 
@@ -1406,6 +1771,7 @@ def run_benchmark(
         reset_heavy = _run_reset_heavy_measurement(
             env,
             action,
+            pool,
             allowed_ids_device,
             cycles=options.reset_heavy_cycles,
         )
@@ -1479,6 +1845,8 @@ def run_benchmark(
             ),
         },
         "assets": asset_evidence,
+        "official_assets": official_asset_evidence,
+        "admission": admission_evidence,
         "pool_residency": pool_residency,
         "deterministic_reset": deterministic_reset,
         "transfer_guard": transfer_guard,
