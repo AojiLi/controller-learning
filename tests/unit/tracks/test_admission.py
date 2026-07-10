@@ -269,6 +269,14 @@ def _passing_report() -> dict:
         "relevant_source_clean": True,
         "source_files_sha256": {"source.py": "0" * 64},
     }
+    artifact_names = ("level0", "train", "validation", "test")
+    artifacts = {
+        name: {
+            "manifest_sha256": f"{index + 1:064x}",
+            "asset_sha256": f"{index + 11:064x}",
+        }
+        for index, name in enumerate(artifact_names)
+    }
     return {
         "schema_version": ADMISSION_REPORT_SCHEMA_VERSION,
         "protocol_version": ADMISSION_PROTOCOL_VERSION,
@@ -280,6 +288,11 @@ def _passing_report() -> dict:
             "hidden_retry": False,
             "bounded_control_step_chunks": True,
             "control_block_steps": FORMAL_CONTROL_BLOCK_STEPS,
+            "official_output_paths": {
+                "official_asset_directory": True,
+                "official_report_path": True,
+                "official_train_cache_directory": True,
+            },
         },
         "splits": split_data,
         "disjointness": {
@@ -309,7 +322,19 @@ def _passing_report() -> dict:
             },
         },
         "source_evidence": {"before": source, "after": dict(source)},
-        "artifacts": {name: {} for name in ("level0", "train", "validation", "test")},
+        "artifacts": artifacts,
+        "artifact_readback": {
+            "passed": True,
+            "official_manifest_splits": list(artifact_names),
+            "fixed_asset_splits": ["level0", "validation", "test"],
+            "train_cache_verified": True,
+            "manifest_files_sha256": {
+                name: value["manifest_sha256"] for name, value in artifacts.items()
+            },
+            "asset_files_sha256": {
+                name: value["asset_sha256"] for name, value in artifacts.items()
+            },
+        },
     }
 
 
@@ -327,6 +352,16 @@ def test_report_gates_require_fixed_shape_gpu_clean_source_and_complete_quotas()
         "splits.quotas",
         "splits.rows",
     }
+
+
+def test_report_cannot_pass_with_nonofficial_paths_or_failed_artifact_readback() -> None:
+    report = _passing_report()
+    report["protocol"]["official_output_paths"]["official_report_path"] = False
+    report["artifact_readback"]["train_cache_verified"] = False
+
+    failed = {check["id"] for check in evaluate_admission_report(report) if not check["passed"]}
+
+    assert failed == {"artifacts.readback", "paths.official"}
 
 
 def test_split_report_keeps_every_rejection_row() -> None:

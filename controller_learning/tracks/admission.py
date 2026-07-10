@@ -579,6 +579,24 @@ def evaluate_admission_report(report: Mapping[str, Any]) -> tuple[dict[str, Any]
     runtime = report.get("runtime", {})
     timing = report.get("timing", {})
     gpu_timing = timing.get("gpu", {})
+    path_evidence = protocol.get("official_output_paths", {})
+    artifacts = report.get("artifacts", {})
+    artifact_readback = report.get("artifact_readback", {})
+    expected_artifact_splits = {"level0", "train", "validation", "test"}
+    expected_fixed_splits = {"level0", "validation", "test"}
+
+    readback_manifest_hashes = artifact_readback.get("manifest_files_sha256", {})
+    readback_asset_hashes = artifact_readback.get("asset_files_sha256", {})
+    readback_hashes_match = (
+        set(artifacts) == expected_artifact_splits
+        and set(readback_manifest_hashes) == expected_artifact_splits
+        and set(readback_asset_hashes) == expected_artifact_splits
+        and all(
+            artifacts[split].get("manifest_sha256") == readback_manifest_hashes[split]
+            and artifacts[split].get("asset_sha256") == readback_asset_hashes[split]
+            for split in expected_artifact_splits
+        )
+    )
 
     split_rows_match = True
     split_order_valid = True
@@ -643,6 +661,16 @@ def evaluate_admission_report(report: Mapping[str, Any]) -> tuple[dict[str, Any]
             and protocol.get("control_block_steps") == FORMAL_CONTROL_BLOCK_STEPS,
         ),
         (
+            "paths.official",
+            set(path_evidence)
+            == {
+                "official_asset_directory",
+                "official_report_path",
+                "official_train_cache_directory",
+            }
+            and all(value is True for value in path_evidence.values()),
+        ),
+        (
             "splits.complete",
             set(splits) == {"train", "validation", "test"}
             and all(splits[name].get("complete") is True for name in splits),
@@ -697,7 +725,16 @@ def evaluate_admission_report(report: Mapping[str, Any]) -> tuple[dict[str, Any]
         ),
         (
             "artifacts.complete",
-            set(report.get("artifacts", {})) == {"level0", "train", "validation", "test"},
+            set(artifacts) == expected_artifact_splits,
+        ),
+        (
+            "artifacts.readback",
+            artifact_readback.get("passed") is True
+            and set(artifact_readback.get("official_manifest_splits", ()))
+            == expected_artifact_splits
+            and set(artifact_readback.get("fixed_asset_splits", ())) == expected_fixed_splits
+            and artifact_readback.get("train_cache_verified") is True
+            and readback_hashes_match,
         ),
     )
     return tuple({"id": check_id, "passed": bool(passed)} for check_id, passed in checks)

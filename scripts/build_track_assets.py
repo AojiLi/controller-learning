@@ -52,8 +52,16 @@ from controller_learning.tracks.admission import (
     verify_selected_disjointness,
     write_strict_json,
 )
+from controller_learning.tracks.assets import sha256_file
 from controller_learning.tracks.hashing import track_geometry_sha256
 from controller_learning.tracks.level0 import build_level0_candidate, build_level0_track
+from controller_learning.tracks.official_assets import (
+    DEFAULT_TRAIN_CACHE,
+    OFFICIAL_TRACK_SPLITS,
+    OfficialAssetVerification,
+    official_track_asset_directory,
+    verify_official_track_assets,
+)
 from controller_learning.tracks.specs import (
     generation_spec_from_project,
     track_capacity_from_project,
@@ -140,6 +148,46 @@ def _resolve_output(project_root: Path, path: Path) -> Path:
     return path if path.is_absolute() else project_root / path
 
 
+def _formal_path_evidence(
+    project_root: Path,
+    options: AdmissionOptions,
+) -> dict[str, bool]:
+    """Return whether every output resolves to its one official v0.1 location."""
+
+    root = project_root.resolve()
+    expected_asset_directory = official_track_asset_directory(
+        "0.1",
+        package_root=root / "controller_learning",
+    ).resolve()
+    expected_train_directory = (root / DEFAULT_TRAIN_CACHE.parent).resolve()
+    expected_report = (root / DEFAULT_REPORT_PATH).resolve()
+    return {
+        "official_asset_directory": (
+            _resolve_output(root, options.asset_directory).resolve() == expected_asset_directory
+        ),
+        "official_train_cache_directory": (
+            _resolve_output(root, options.train_cache_directory).resolve()
+            == expected_train_directory
+        ),
+        "official_report_path": (
+            _resolve_output(root, options.output).resolve() == expected_report
+        ),
+    }
+
+
+def _require_formal_output_paths(
+    project_root: Path,
+    options: AdmissionOptions,
+) -> dict[str, bool]:
+    evidence = _formal_path_evidence(project_root, options)
+    failed = [name for name, passed in evidence.items() if not passed]
+    if failed:
+        raise ValueError(
+            "formal M5 admission requires the official output paths; invalid: " + ", ".join(failed)
+        )
+    return evidence
+
+
 def _source_evidence(project_root: Path) -> dict[str, Any]:
     revision_result = subprocess.run(
         ("git", "rev-parse", "HEAD"),
@@ -212,6 +260,55 @@ def _runtime_evidence(device: Any) -> dict[str, Any]:
             "device_kind": str(getattr(device, "device_kind", "unknown")),
         },
         **_nvidia_smi(),
+    }
+
+
+def _artifact_readback_evidence(
+    *,
+    verification: OfficialAssetVerification,
+    asset_directory: Path,
+    train_cache_path: Path,
+    materialized: dict[str, dict[str, str]],
+) -> dict[str, Any]:
+    """Prove the just-written manifests and all four assets form one official set."""
+
+    expected_splits = tuple(spec.split for spec in OFFICIAL_TRACK_SPLITS)
+    expected_fixed = tuple(spec.split for spec in OFFICIAL_TRACK_SPLITS if spec.package_asset)
+    manifest_splits = tuple(verification.manifests)
+    fixed_splits = tuple(verification.fixed_batches)
+    if set(manifest_splits) != set(expected_splits):
+        raise RuntimeError("official readback did not return all four manifests")
+    if set(fixed_splits) != set(expected_fixed):
+        raise RuntimeError("official readback did not return every fixed package asset")
+    if not verification.train_cache_verified:
+        raise RuntimeError("official readback did not verify the training cache")
+
+    manifest_hashes: dict[str, str] = {}
+    asset_hashes: dict[str, str] = {}
+    for spec in OFFICIAL_TRACK_SPLITS:
+        manifest = verification.manifests[spec.split]
+        manifest_digest = sha256_file(asset_directory / spec.manifest_file)
+        asset_path = (
+            train_cache_path if spec.split == "train" else asset_directory / spec.asset_file
+        )
+        asset_digest = sha256_file(asset_path)
+        emitted = materialized[spec.split]
+        if emitted["manifest_sha256"] != manifest_digest:
+            raise RuntimeError(f"{spec.split} manifest changed before official readback")
+        if emitted["asset_sha256"] != asset_digest:
+            raise RuntimeError(f"{spec.split} asset changed before official readback")
+        if manifest.asset_sha256 != asset_digest:
+            raise RuntimeError(f"{spec.split} readback asset digest does not match its manifest")
+        manifest_hashes[spec.split] = manifest_digest
+        asset_hashes[spec.split] = asset_digest
+
+    return {
+        "passed": True,
+        "official_manifest_splits": list(expected_splits),
+        "fixed_asset_splits": list(expected_fixed),
+        "train_cache_verified": True,
+        "manifest_files_sha256": manifest_hashes,
+        "asset_files_sha256": asset_hashes,
     }
 
 
@@ -632,6 +729,7 @@ def run_formal_admission(
 ) -> dict[str, Any]:
     """Run the formal Level 0 and Level 1 admission/materialization protocol."""
 
+    path_evidence = _require_formal_output_paths(project_root, options)
     source_before = _source_evidence(project_root)
     started = time.perf_counter()
     project_config = load_project_config(project_root)
@@ -696,6 +794,19 @@ def run_formal_admission(
         level0_hash=level0_hash,
         split_results=split_results,
     )
+    train_cache_path = train_cache_directory / "train_pool.npz"
+    verification = verify_official_track_assets(
+        project_config,
+        asset_directory=asset_directory,
+        train_cache_path=train_cache_path,
+        require_train_cache=True,
+    )
+    artifact_readback = _artifact_readback_evidence(
+        verification=verification,
+        asset_directory=asset_directory,
+        train_cache_path=train_cache_path,
+        materialized=artifacts,
+    )
     source_after = _source_evidence(project_root)
     report: dict[str, Any] = {
         "schema_version": ADMISSION_REPORT_SCHEMA_VERSION,
@@ -720,6 +831,7 @@ def run_formal_admission(
             "selection_rule": "first-N geometry-valid, physically successful, unique hashes",
             "target_speed_mps": FORMAL_TARGET_SPEED_MPS,
             "train_asset_storage": "local cache only",
+            "official_output_paths": path_evidence,
         },
         "level0": {
             "seed": level0_track.seed,
@@ -731,6 +843,7 @@ def run_formal_admission(
         "splits": {result.rule.split: split_result_dict(result) for result in split_results},
         "disjointness": disjointness,
         "artifacts": artifacts,
+        "artifact_readback": artifact_readback,
         "timing": {
             "total_s": time.perf_counter() - started,
             "split_scan_s": split_timing,
