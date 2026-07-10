@@ -28,6 +28,7 @@ from controller_learning.control.runner import (
     EpisodeStepLimitError,
     run_controller_episode,
 )
+from controller_learning.control.speed_profile import curvature_speed_profile
 
 __all__ = [
     "PUBLIC_CONTROLLER_CONFIG_KEYS",
@@ -45,6 +46,7 @@ __all__ = [
     "PublicControllerConfig",
     "body_to_world",
     "build_public_controller_config",
+    "curvature_speed_profile",
     "load_controller",
     "load_controller_config",
     "run_controller_episode",
