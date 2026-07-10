@@ -20,8 +20,21 @@ REQUIRED_WHEEL_PATHS = (
     "controller_learning/tracks/validator.py",
     "controller_learning/tracks/specs.py",
     "controller_learning/tracks/driveability.py",
+    "controller_learning/tracks/assets.py",
+    "controller_learning/tracks/hashing.py",
+    "controller_learning/tracks/level0.py",
+    "controller_learning/tracks/official_assets.py",
+    "controller_learning/tracks/pool.py",
+    "controller_learning/tracks/admission.py",
     "controller_learning/envs/race_core.py",
     "controller_learning/envs/configuration.py",
+    "controller_learning/assets/tracks/v0.1/level0.json",
+    "controller_learning/assets/tracks/v0.1/level0.npz",
+    "controller_learning/assets/tracks/v0.1/train.json",
+    "controller_learning/assets/tracks/v0.1/validation.json",
+    "controller_learning/assets/tracks/v0.1/validation.npz",
+    "controller_learning/assets/tracks/v0.1/test.json",
+    "controller_learning/assets/tracks/v0.1/test.npz",
 )
 
 
@@ -56,6 +69,7 @@ def test_built_wheel_contains_and_loads_the_m1_vehicle(tmp_path: Path) -> None:
         assert len(names) == len(set(names))
         for required_path in REQUIRED_WHEEL_PATHS:
             assert names.count(required_path) == 1
+        assert "controller_learning/assets/tracks/v0.1/train_pool.npz" not in names
         for name in names:
             lowered = f"/{name.lower()}"
             assert "/reference/" not in lowered
@@ -77,6 +91,18 @@ assert package_file.is_relative_to(site_dir), (package_file, site_dir)
 package = files("controller_learning")
 assert package.joinpath("py.typed").is_file()
 assert package.joinpath("assets", "vehicle", "car.xml").is_file()
+tracks = package.joinpath("assets", "tracks", "v0.1")
+for name in (
+    "level0.json",
+    "level0.npz",
+    "train.json",
+    "validation.json",
+    "validation.npz",
+    "test.json",
+    "test.npz",
+):
+    assert tracks.joinpath(name).is_file(), name
+assert not tracks.joinpath("train_pool.npz").is_file()
 config = load_vehicle_config(Path(sys.argv[2]))
 model, _ = load_vehicle_model(config)
 assert (model.nq, model.nv, model.nu) == (13, 12, 6)
