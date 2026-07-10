@@ -70,6 +70,7 @@ format = { cmd = "ruff format .", description = "Format Python files" }
 format-check = { cmd = "ruff format --check .", description = "Check Python formatting" }
 lint = { cmd = "ruff check .", description = "Run Python lint checks" }
 tests = { cmd = "pytest", description = "Run CPU tests" }
+sim = { cmd = "python scripts/sim.py", description = "Run one M4 Controller episode on one generated Level 1 track" }
 docs = { cmd = "mkdocs build --strict", description = "Build documentation" }
 actions-lint = { cmd = "actionlint", description = "Validate GitHub Actions workflows" }
 package = { cmd = "python -m build --no-isolation --outdir dist", description = "Build an sdist, then build the wheel from that sdist" }
