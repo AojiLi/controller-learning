@@ -1,0 +1,686 @@
+{
+  "benchmark_version": "v0.1",
+  "implementation": {
+    "git_revision": "3c6f8ab72e9586ddbed9d7a0705c9c3fe7a66745",
+    "relevant_source_clean": true,
+    "source_files_sha256": {
+      "controller_learning/tracks/capacity_benchmark.py": "8278871b2e351d2002483b4faf57d96675d02e4bb879b9c1d25548474d457eae",
+      "controller_learning/tracks/generator.py": "2b5212b000214552bd067bdf49be929d6cbffe7793e19f838e7b475e2ec5a27f",
+      "controller_learning/tracks/geometry.py": "d9888adee9cb597120280624147024fcc9153d080e134df1d0f44bd7192f2e46",
+      "controller_learning/tracks/types.py": "add7c12efd86413c1ea8107a433c0ea8e3ce40fab4cdb0c10746988f95d5a0d5",
+      "controller_learning/tracks/validator.py": "47fbf0a96f5ba810be9da42bca5a0e0adfd4409c94e5952b38e9111ddea677a9",
+      "scripts/benchmark_track_capacity.py": "93bb3a1c4fd83ba8539ea5bf392dc10a209b7622e2f2f2a7ac12c32dc430f9fb"
+    }
+  },
+  "protocol": {
+    "arc_spacings_m": [
+      0.75,
+      1.0,
+      1.25
+    ],
+    "percentile_method": "linear",
+    "percentiles": [
+      "min",
+      "p1",
+      "p5",
+      "p50",
+      "p95",
+      "p99",
+      "p99_9",
+      "max"
+    ],
+    "reproducibility_sample_count": 8,
+    "seed_range": {
+      "contiguous": true,
+      "count": 10000,
+      "end_exclusive": 10000,
+      "start_inclusive": 0
+    }
+  },
+  "schema_version": "controller-learning.track-capacity.v1",
+  "spacing_results": [
+    {
+      "arc_spacing_m": 0.75,
+      "generation": {
+        "attempted_count": 10000,
+        "failed_count": 6,
+        "succeeded_count": 9994
+      },
+      "generator_spec": {
+        "angular_gap_jitter": 0.18,
+        "arc_length_convergence_m": 0.002,
+        "arc_spacing_m": 0.75,
+        "checkpoint_spacing_m": 15.0,
+        "dense_samples_per_control_point": 1024,
+        "generator_version": "v0.1",
+        "max_control_points": 16,
+        "max_length_m": 600.0,
+        "max_radius_m": 88.0,
+        "min_control_points": 8,
+        "min_length_m": 300.0,
+        "min_radius_m": 52.0,
+        "radial_perturbation": 0.16,
+        "start_max_curvature_1pm": 0.025,
+        "start_window_m": 25.0,
+        "tail_merge_fraction": 0.5,
+        "width_m": 7.0
+      },
+      "memory_estimates": {
+        "bytes_10000_track_pool": 377760000,
+        "bytes_1024_world_batch": 38682624,
+        "bytes_per_track": 37776,
+        "method": "Track arrays measured by track_array_bytes plus TrackBatch scalar arrays",
+        "mib_10000_track_pool": 360.260009765625,
+        "mib_1024_world_batch": 36.890625,
+        "mib_per_track": 0.0360260009765625,
+        "runtime_scalar_array_bytes_per_track": 20,
+        "scope": "all runtime numerical TrackBatch leaves; generator_version is host metadata",
+        "track_field_array_bytes_per_track": 37756
+      },
+      "rejections": {
+        "all_reason_counts": {
+          "curvature_exceeded": 30,
+          "length_out_of_range": 6
+        },
+        "by_stage": {
+          "generation": 6,
+          "validation": 30
+        },
+        "primary_reason_counts": {
+          "curvature_exceeded": 30,
+          "length_out_of_range": 6
+        },
+        "sample_seeds_by_primary_reason": {
+          "curvature_exceeded": [
+            33,
+            215,
+            369,
+            861,
+            883,
+            1353,
+            1461,
+            1604,
+            1873,
+            2080
+          ],
+          "length_out_of_range": [
+            2418,
+            2670,
+            3577,
+            3789,
+            3948,
+            4727
+          ]
+        },
+        "total": 36
+      },
+      "reproducibility": {
+        "checked_count": 8,
+        "checked_seeds": [
+          0,
+          1428,
+          2856,
+          4285,
+          5713,
+          7142,
+          8570,
+          9999
+        ],
+        "mismatch_seeds": [],
+        "passed": true
+      },
+      "selected_capacity_candidate": {
+        "base_checkpoints": 40,
+        "base_track_points": 801,
+        "checkpoint_rounding": 8,
+        "headroom_fraction": 0.05,
+        "max_checkpoints": 48,
+        "max_track_points": 896,
+        "observed_max_checkpoints": 40,
+        "observed_max_track_points": 800,
+        "rule": "max(theoretical_required, observed_max), add 5%, then round upward",
+        "track_point_rounding": 64
+      },
+      "statistics": {
+        "generated_candidates": {
+          "checkpoint_count": {
+            "max": 40.0,
+            "min": 21.0,
+            "p1": 22.0,
+            "p5": 23.0,
+            "p50": 30.0,
+            "p95": 37.0,
+            "p99": 39.0,
+            "p99_9": 40.0
+          },
+          "count": 9994,
+          "length_m": {
+            "max": 599.4322591220769,
+            "min": 301.4999825730639,
+            "p1": 321.3021482589166,
+            "p5": 338.225985259918,
+            "p50": 443.3577794934298,
+            "p95": 554.3826460359851,
+            "p99": 576.0283277914385,
+            "p99_9": 590.2194564188761
+          },
+          "max_abs_curvature_1pm": {
+            "max": 0.09337310714933326,
+            "min": 0.012569552712279311,
+            "p1": 0.015035751171590131,
+            "p5": 0.017249092744934386,
+            "p50": 0.026924238357199204,
+            "p95": 0.0464585877598163,
+            "p99": 0.05757822645248112,
+            "p99_9": 0.0758779095919337
+          },
+          "point_count": {
+            "max": 800.0,
+            "min": 403.0,
+            "p1": 429.0,
+            "p5": 452.0,
+            "p50": 592.0,
+            "p95": 740.0,
+            "p99": 769.0699999999997,
+            "p99_9": 788.0070000000014
+          }
+        },
+        "validated_accepted_candidates": {
+          "checkpoint_count": {
+            "max": 40.0,
+            "min": 21.0,
+            "p1": 22.0,
+            "p5": 23.0,
+            "p50": 30.0,
+            "p95": 37.0,
+            "p99": 39.0,
+            "p99_9": 40.0
+          },
+          "count": 9964,
+          "length_m": {
+            "max": 599.4322591220769,
+            "min": 301.4999825730639,
+            "p1": 321.38171258577523,
+            "p5": 338.2615130645879,
+            "p50": 443.62560499158093,
+            "p95": 554.5005613457256,
+            "p99": 576.1422009006127,
+            "p99_9": 590.244312715931
+          },
+          "max_abs_curvature_1pm": {
+            "max": 0.06663523366710805,
+            "min": 0.012569552712279311,
+            "p1": 0.015035576145166487,
+            "p5": 0.01724085307029387,
+            "p50": 0.02687294482873572,
+            "p95": 0.04612277692522342,
+            "p99": 0.05566382082763682,
+            "p99_9": 0.06323018285556854
+          },
+          "point_count": {
+            "max": 800.0,
+            "min": 403.0,
+            "p1": 429.63,
+            "p5": 452.0,
+            "p50": 592.5,
+            "p95": 740.0,
+            "p99": 769.3700000000008,
+            "p99_9": 788.0370000000003
+          }
+        }
+      },
+      "theoretical_capacity": {
+        "arc_spacing_m": 0.75,
+        "checkpoint_formula": "ceil(max_length_m / checkpoint_spacing_m)",
+        "checkpoint_spacing_m": 15.0,
+        "max_checkpoints_required": 40,
+        "max_length_m": 600.0,
+        "max_track_points_required": 801,
+        "track_point_formula": "mirror fixed-spacing tail merge at max_length_m, including explicit closure"
+      },
+      "validation": {
+        "accepted_count": 9964,
+        "available": true,
+        "rejected_count": 30,
+        "validated_count": 9994
+      }
+    },
+    {
+      "arc_spacing_m": 1.0,
+      "generation": {
+        "attempted_count": 10000,
+        "failed_count": 6,
+        "succeeded_count": 9994
+      },
+      "generator_spec": {
+        "angular_gap_jitter": 0.18,
+        "arc_length_convergence_m": 0.002,
+        "arc_spacing_m": 1.0,
+        "checkpoint_spacing_m": 15.0,
+        "dense_samples_per_control_point": 1024,
+        "generator_version": "v0.1",
+        "max_control_points": 16,
+        "max_length_m": 600.0,
+        "max_radius_m": 88.0,
+        "min_control_points": 8,
+        "min_length_m": 300.0,
+        "min_radius_m": 52.0,
+        "radial_perturbation": 0.16,
+        "start_max_curvature_1pm": 0.025,
+        "start_window_m": 25.0,
+        "tail_merge_fraction": 0.5,
+        "width_m": 7.0
+      },
+      "memory_estimates": {
+        "bytes_10000_track_pool": 272800000,
+        "bytes_1024_world_batch": 27934720,
+        "bytes_per_track": 27280,
+        "method": "Track arrays measured by track_array_bytes plus TrackBatch scalar arrays",
+        "mib_10000_track_pool": 260.162353515625,
+        "mib_1024_world_batch": 26.640625,
+        "mib_per_track": 0.0260162353515625,
+        "runtime_scalar_array_bytes_per_track": 20,
+        "scope": "all runtime numerical TrackBatch leaves; generator_version is host metadata",
+        "track_field_array_bytes_per_track": 27260
+      },
+      "rejections": {
+        "all_reason_counts": {
+          "curvature_exceeded": 29,
+          "length_out_of_range": 6
+        },
+        "by_stage": {
+          "generation": 6,
+          "validation": 29
+        },
+        "primary_reason_counts": {
+          "curvature_exceeded": 29,
+          "length_out_of_range": 6
+        },
+        "sample_seeds_by_primary_reason": {
+          "curvature_exceeded": [
+            33,
+            215,
+            369,
+            861,
+            883,
+            1353,
+            1461,
+            1604,
+            1873,
+            2080
+          ],
+          "length_out_of_range": [
+            2418,
+            2670,
+            3577,
+            3789,
+            3948,
+            4727
+          ]
+        },
+        "total": 35
+      },
+      "reproducibility": {
+        "checked_count": 8,
+        "checked_seeds": [
+          0,
+          1428,
+          2856,
+          4285,
+          5713,
+          7142,
+          8570,
+          9999
+        ],
+        "mismatch_seeds": [],
+        "passed": true
+      },
+      "selected_capacity_candidate": {
+        "base_checkpoints": 40,
+        "base_track_points": 601,
+        "checkpoint_rounding": 8,
+        "headroom_fraction": 0.05,
+        "max_checkpoints": 48,
+        "max_track_points": 640,
+        "observed_max_checkpoints": 40,
+        "observed_max_track_points": 600,
+        "rule": "max(theoretical_required, observed_max), add 5%, then round upward",
+        "track_point_rounding": 64
+      },
+      "statistics": {
+        "generated_candidates": {
+          "checkpoint_count": {
+            "max": 40.0,
+            "min": 21.0,
+            "p1": 22.0,
+            "p5": 23.0,
+            "p50": 30.0,
+            "p95": 37.0,
+            "p99": 39.0,
+            "p99_9": 40.0
+          },
+          "count": 9994,
+          "length_m": {
+            "max": 599.4322591220769,
+            "min": 301.4999825730639,
+            "p1": 321.3021482589166,
+            "p5": 338.225985259918,
+            "p50": 443.3577794934298,
+            "p95": 554.3826460359851,
+            "p99": 576.0283277914385,
+            "p99_9": 590.2194564188761
+          },
+          "max_abs_curvature_1pm": {
+            "max": 0.09389523065776667,
+            "min": 0.012583166362421188,
+            "p1": 0.015034862635465579,
+            "p5": 0.01722987004311603,
+            "p50": 0.0268546829542253,
+            "p95": 0.046325538955743796,
+            "p99": 0.05727393379935108,
+            "p99_9": 0.0756166636139181
+          },
+          "point_count": {
+            "max": 600.0,
+            "min": 302.0,
+            "p1": 322.0,
+            "p5": 339.0,
+            "p50": 444.0,
+            "p95": 555.0,
+            "p99": 577.0,
+            "p99_9": 591.0070000000014
+          }
+        },
+        "validated_accepted_candidates": {
+          "checkpoint_count": {
+            "max": 40.0,
+            "min": 21.0,
+            "p1": 22.0,
+            "p5": 23.0,
+            "p50": 30.0,
+            "p95": 37.0,
+            "p99": 39.0,
+            "p99_9": 40.0
+          },
+          "count": 9965,
+          "length_m": {
+            "max": 599.4322591220769,
+            "min": 301.4999825730639,
+            "p1": 321.3829053946345,
+            "p5": 338.2616251487753,
+            "p50": 443.62499891427615,
+            "p95": 554.4952298895922,
+            "p99": 576.1384051303069,
+            "p99_9": 590.2434841726971
+          },
+          "max_abs_curvature_1pm": {
+            "max": 0.06644681176875615,
+            "min": 0.012583166362421188,
+            "p1": 0.015033429396590385,
+            "p5": 0.017229147992437348,
+            "p50": 0.026822443202153053,
+            "p95": 0.046013037253251336,
+            "p99": 0.05564718142462628,
+            "p99_9": 0.06338697735907312
+          },
+          "point_count": {
+            "max": 600.0,
+            "min": 302.0,
+            "p1": 322.0,
+            "p5": 339.0,
+            "p50": 445.0,
+            "p95": 555.7999999999993,
+            "p99": 577.0,
+            "p99_9": 591.0360000000019
+          }
+        }
+      },
+      "theoretical_capacity": {
+        "arc_spacing_m": 1.0,
+        "checkpoint_formula": "ceil(max_length_m / checkpoint_spacing_m)",
+        "checkpoint_spacing_m": 15.0,
+        "max_checkpoints_required": 40,
+        "max_length_m": 600.0,
+        "max_track_points_required": 601,
+        "track_point_formula": "mirror fixed-spacing tail merge at max_length_m, including explicit closure"
+      },
+      "validation": {
+        "accepted_count": 9965,
+        "available": true,
+        "rejected_count": 29,
+        "validated_count": 9994
+      }
+    },
+    {
+      "arc_spacing_m": 1.25,
+      "generation": {
+        "attempted_count": 10000,
+        "failed_count": 6,
+        "succeeded_count": 9994
+      },
+      "generator_spec": {
+        "angular_gap_jitter": 0.18,
+        "arc_length_convergence_m": 0.002,
+        "arc_spacing_m": 1.25,
+        "checkpoint_spacing_m": 15.0,
+        "dense_samples_per_control_point": 1024,
+        "generator_version": "v0.1",
+        "max_control_points": 16,
+        "max_length_m": 600.0,
+        "max_radius_m": 88.0,
+        "min_control_points": 8,
+        "min_length_m": 300.0,
+        "min_radius_m": 52.0,
+        "radial_perturbation": 0.16,
+        "start_max_curvature_1pm": 0.025,
+        "start_window_m": 25.0,
+        "tail_merge_fraction": 0.5,
+        "width_m": 7.0
+      },
+      "memory_estimates": {
+        "bytes_10000_track_pool": 220320000,
+        "bytes_1024_world_batch": 22560768,
+        "bytes_per_track": 22032,
+        "method": "Track arrays measured by track_array_bytes plus TrackBatch scalar arrays",
+        "mib_10000_track_pool": 210.113525390625,
+        "mib_1024_world_batch": 21.515625,
+        "mib_per_track": 0.0210113525390625,
+        "runtime_scalar_array_bytes_per_track": 20,
+        "scope": "all runtime numerical TrackBatch leaves; generator_version is host metadata",
+        "track_field_array_bytes_per_track": 22012
+      },
+      "rejections": {
+        "all_reason_counts": {
+          "curvature_exceeded": 29,
+          "length_out_of_range": 6
+        },
+        "by_stage": {
+          "generation": 6,
+          "validation": 29
+        },
+        "primary_reason_counts": {
+          "curvature_exceeded": 29,
+          "length_out_of_range": 6
+        },
+        "sample_seeds_by_primary_reason": {
+          "curvature_exceeded": [
+            33,
+            215,
+            369,
+            861,
+            883,
+            1353,
+            1461,
+            1604,
+            1873,
+            2080
+          ],
+          "length_out_of_range": [
+            2418,
+            2670,
+            3577,
+            3789,
+            3948,
+            4727
+          ]
+        },
+        "total": 35
+      },
+      "reproducibility": {
+        "checked_count": 8,
+        "checked_seeds": [
+          0,
+          1428,
+          2856,
+          4285,
+          5713,
+          7142,
+          8570,
+          9999
+        ],
+        "mismatch_seeds": [],
+        "passed": true
+      },
+      "selected_capacity_candidate": {
+        "base_checkpoints": 40,
+        "base_track_points": 481,
+        "checkpoint_rounding": 8,
+        "headroom_fraction": 0.05,
+        "max_checkpoints": 48,
+        "max_track_points": 512,
+        "observed_max_checkpoints": 40,
+        "observed_max_track_points": 481,
+        "rule": "max(theoretical_required, observed_max), add 5%, then round upward",
+        "track_point_rounding": 64
+      },
+      "statistics": {
+        "generated_candidates": {
+          "checkpoint_count": {
+            "max": 40.0,
+            "min": 21.0,
+            "p1": 22.0,
+            "p5": 23.0,
+            "p50": 30.0,
+            "p95": 37.0,
+            "p99": 39.0,
+            "p99_9": 40.0
+          },
+          "count": 9994,
+          "length_m": {
+            "max": 599.4322591220769,
+            "min": 301.4999825730639,
+            "p1": 321.3021482589166,
+            "p5": 338.225985259918,
+            "p50": 443.3577794934298,
+            "p95": 554.3826460359851,
+            "p99": 576.0283277914385,
+            "p99_9": 590.2194564188761
+          },
+          "max_abs_curvature_1pm": {
+            "max": 0.0931057604312766,
+            "min": 0.012569552712279311,
+            "p1": 0.015013735001272859,
+            "p5": 0.017229946829661502,
+            "p50": 0.026847051591742676,
+            "p95": 0.046222157823530716,
+            "p99": 0.0574809798568946,
+            "p99_9": 0.0755510783436022
+          },
+          "point_count": {
+            "max": 481.0,
+            "min": 242.0,
+            "p1": 258.0,
+            "p5": 272.0,
+            "p50": 356.0,
+            "p95": 444.35000000000036,
+            "p99": 462.0,
+            "p99_9": 473.0070000000014
+          }
+        },
+        "validated_accepted_candidates": {
+          "checkpoint_count": {
+            "max": 40.0,
+            "min": 21.0,
+            "p1": 22.0,
+            "p5": 23.0,
+            "p50": 30.0,
+            "p95": 37.0,
+            "p99": 39.0,
+            "p99_9": 40.0
+          },
+          "count": 9965,
+          "length_m": {
+            "max": 599.4322591220769,
+            "min": 301.4999825730639,
+            "p1": 321.3829053946345,
+            "p5": 338.2616251487753,
+            "p50": 443.62499891427615,
+            "p95": 554.4952298895922,
+            "p99": 576.1384051303069,
+            "p99_9": 590.2434841726971
+          },
+          "max_abs_curvature_1pm": {
+            "max": 0.06654588889780014,
+            "min": 0.012569552712279311,
+            "p1": 0.015012434141512598,
+            "p5": 0.01722854299674719,
+            "p50": 0.026814195242590554,
+            "p95": 0.045884886292962265,
+            "p99": 0.055496335914084954,
+            "p99_9": 0.0632901087015056
+          },
+          "point_count": {
+            "max": 481.0,
+            "min": 242.0,
+            "p1": 258.0,
+            "p5": 272.0,
+            "p50": 356.0,
+            "p95": 445.0,
+            "p99": 462.0,
+            "p99_9": 473.0360000000019
+          }
+        }
+      },
+      "theoretical_capacity": {
+        "arc_spacing_m": 1.25,
+        "checkpoint_formula": "ceil(max_length_m / checkpoint_spacing_m)",
+        "checkpoint_spacing_m": 15.0,
+        "max_checkpoints_required": 40,
+        "max_length_m": 600.0,
+        "max_track_points_required": 481,
+        "track_point_formula": "mirror fixed-spacing tail merge at max_length_m, including explicit closure"
+      },
+      "validation": {
+        "accepted_count": 9965,
+        "available": true,
+        "rejected_count": 29,
+        "validated_count": 9994
+      }
+    }
+  ],
+  "validator": {
+    "function": "validate_track_candidate",
+    "module": "controller_learning.tracks.validator",
+    "unavailable_means_unvalidated_not_accepted": true,
+    "validation_available": true,
+    "validation_spec": {
+      "boundary_offset_tolerance_m": 1e-05,
+      "checkpoint_center_tolerance_m": 0.02,
+      "checkpoint_tangent_tolerance": 0.001,
+      "closure_tolerance_m": 1e-08,
+      "cumulative_tolerance_m": 1e-06,
+      "expected_width_m": 7.0,
+      "intersection_tolerance_m": 1e-09,
+      "local_arc_exclusion_m": 25.0,
+      "max_abs_curvature_1pm": 0.06666666666666667,
+      "max_length_m": 600.0,
+      "min_length_m": 300.0,
+      "min_nonlocal_centerline_clearance_m": 9.0,
+      "start_max_abs_curvature_1pm": 0.025,
+      "start_pose_tolerance": 1e-08,
+      "start_window_m": 25.0,
+      "tangent_norm_tolerance": 1e-06,
+      "width_tolerance_m": 1e-06
+    }
+  }
+}
