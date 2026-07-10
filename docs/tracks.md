@@ -1,13 +1,69 @@
 # Tracks and Race Core
 
-M3 establishes deterministic closed-track geometry and the pure-JAX batched race-state layer. The
+M3 established deterministic closed-track geometry and the pure-JAX batched race-state layer. The
 physical vehicle still runs on a uniform MuJoCo plane: tracks are numerical Challenge data rather
 than collision meshes. This lets every GPU world use different geometry without duplicating or
 recompiling the vehicle model.
 
-M4 now exposes these contracts through the Gymnasium and Controller interfaces described in
-[Gymnasium and Controller Platform](environment.md). Track pools and fixed Level assets remain M5
-responsibilities.
+M4 exposes these contracts through the Gymnasium and Controller interfaces described in
+[Gymnasium and Controller Platform](environment.md). M5 now publishes the fixed Level assets,
+versioned split manifests, reproducible training cache, and device-resident TrackPool.
+
+## Published Levels and Splits
+
+Level 0 is a deterministic smooth ellipse, with 70 m and 50 m semi-axes and the same fixed 7 m width
+used by Level 1. Its start is normalized to `(0, 0, 0)` with a `+x` tangent. It uses the reserved
+maximum uint32 Track ID, `4,294,967,295`, so it cannot collide with an ordinary Level 1 generator
+seed.
+
+Level 1 uses three immutable half-open seed namespaces. Admission scans each namespace in ascending
+order and does not hide retries inside Track generation:
+
+| Split | Track count | Seed namespace | Use |
+| --- | ---: | --- | --- |
+| Train | 10,000 | `[0, 1,000,000)` | Controller training and pool sampling |
+| Validation | 100 | `[1,000,000, 2,000,000)` | Development and tuning evidence |
+| Test | 20 | `[2,000,000, 3,000,000)` | Held-out formal evaluation |
+
+The stable public namespace of a numeric `track_id` is the composite
+`(benchmark_version, level_id, track_id)`. The ID itself remains a device-native uint32 generator
+seed rather than a host string. The manifests bind each accepted seed to its packed-geometry
+SHA-256 digest, protocol versions, capacity, and exact asset digest. Selected seeds and geometry
+hashes are disjoint across Level 0, Train, Validation, and Test.
+
+## Official Asset Workflow
+
+All manifests live under `controller_learning/assets/tracks/v0.1/`. The small fixed
+`level0.npz`, `validation.npz`, and `test.npz` assets are committed and packaged. The Train manifest
+is committed, but its 272,800,000-byte `train_pool.npz` is reconstructed into the ignored local
+cache `.track-cache/v0.1/train_pool.npz`; it is not a repository asset.
+
+Verify the manifests and fixed assets without requiring a local Train cache:
+
+```bash
+pixi run verify-track-assets
+```
+
+Reproduce or verify the Train cache from the committed seed/hash manifest, then verify all assets
+including that cache:
+
+```bash
+pixi run materialize-track-pool
+pixi run verify-track-assets -- --require-train-cache
+```
+
+The formal GPU admission command regenerates the official manifests, fixed assets, local Train
+cache, and admission report. It is the expensive publication workflow, not a normal setup step:
+
+```bash
+pixi run -e gpu build-track-assets
+```
+
+Run the formal 1,024-world TrackPool protocol after the Train cache is present:
+
+```bash
+pixi run -e gpu benchmark-track-pool
+```
 
 ## Fixed-Capacity Track Contract
 
@@ -88,3 +144,41 @@ error was 0.2387 m and maximum planar speed was 3.9847 m/s. There were no off-tr
 invalid-action, numerical-failure, contact/constraint-overflow, or unexpected-contact outcomes. The
 complete machine-readable evidence is the
 [track-driveability report](https://github.com/AojiLi/controller-learning/blob/main/benchmarks/v0.1/track_driveability_report.json).
+
+## Measured M5 Admission Result
+
+The formal M5 admission run completed in 1,266.411 seconds. Its batched four-wheel MJX-Warp work
+took 1,116.205 seconds and executed 54,161,408 transitions at 48,522.822 transitions/s.
+
+| Split | Attempts | Geometry rejected | Driveability rejected | Selected |
+| --- | ---: | ---: | ---: | ---: |
+| Train | 11,306 | 42 | 1,220 | 10,000 |
+| Validation | 1,027 | 3 | 13 | 100 |
+| Test | 1,026 | 2 | 4 | 20 |
+
+Level 0 and every selected Level 1 Track passed geometry and conservative physical driveability.
+All official locations and hashes, cross-split seed/hash disjointness, serialized artifact readback,
+and source/runtime gates passed. The complete evidence is the
+[M5 Track admission report](https://github.com/AojiLi/controller-learning/blob/main/benchmarks/v0.1/m5_track_admission_report.json).
+
+## Measured M5 TrackPool Result
+
+The formal pool contained 10,000 Tracks and 17 GPU-resident leaves occupying exactly 272,800,000
+bytes, matching the verified host representation. Its E1 headline epoch used 1,024 worlds for
+10,000 steps: 10,240,000 transitions in 48.6758 seconds, or 210,371.5 transitions/s. The matched
+fixed-Track baseline measured 219,604.7 transitions/s, so pool sampling retained a 0.958 throughput
+ratio.
+
+The first long run exposed a one-time 524 MiB process-VRAM allocator expansion. The v2 protocol
+therefore fixes its memory baseline only after a separate 10,000-step E0 stabilization epoch, then
+runs three distinct-seed 10,000-step epochs on the same environment without clearing JAX caches.
+Across E0–E3, 40,960,000 transitions were executed. Post-E0 process-VRAM, allocator-pool, and
+allocator-peak growth were all zero. Live JAX bytes had 4,936,960-byte maximum growth and ended
+2,191,360 bytes above E0; host RSS ended only 0.027 MiB above E0. Peak sampled process VRAM was
+1,334 MiB.
+
+The separate 3,998-step health run observed exactly 1,024 timeout and next-step autoreset events,
+with no unexpected termination or non-finite value. The reset-heavy protocol requested 65,536
+resets and matched the host domain-2 reference. Active/mixed transfer guards, E0–E3 JIT-cache
+stability, source binding, and privacy gates all passed. The complete 62-gate evidence is the
+[M5 TrackPool report](https://github.com/AojiLi/controller-learning/blob/main/benchmarks/v0.1/m5_track_pool_report.json).

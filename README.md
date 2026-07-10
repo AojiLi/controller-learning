@@ -7,9 +7,9 @@ Controller Learning is a benchmark and teaching platform for developing and comp
 controllers under one environment, vehicle, task, and evaluation protocol. PID, MPC, and PPO are
 provided as examples; the reusable Challenge and Controller interface are the core product.
 
-> **Project status:** M4 is complete. The Gymnasium single/vector environments, trusted Controller
-> plugin platform, public 2D renderer, and single-run CLI have passed their CPU and GPU gates. M5
-> Level assets and versioned Track pools are now active.
+> **Project status:** M5 is complete. Fixed Level 0/1 assets, versioned Track manifests, reproducible
+> training-pool materialization, and the 10,000-Track GPU pool have passed their formal gates. M6
+> PID and MPC Controller examples are now active.
 
 Reviewed machine-readable evidence is available in the
 [M1 CPU report](benchmarks/v0.1/m1_cpu_report.json) and
@@ -17,7 +17,9 @@ Reviewed machine-readable evidence is available in the
 [track-capacity report](benchmarks/v0.1/track_capacity_report.json) and
 [track-driveability report](benchmarks/v0.1/track_driveability_report.json). The complete M4
 environment path is measured in the
-[M4 environment report](benchmarks/v0.1/m4_environment_report.json).
+[M4 environment report](benchmarks/v0.1/m4_environment_report.json). M5 evidence is in the
+[Track admission report](benchmarks/v0.1/m5_track_admission_report.json) and
+[TrackPool GPU report](benchmarks/v0.1/m5_track_pool_report.json).
 
 ## Why This Project Exists
 
@@ -135,6 +137,34 @@ gate. First-step compilation took 1.698 seconds on the recorded NVIDIA GeForce R
 GPU. These are zero-action environment-throughput measurements, not Controller performance claims.
 See [Gymnasium and Controller Platform](docs/environment.md) for the API and protocol.
 
+## Verified M5 Level Assets and TrackPool Result
+
+M5 publishes one deterministic Level 0 ellipse with reserved numeric Track ID `UINT32_MAX`, plus
+three disjoint Level 1 namespaces:
+
+| Split | Published Tracks | Allowed seed range |
+| --- | ---: | --- |
+| Train | 10,000 | `[0, 1,000,000)` |
+| Validation | 100 | `[1,000,000, 2,000,000)` |
+| Test | 20 | `[2,000,000, 3,000,000)` |
+
+All four manifests are committed. Level 0, Validation, and Test NPZ assets are also committed and
+packaged; the 272,800,000-byte Train pool is reconstructed into the ignored local cache
+`.track-cache/v0.1/train_pool.npz` and verified against its manifest hash. Formal admission selected
+the 10,000 Train Tracks from 11,306 ascending-seed attempts after 42 geometry and 1,220 physical
+driveability rejections. The complete admission took 1,266.411 seconds, including 1,116.205 seconds
+and 54,161,408 transitions on the four-wheel GPU backend at 48,522.822 transitions/s. All official
+Tracks, split-disjointness checks, artifact hashes, and serialized readback gates passed.
+
+The formal TrackPool headline epoch ran 1,024 worlds for 10,000 steps: 10,240,000 transitions in
+48.6758 seconds, or 210,371.5 transitions/s. The matched fixed-Track baseline measured 219,604.7
+transitions/s, giving a 0.958 throughput ratio. The strengthened memory protocol ran E0 through E3
+for 40,960,000 total transitions on one environment. The first long run exposed a one-time 524 MiB
+allocator expansion; after E0, process VRAM, allocator pool size, and allocator peak growth were all
+zero through E3. Peak sampled process VRAM was 1,334 MiB. Health, reset-heavy, transfer, JIT-cache,
+source, and privacy gates also passed. These are environment and asset results, not Controller
+success claims. See [Tracks and Race Core](docs/tracks.md) for the asset and sampling contracts.
+
 ## Roadmap
 
 The implementation follows strict milestone gates:
@@ -144,8 +174,8 @@ The implementation follows strict milestone gates:
 - M2: MJX-Warp 1/64/256/1024-world GPU go/no-go — complete
 - M3: batched tracks and Race Core — complete
 - M4: Gymnasium environments and Controller platform — complete
-- M5: Level 0/1 and versioned track pools — active
-- M6: PID and MPC
+- M5: Level 0/1 and versioned track pools — complete
+- M6: PID and MPC — active
 - M7: PPO on the official vector environment
 - M8: evaluation, documentation, and public v0.1 release
 

@@ -1,8 +1,9 @@
 # Gymnasium and Controller Platform
 
-M4 exposes the physical four-wheel Challenge through one vector state machine and one thin
+M4 exposed the physical four-wheel Challenge through one vector state machine and one thin
 single-world adapter. Classical Controllers, later PPO training, and evaluation all use this same
-transition path; there is no simplified RL environment.
+transition path; there is no simplified RL environment. M5 extends that same vector state machine
+with deterministic device-native TrackPool selection and masked replacement.
 
 ## Quick Simulation
 
@@ -34,8 +35,8 @@ ControllerLearning/CarRacing-v0
 
 `CarRacingEnv` is a host/NumPy batch-one adapter over `VecCarRacingEnv`. The vector environment owns
 all vehicle, Race Core, seed, termination, and NEXT_STEP autoreset state. Both constructors require
-an explicit immutable `ProjectConfig`, Level, Track data, and backend. M4 injects already generated
-Tracks; versioned Level assets and Track pools are M5 work.
+an explicit immutable `ProjectConfig`, Level, Track source, and backend. The source is either fixed
+injected Track data or the published M5 Train TrackPool; both modes use the same Challenge path.
 
 The public action is a float32 vector in physical units:
 
@@ -85,6 +86,19 @@ Reset and non-terminal rows use neutral terminal values. Environment and Control
 domain-separated and deterministic for `(root seed, world index, episode counter)`. The GPU path
 implements the same NumPy `SeedSequence` result in pure JAX, so masked autoreset does not transfer
 state to the host.
+
+`track_id` is the selected Track's uint32 generator seed. Its stable identity is the composite
+`(benchmark_version, level_id, track_id)`; the numeric value is not globally meaningful without the
+published benchmark and Level namespace. Level 0 reserves `UINT32_MAX`. The Level 1 Train,
+Validation, and Test namespaces are disjoint, and each manifest binds its IDs to exact geometry
+hashes.
+
+TrackPool choice uses SeedSequence domain 2, separate from episode domain 0 and Controller domain 1,
+then maps the uint32 selection seed to a pool row with replacement. On a terminal call, info still
+contains the old Track ID. On the following NEXT_STEP call, affected worlds first advance their
+episode counters, derive their new domain-2 choice, and atomically replace Track, vehicle, Race Core,
+and observation state. That reset transition returns the new Track ID with zero reward and false
+termination flags; unaffected worlds advance normally.
 
 Termination reason values are `0=none`, `1=success`, `2=off_track`, `3=invalid_action`, and
 `4=timeout`. Timeout sets `truncated`; success, off-track, and invalid action set `terminated`.
@@ -181,3 +195,27 @@ MuJoCo/MJX-Warp 3.10.0, and Warp 1.13.0. This is an environment-throughput and c
 it is not a driving Controller benchmark. The complete source hashes, Track IDs, configuration,
 checks, versions, and memory samples are in the
 [M4 environment report](https://github.com/AojiLi/controller-learning/blob/main/benchmarks/v0.1/m4_environment_report.json).
+
+## Measured M5 TrackPool Result
+
+Run the reproducible local-cache and formal GPU workflows with:
+
+```bash
+pixi run materialize-track-pool
+pixi run -e gpu benchmark-track-pool
+```
+
+The reviewed E1 headline epoch ran 1,024 worlds against the full 10,000-Track Train pool for 10,000
+steps: 10,240,000 transitions in 48.6758 seconds, or 210,371.5 transitions/s. The fixed-Track
+baseline measured 219,604.7 transitions/s, giving a 0.958 ratio. E0 plus three distinct-seed
+measurement epochs ran 40,960,000 transitions on the same environment. After the disclosed one-time
+524 MiB allocator expansion, process VRAM, allocator-pool size, and allocator peak showed zero
+post-E0 growth; peak sampled process VRAM was 1,334 MiB.
+
+The health protocol ran 3,998 steps and observed exactly 1,024 timeouts followed by 1,024 independent
+autoresets, with no unexpected termination or non-finite public value. Another 65,536 requested
+reset events matched the host domain-2 reference. Active and mixed-reset transfer guards, JIT-cache
+stability, source binding, and privacy gates passed. These measurements establish the environment
+and pool path; they do not claim that a Controller can drive. See the
+[M5 TrackPool report](https://github.com/AojiLi/controller-learning/blob/main/benchmarks/v0.1/m5_track_pool_report.json)
+for all 62 gates and [Tracks and Race Core](tracks.md) for admission and asset details.
