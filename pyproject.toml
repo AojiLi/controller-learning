@@ -91,6 +91,7 @@ benchmark-racing-env = { cmd = "python scripts/benchmark_racing_env.py", descrip
 validate-track-driveability = { cmd = "python scripts/validate_track_driveability.py --output benchmarks/v0.1/track_driveability_report.json", description = "Validate M3 generated tracks on the formal four-wheel GPU backend" }
 build-track-assets = { cmd = "python scripts/build_track_assets.py", description = "Run formal M5 GPU admission and build official Track assets" }
 benchmark-track-pool = { cmd = "python scripts/benchmark_track_pool.py", description = "Run the formal 1024-world M5 TrackPool benchmark" }
+benchmark-controllers = { cmd = "python scripts/benchmark_m6_controllers.py", description = "Run the formal M6 PID and MPC Controller benchmark" }
 
 [tool.pixi.environments]
 default = { features = ["cpu", "dev"], solve-group = "cpu" }
