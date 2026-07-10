@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import math
 from collections.abc import Mapping
+from dataclasses import FrozenInstanceError
 from inspect import signature
 from pathlib import Path
 from typing import Any
@@ -13,9 +15,11 @@ import pytest
 from controller_learning.config import ProjectConfig, load_project_config
 from controller_learning.control import (
     ControllerExecutionError,
+    EpisodeRunResult,
     EpisodeStepLimitError,
     run_controller_episode,
 )
+from controller_learning.control import runner as runner_module
 from controller_learning.control.debug_draw import DebugDrawCommand, LineCommand
 from controller_learning.envs.episode import PUBLIC_INFO_KEYS
 
@@ -169,10 +173,79 @@ def test_runner_orders_lifecycle_and_returns_an_immutable_result(tmp_path: Path)
     assert result.truncated is False
     assert result.final_info["lap_completed"] is True
     assert result.debug_commands == ()
+    assert math.isfinite(result.controller_import_time_s)
+    assert math.isfinite(result.controller_init_time_s)
+    assert result.controller_import_time_s >= 0.0
+    assert result.controller_init_time_s >= 0.0
+    assert len(result.compute_times_s) == result.steps
+    assert all(math.isfinite(value) and value >= 0.0 for value in result.compute_times_s)
     assert isinstance(result.final_info, Mapping)
     with pytest.raises(TypeError):
         result.final_info["track_id"] = 8  # type: ignore[index]
+    with pytest.raises(FrozenInstanceError):
+        result.compute_times_s = ()  # type: ignore[misc]
     assert env.closed is False
+
+
+def test_runner_measures_only_plugin_load_init_and_compute_boundaries(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    plugin = _write_plugin(tmp_path / "plugin", ORDERED_PLUGIN)
+    env = FakeEnv(episode_steps=2)
+    timestamps_ns = iter((10, 110, 200, 700, 1_000, 1_100, 2_000, 2_300))
+    clock_calls: list[int] = []
+
+    def fake_perf_counter_ns() -> int:
+        value = next(timestamps_ns)
+        clock_calls.append(value)
+        env.events.append(("clock", value))
+        return value
+
+    monkeypatch.setattr(runner_module.time, "perf_counter_ns", fake_perf_counter_ns)
+
+    result = run_controller_episode(env, plugin, reset_seed=73)
+
+    assert clock_calls == [10, 110, 200, 700, 1_000, 1_100, 2_000, 2_300]
+    assert result.controller_import_time_s == pytest.approx(100e-9)
+    assert result.controller_init_time_s == pytest.approx(500e-9)
+    assert result.compute_times_s == pytest.approx((100e-9, 300e-9))
+
+    event_names = [event[0] if isinstance(event, tuple) else event for event in env.events]
+    assert event_names == [
+        "reset",
+        "clock",
+        "clock",
+        "clock",
+        "init",
+        "clock",
+        "clock",
+        "compute",
+        "clock",
+        "env.step",
+        "step_callback",
+        "clock",
+        "compute",
+        "clock",
+        "env.step",
+        "step_callback",
+        "episode_callback",
+    ]
+
+
+def test_episode_result_preserves_legacy_construction_defaults() -> None:
+    result = EpisodeRunResult(
+        steps=0,
+        total_reward=0.0,
+        terminated=False,
+        truncated=True,
+        final_info={},
+        debug_commands=(),
+    )
+
+    assert result.controller_import_time_s == 0.0
+    assert result.controller_init_time_s == 0.0
+    assert result.compute_times_s == ()
 
 
 def test_runner_constructs_fresh_controller_state_for_every_call(tmp_path: Path) -> None:

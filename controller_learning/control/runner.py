@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from functools import partial
@@ -59,6 +60,9 @@ class EpisodeRunResult:
     truncated: bool
     final_info: Mapping[str, Any]
     debug_commands: tuple[DebugDrawCommand, ...]
+    controller_import_time_s: float = 0.0
+    controller_init_time_s: float = 0.0
+    compute_times_s: tuple[float, ...] = ()
 
 
 def _plugin_call(
@@ -71,6 +75,13 @@ def _plugin_call(
         raise
     except Exception as error:
         raise ControllerExecutionError(phase, error) from error
+
+
+def _elapsed_seconds(started_ns: int) -> float:
+    """Return a finite, nonnegative duration from the monotonic Runner clock."""
+
+    elapsed_ns = max(0, time.perf_counter_ns() - started_ns)
+    return elapsed_ns / 1_000_000_000
 
 
 def _public_info_keys() -> tuple[str, ...]:
@@ -182,23 +193,28 @@ def run_controller_episode(
     obs, reset_info_value = env.reset(seed=reset_seed)
     reset_info = _public_info(reset_info_value, source="reset")
 
+    import_started_ns = time.perf_counter_ns()
     controller_class = _plugin_call("import", lambda: load_controller(controller_directory))
     controller_parameters = _plugin_call(
         "import", lambda: load_controller_config(controller_directory)
     )
+    controller_import_time_s = _elapsed_seconds(import_started_ns)
     public_config = build_public_controller_config(
         project_config,
         level_id,
         controller_parameters,
     )
+    init_started_ns = time.perf_counter_ns()
     controller = _plugin_call(
         "init",
         lambda: controller_class(obs, reset_info, public_config),
     )
+    controller_init_time_s = _elapsed_seconds(init_started_ns)
 
     debug_buffer = _DebugDrawBuffer()
     episode_debug_commands: list[DebugDrawCommand] = []
     steps = 0
+    compute_times_s: list[float] = []
     total_reward = 0.0
     terminated = False
     truncated = False
@@ -210,10 +226,10 @@ def run_controller_episode(
             if max_steps is not None and steps >= max_steps:
                 raise EpisodeStepLimitError(steps=steps, max_steps=max_steps)
 
-            action = _plugin_call(
-                "compute",
-                partial(controller.compute_control, obs, final_info),
-            )
+            compute_control = partial(controller.compute_control, obs, final_info)
+            compute_started_ns = time.perf_counter_ns()
+            action = _plugin_call("compute", compute_control)
+            compute_times_s.append(_elapsed_seconds(compute_started_ns))
             next_obs, reward_value, terminated_value, truncated_value, info_value = env.step(action)
             reward = float(reward_value)
             terminated = bool(terminated_value)
@@ -269,6 +285,9 @@ def run_controller_episode(
         truncated=truncated,
         final_info=final_info,
         debug_commands=tuple(episode_debug_commands),
+        controller_import_time_s=controller_import_time_s,
+        controller_init_time_s=controller_init_time_s,
+        compute_times_s=tuple(compute_times_s),
     )
 
 
