@@ -39,6 +39,7 @@ platforms = ["linux-64"]
 requires-pixi = ">=0.69,<1"
 
 [tool.pixi.dependencies]
+casadi = "3.7.2.*"
 python = "3.11.*"
 hatchling = ">=1.27,<2"
 
