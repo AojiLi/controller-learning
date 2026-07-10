@@ -130,6 +130,11 @@ def test_repository_ppo_config_is_strict_cross_validated_and_immutable() -> None
             "progress_scale = 1e-300",
             "must remain positive in normal float32",
         ),
+        (
+            "save_optimizer_state = true",
+            "save_optimizer_state = false",
+            "must be true for optimizer continuation",
+        ),
     ),
 )
 def test_ppo_config_rejects_invalid_values(

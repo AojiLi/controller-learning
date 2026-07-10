@@ -15,8 +15,7 @@ from controller_learning.envs.race_core import RaceTermination, wrap_angle
 from controller_learning.envs.vector_racing import VecCarRacingEnv
 from controller_learning.rl.configuration import PpoRewardConfig
 from controller_learning.rl.features import local_track_reference_jax
-
-PUBLIC_REWARD_SCHEMA_VERSION = "controller-learning.m7-public-reward.v1"
+from controller_learning.rl.schema import PUBLIC_REWARD_SCHEMA_VERSION
 
 
 class RewardShapingResult(NamedTuple):

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -218,8 +219,24 @@ class _InjectInvalidActionOnCall(gym.vector.VectorWrapper):
         return self.env.step(actions)
 
 
-def _small_formal_stack() -> tuple[JaxToTorchVecEnv, Any]:
+def _small_formal_stack(
+    *,
+    inject_invalid: bool = True,
+    short_timeout: bool = False,
+) -> tuple[JaxToTorchVecEnv, Any]:
     project = load_project_config(PROJECT_ROOT)
+    if short_timeout:
+        project = replace(
+            project,
+            benchmark=replace(
+                project.benchmark,
+                episode=replace(
+                    project.benchmark.episode,
+                    minimum_timeout_s=0.1,
+                    timeout_reference_speed_mps=1.0e6,
+                ),
+            ),
+        )
     ppo = load_ppo_config(PROJECT_ROOT / "configs" / "ppo.toml")
     generation = generation_spec_from_project(project)
     capacity = track_capacity_from_project(project)
@@ -233,8 +250,8 @@ def _small_formal_stack() -> tuple[JaxToTorchVecEnv, Any]:
     )
     shaped = PublicRewardShapingVecEnv(base, ppo.reward)
     featured = LocalTrackObservationVecEnv(shaped, config=ppo.observation)
-    injected = _InjectInvalidActionOnCall(featured, call=2, world=1)
-    env = JaxToTorchVecEnv(injected, device=_device())
+    outer = _InjectInvalidActionOnCall(featured, call=2, world=1) if inject_invalid else featured
+    env = JaxToTorchVecEnv(outer, device=_device())
     policy = _policy_module().PpoActorCritic(
         LOCAL_TRACK_FEATURE_DIM,
         action_low=base.single_action_space.low,
@@ -270,6 +287,12 @@ def test_collector_owns_cuda_rollout_and_preserves_pending_reset_between_updates
             "rewards": (2, 2),
             "terminated": (2, 2),
             "truncated": (2, 2),
+            "termination_reason": (2, 2),
+            "lap_completed": (2, 2),
+            "lap_time_s": (2, 2),
+            "episode_seed": (2, 2),
+            "controller_seed": (2, 2),
+            "track_id": (2, 2),
             "valid_transition": (2, 2),
             "reset_only": (2, 2),
         }
@@ -295,6 +318,9 @@ def test_collector_owns_cuda_rollout_and_preserves_pending_reset_between_updates
             torch.tensor((False, True), dtype=torch.bool, device=env.device),
         )
         assert rollout_a.terminated[1, 1]
+        assert rollout_a.termination_reason[1, 1] == 3
+        assert not torch.any(rollout_a.lap_completed)
+        assert torch.all(rollout_a.lap_time_s == 0.0)
         assert not torch.any(rollout_a.truncated)
         assert torch.all(rollout_a.actions >= policy.action_low)
         assert torch.all(rollout_a.actions <= policy.action_high)
@@ -327,6 +353,9 @@ def test_collector_owns_cuda_rollout_and_preserves_pending_reset_between_updates
         )
         assert torch.equal(rollout_b.valid_transition, torch.logical_not(rollout_b.reset_only))
         assert rollout_b.rewards[0, 1].item() == 0.0
+        assert rollout_b.termination_reason[0, 1].item() == 0
+        assert not rollout_b.lap_completed[0, 1]
+        assert rollout_b.lap_time_s[0, 1].item() == 0.0
         assert not rollout_b.terminated[0, 1]
         assert not rollout_b.truncated[0, 1]
         torch.testing.assert_close(
@@ -363,6 +392,52 @@ def test_collector_requires_explicit_compatible_state_and_policy_generator() -> 
                 type(state)(state.observation, state.pending_reset.cpu()),
                 generator=torch.Generator(device=env.device),
             )
+    finally:
+        env.close()
+
+
+@pytest.mark.parametrize("rollout_steps", (2, 3))
+def test_actual_timeout_bootstraps_terminal_observation_at_end_or_mid_rollout(
+    rollout_steps: int,
+) -> None:
+    torch = _torch()
+    env, policy = _small_formal_stack(inject_invalid=False, short_timeout=True)
+    collector = _collector_module().TorchRolloutCollector(
+        env,
+        policy,
+        rollout_steps=rollout_steps,
+    )
+    generator = torch.Generator(device=env.device).manual_seed(431)
+    try:
+        rollout = collector.collect(collector.initialize(seed=433), generator=generator)
+        assert torch.all(rollout.truncated[1])
+        assert torch.all(rollout.termination_reason[1] == 4)
+        assert not torch.any(rollout.terminated)
+        assert torch.all(rollout.final_state.pending_reset == (rollout_steps == 2))
+        terminal_observation = (
+            rollout.final_state.observation if rollout_steps == 2 else rollout.observations[2]
+        )
+        with torch.no_grad():
+            terminal_value = policy.value(terminal_observation)
+        torch.testing.assert_close(
+            rollout.values[2],
+            terminal_value,
+            rtol=0.0,
+            atol=0.0,
+        )
+
+        gae = rollout.generalized_advantage_estimate(gamma=0.9, gae_lambda=0.8)
+        torch.testing.assert_close(
+            gae.returns[1],
+            rollout.rewards[1] + 0.9 * rollout.values[2],
+            rtol=1.0e-6,
+            atol=1.0e-6,
+        )
+        if rollout_steps == 3:
+            assert torch.all(rollout.reset_only[2])
+            assert torch.all(rollout.rewards[2] == 0.0)
+            assert torch.all(gae.advantages[2] == 0.0)
+            assert torch.all(gae.returns[2] == 0.0)
     finally:
         env.close()
 

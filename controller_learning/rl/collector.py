@@ -9,6 +9,7 @@ accounting, but masks exclude them from GAE and later PPO losses.
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping
 from dataclasses import dataclass
 from numbers import Real
 from typing import Any
@@ -103,6 +104,12 @@ class CollectedRollout:
     rewards: Tensor
     terminated: Tensor
     truncated: Tensor
+    termination_reason: Tensor
+    lap_completed: Tensor
+    lap_time_s: Tensor
+    episode_seed: Tensor
+    controller_seed: Tensor
+    track_id: Tensor
     valid_transition: Tensor
     reset_only: Tensor
     initial_pending_reset: Tensor
@@ -439,6 +446,12 @@ class TorchRolloutCollector:
         rewards = torch.empty(time_world, dtype=self.dtype, device=self.device)
         terminated = torch.empty(time_world, dtype=torch.bool, device=self.device)
         truncated = torch.empty_like(terminated)
+        termination_reason = torch.empty(time_world, dtype=torch.int32, device=self.device)
+        lap_completed = torch.empty_like(terminated)
+        lap_time_s = torch.empty(time_world, dtype=self.dtype, device=self.device)
+        episode_seed = torch.empty(time_world, dtype=torch.uint32, device=self.device)
+        controller_seed = torch.empty_like(episode_seed)
+        track_id = torch.empty_like(episode_seed)
         valid_transition = torch.empty_like(terminated)
         reset_only = torch.empty_like(terminated)
 
@@ -461,7 +474,9 @@ class TorchRolloutCollector:
                 old_log_prob[step].copy_(sample.log_prob)
                 values[step].copy_(sample.value)
 
-                next_observation, reward, term, trunc, _ = self.env.step(sample.action)
+                next_observation, reward, term, trunc, info = self.env.step(sample.action)
+                if not isinstance(info, Mapping):
+                    raise TypeError("public vector info must be a mapping")
                 validated_next = _validate_tensor(
                     next_observation,
                     name="step observation",
@@ -497,6 +512,60 @@ class TorchRolloutCollector:
                         device=self.device,
                     )
                 )
+                termination_reason[step].copy_(
+                    _validate_tensor(
+                        info["termination_reason"],
+                        name="info['termination_reason']",
+                        shape=(self.num_envs,),
+                        dtype=torch.int32,
+                        device=self.device,
+                    )
+                )
+                lap_completed[step].copy_(
+                    _validate_tensor(
+                        info["lap_completed"],
+                        name="info['lap_completed']",
+                        shape=(self.num_envs,),
+                        dtype=torch.bool,
+                        device=self.device,
+                    )
+                )
+                lap_time_s[step].copy_(
+                    _validate_tensor(
+                        info["lap_time_s"],
+                        name="info['lap_time_s']",
+                        shape=(self.num_envs,),
+                        dtype=self.dtype,
+                        device=self.device,
+                    )
+                )
+                episode_seed[step].copy_(
+                    _validate_tensor(
+                        info["episode_seed"],
+                        name="info['episode_seed']",
+                        shape=(self.num_envs,),
+                        dtype=torch.uint32,
+                        device=self.device,
+                    )
+                )
+                controller_seed[step].copy_(
+                    _validate_tensor(
+                        info["controller_seed"],
+                        name="info['controller_seed']",
+                        shape=(self.num_envs,),
+                        dtype=torch.uint32,
+                        device=self.device,
+                    )
+                )
+                track_id[step].copy_(
+                    _validate_tensor(
+                        info["track_id"],
+                        name="info['track_id']",
+                        shape=(self.num_envs,),
+                        dtype=torch.uint32,
+                        device=self.device,
+                    )
+                )
                 torch.logical_or(terminated[step], truncated[step], out=pending_reset)
                 current_observation, next_observation_buffer = (
                     next_observation_buffer,
@@ -518,6 +587,12 @@ class TorchRolloutCollector:
             rewards=rewards,
             terminated=terminated,
             truncated=truncated,
+            termination_reason=termination_reason,
+            lap_completed=lap_completed,
+            lap_time_s=lap_time_s,
+            episode_seed=episode_seed,
+            controller_seed=controller_seed,
+            track_id=track_id,
             valid_transition=valid_transition,
             reset_only=reset_only,
             initial_pending_reset=initial_pending_reset,
@@ -532,6 +607,12 @@ class TorchRolloutCollector:
             rewards=rewards,
             terminated=terminated,
             truncated=truncated,
+            termination_reason=termination_reason,
+            lap_completed=lap_completed,
+            lap_time_s=lap_time_s,
+            episode_seed=episode_seed,
+            controller_seed=controller_seed,
+            track_id=track_id,
             valid_transition=valid_transition,
             reset_only=reset_only,
             initial_pending_reset=initial_pending_reset,
@@ -550,6 +631,12 @@ class TorchRolloutCollector:
         rewards: Tensor,
         terminated: Tensor,
         truncated: Tensor,
+        termination_reason: Tensor,
+        lap_completed: Tensor,
+        lap_time_s: Tensor,
+        episode_seed: Tensor,
+        controller_seed: Tensor,
+        track_id: Tensor,
         valid_transition: Tensor,
         reset_only: Tensor,
         initial_pending_reset: Tensor,
@@ -567,6 +654,7 @@ class TorchRolloutCollector:
                     torch.all(torch.isfinite(old_log_prob)),
                     torch.all(torch.isfinite(values)),
                     torch.all(torch.isfinite(rewards)),
+                    torch.all(torch.isfinite(lap_time_s)),
                     torch.all(torch.isfinite(final_state.observation)),
                 )
             ).all()
@@ -582,6 +670,15 @@ class TorchRolloutCollector:
                 (terminated & truncated).sum(dtype=torch.int64),
                 (reset_only & terminal).sum(dtype=torch.int64),
                 (reset_only & (rewards != 0.0)).sum(dtype=torch.int64),
+                (reset_only & (termination_reason != 0)).sum(dtype=torch.int64),
+                (reset_only & lap_completed).sum(dtype=torch.int64),
+                (lap_completed & torch.logical_not(terminated)).sum(dtype=torch.int64),
+                ((termination_reason < 0) | (termination_reason > 4)).sum(dtype=torch.int64),
+                ((termination_reason == 0) != torch.logical_not(terminal)).sum(dtype=torch.int64),
+                ((termination_reason == 4) != truncated).sum(dtype=torch.int64),
+                ((termination_reason == 1) != lap_completed).sum(dtype=torch.int64),
+                (lap_completed & (lap_time_s <= 0.0)).sum(dtype=torch.int64),
+                (torch.logical_not(lap_completed) & (lap_time_s != 0.0)).sum(dtype=torch.int64),
                 numerical_failure.to(dtype=torch.int64),
             )
         ).to(device="cpu")
@@ -595,6 +692,15 @@ class TorchRolloutCollector:
             overlapping_terminal_count,
             reset_terminal_count,
             reset_reward_count,
+            reset_reason_count,
+            reset_lap_count,
+            lap_without_termination_count,
+            invalid_reason_count,
+            reason_terminal_mismatch_count,
+            timeout_mismatch_count,
+            success_mismatch_count,
+            success_time_count,
+            nonsuccess_time_count,
             numerical_failure_count,
         ) = summary.tolist()
 
@@ -604,6 +710,20 @@ class TorchRolloutCollector:
             raise ValueError("a NEXT_STEP reset-only row must return false terminal flags")
         if reset_reward_count:
             raise ValueError("NEXT_STEP reset-only rewards must be exactly zero")
+        if reset_reason_count or reset_lap_count:
+            raise ValueError("NEXT_STEP reset-only public episode info must be neutral")
+        if lap_without_termination_count:
+            raise ValueError("lap_completed requires a terminated transition")
+        if invalid_reason_count:
+            raise ValueError("termination_reason must use the public range [0, 4]")
+        if reason_terminal_mismatch_count:
+            raise ValueError("termination_reason NONE must match nonterminal transitions")
+        if timeout_mismatch_count:
+            raise ValueError("termination_reason TIMEOUT must match truncated transitions")
+        if success_mismatch_count:
+            raise ValueError("termination_reason SUCCESS must match lap_completed")
+        if success_time_count or nonsuccess_time_count:
+            raise ValueError("lap_time_s must be positive only for completed laps")
         if numerical_failure_count:
             raise FloatingPointError("rollout tensors contain a non-finite value")
 

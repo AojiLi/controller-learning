@@ -459,6 +459,10 @@ class PpoCheckpointConfig:
                 field="ppo.checkpoint.save_optimizer_state",
             ),
         )
+        if not self.save_optimizer_state:
+            raise ConfigError(
+                "ppo.checkpoint.save_optimizer_state must be true for optimizer continuation"
+            )
 
 
 @dataclass(frozen=True, slots=True)

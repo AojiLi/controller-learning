@@ -34,8 +34,8 @@ from numpy.typing import NDArray
 from controller_learning.envs.observation import OBSERVATION_KEYS
 from controller_learning.envs.vector_racing import VecCarRacingEnv
 from controller_learning.rl.configuration import PpoObservationConfig
+from controller_learning.rl.schema import LOCAL_TRACK_FEATURE_SCHEMA_VERSION
 
-LOCAL_TRACK_FEATURE_SCHEMA_VERSION = 1
 LOCAL_TRACK_PREVIEW_POINTS = 16
 LOCAL_TRACK_FEATURE_DIM = 100
 
