@@ -1,0 +1,33 @@
+schema_version = 1
+
+[representation]
+arc_spacing_m = 1.0
+max_track_points = 640
+checkpoint_spacing_m = 15.0
+max_checkpoints = 48
+
+[generator]
+generator_version = "spike-v1"
+min_control_points = 8
+max_control_points = 16
+min_radius_m = 52.0
+max_radius_m = 88.0
+angular_gap_jitter = 0.18
+radial_perturbation = 0.16
+dense_samples_per_control_point = 1024
+arc_length_convergence_m = 0.002
+tail_merge_fraction = 0.5
+
+[validation]
+min_length_m = 300.0
+max_length_m = 600.0
+min_turn_radius_m = 15.0
+min_nonlocal_centerline_clearance_m = 9.0
+local_arc_exclusion_m = 25.0
+start_window_m = 25.0
+start_max_curvature_1pm = 0.025
+
+[race]
+safety_margin_m = 0.2
+projection_backward_segments = 4
+projection_forward_segments = 12

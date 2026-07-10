@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from math import isclose, isfinite
+from math import ceil, floor, isclose, isfinite
 
 SCHEMA_VERSION = 1
 
@@ -15,6 +15,11 @@ class ConfigError(ValueError):
 def _require_positive(value: float, field: str) -> None:
     if not isfinite(value) or value <= 0.0:
         raise ConfigError(f"{field} must be a finite positive number, got {value!r}")
+
+
+def _require_integer_at_least(value: int, minimum: int, field: str) -> None:
+    if isinstance(value, bool) or not isinstance(value, int) or value < minimum:
+        raise ConfigError(f"{field} must be an integer greater than or equal to {minimum}")
 
 
 def _validate_schema_version(value: int, config_name: str) -> None:
@@ -202,12 +207,202 @@ class BenchmarkConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class TrackRepresentationConfig:
+    """Fixed-shape Track storage and arc-length sampling parameters."""
+
+    arc_spacing_m: float
+    max_track_points: int
+    checkpoint_spacing_m: float
+    max_checkpoints: int
+
+    def __post_init__(self) -> None:
+        _require_positive(self.arc_spacing_m, "track.representation.arc_spacing_m")
+        _require_integer_at_least(
+            self.max_track_points,
+            4,
+            "track.representation.max_track_points",
+        )
+        _require_positive(
+            self.checkpoint_spacing_m,
+            "track.representation.checkpoint_spacing_m",
+        )
+        _require_integer_at_least(
+            self.max_checkpoints,
+            1,
+            "track.representation.max_checkpoints",
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class TrackGeneratorConfig:
+    """Versioned parameters for deterministic periodic-spline generation."""
+
+    generator_version: str
+    min_control_points: int
+    max_control_points: int
+    min_radius_m: float
+    max_radius_m: float
+    angular_gap_jitter: float
+    radial_perturbation: float
+    dense_samples_per_control_point: int
+    arc_length_convergence_m: float
+    tail_merge_fraction: float
+
+    def __post_init__(self) -> None:
+        if not self.generator_version:
+            raise ConfigError("track.generator.generator_version cannot be empty")
+        _require_integer_at_least(
+            self.min_control_points,
+            4,
+            "track.generator.min_control_points",
+        )
+        _require_integer_at_least(
+            self.max_control_points,
+            self.min_control_points,
+            "track.generator.max_control_points",
+        )
+        _require_positive(self.min_radius_m, "track.generator.min_radius_m")
+        _require_positive(self.max_radius_m, "track.generator.max_radius_m")
+        if self.min_radius_m >= self.max_radius_m:
+            raise ConfigError("track generator radius limits must be strictly ordered")
+        for value, field in (
+            (self.angular_gap_jitter, "angular_gap_jitter"),
+            (self.radial_perturbation, "radial_perturbation"),
+        ):
+            if not isfinite(value) or not 0.0 <= value < 1.0:
+                raise ConfigError(f"track.generator.{field} must be in [0, 1)")
+        _require_integer_at_least(
+            self.dense_samples_per_control_point,
+            64,
+            "track.generator.dense_samples_per_control_point",
+        )
+        _require_positive(
+            self.arc_length_convergence_m,
+            "track.generator.arc_length_convergence_m",
+        )
+        if not isfinite(self.tail_merge_fraction) or not 0.0 < self.tail_merge_fraction <= 1.0:
+            raise ConfigError("track.generator.tail_merge_fraction must be in (0, 1]")
+
+
+@dataclass(frozen=True, slots=True)
+class TrackValidationConfig:
+    """Geometric validity limits for generated Level 1 tracks."""
+
+    min_length_m: float
+    max_length_m: float
+    min_turn_radius_m: float
+    min_nonlocal_centerline_clearance_m: float
+    local_arc_exclusion_m: float
+    start_window_m: float
+    start_max_curvature_1pm: float
+
+    def __post_init__(self) -> None:
+        for field in (
+            "min_length_m",
+            "max_length_m",
+            "min_turn_radius_m",
+            "min_nonlocal_centerline_clearance_m",
+            "local_arc_exclusion_m",
+            "start_window_m",
+            "start_max_curvature_1pm",
+        ):
+            _require_positive(getattr(self, field), f"track.validation.{field}")
+        if self.min_length_m >= self.max_length_m:
+            raise ConfigError("track validation length limits must be strictly ordered")
+        if self.start_window_m >= self.min_length_m:
+            raise ConfigError("track.validation.start_window_m must be shorter than min_length_m")
+        if self.local_arc_exclusion_m < self.min_nonlocal_centerline_clearance_m:
+            raise ConfigError(
+                "track.validation.local_arc_exclusion_m must be at least the nonlocal clearance"
+            )
+
+    @property
+    def max_abs_curvature_1pm(self) -> float:
+        """Return the curvature limit corresponding to ``min_turn_radius_m``."""
+
+        return 1.0 / self.min_turn_radius_m
+
+
+@dataclass(frozen=True, slots=True)
+class TrackRaceConfig:
+    """Topology-local projection and effective-boundary rules."""
+
+    safety_margin_m: float
+    projection_backward_segments: int
+    projection_forward_segments: int
+
+    def __post_init__(self) -> None:
+        if not isfinite(self.safety_margin_m) or self.safety_margin_m < 0.0:
+            raise ConfigError("track.race.safety_margin_m must be finite and non-negative")
+        _require_integer_at_least(
+            self.projection_backward_segments,
+            0,
+            "track.race.projection_backward_segments",
+        )
+        _require_integer_at_least(
+            self.projection_forward_segments,
+            1,
+            "track.race.projection_forward_segments",
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class TrackConfig:
+    """Complete Track generation, validation, representation, and race configuration."""
+
+    schema_version: int
+    representation: TrackRepresentationConfig
+    generator: TrackGeneratorConfig
+    validation: TrackValidationConfig
+    race: TrackRaceConfig
+
+    def __post_init__(self) -> None:
+        _validate_schema_version(self.schema_version, "track")
+        if self.generator.arc_length_convergence_m >= self.representation.arc_spacing_m:
+            raise ConfigError(
+                "track generator arc-length convergence must be smaller than arc spacing"
+            )
+        if self.generator.min_radius_m < self.validation.min_turn_radius_m:
+            raise ConfigError(
+                "track generator minimum radius cannot be smaller than the validation turn radius"
+            )
+        if self.representation.max_track_points < self.required_track_points:
+            raise ConfigError(
+                "track.representation.max_track_points cannot cover the maximum valid track "
+                f"length: requires at least {self.required_track_points}"
+            )
+        if self.representation.max_checkpoints < self.required_checkpoints:
+            raise ConfigError(
+                "track.representation.max_checkpoints cannot cover the maximum valid track "
+                f"length: requires at least {self.required_checkpoints}"
+            )
+
+    @property
+    def required_track_points(self) -> int:
+        """Return the worst-case point count, including the explicit closing point."""
+
+        spacing = self.representation.arc_spacing_m
+        full_steps = floor(self.validation.max_length_m / spacing)
+        remainder_m = self.validation.max_length_m - full_steps * spacing
+        if remainder_m <= 1.0e-10 or remainder_m < spacing * self.generator.tail_merge_fraction:
+            return full_steps + 1
+        return full_steps + 2
+
+    @property
+    def required_checkpoints(self) -> int:
+        """Return the worst-case ordered checkpoint count, including the finish line."""
+
+        return ceil(self.validation.max_length_m / self.representation.checkpoint_spacing_m)
+
+
+@dataclass(frozen=True, slots=True)
 class ProjectConfig:
     """Cross-validated vehicle, Levels, and benchmark protocol."""
 
     vehicle: VehicleConfig
     levels: tuple[LevelConfig, ...]
     benchmark: BenchmarkConfig
+    track: TrackConfig
 
     def __post_init__(self) -> None:
         levels_by_id = {level.level_id: level for level in self.levels}
@@ -235,6 +430,23 @@ class ProjectConfig:
                 )
         if not isclose(level0.track_width_m, level1.track_width_m):
             raise ConfigError("Level 0 and Level 1 must use the same fixed track width")
+        track_width_m = level1.track_width_m
+        if (
+            track_width_m
+            <= self.vehicle.vehicle.vehicle_width_m + 2.0 * self.track.race.safety_margin_m
+        ):
+            raise ConfigError(
+                "track effective half-width must remain positive after vehicle width and safety "
+                "margin"
+            )
+        if self.track.validation.min_turn_radius_m <= 0.5 * track_width_m:
+            raise ConfigError(
+                "track validation turn radius must exceed half the fixed Level track width"
+            )
+        if self.track.validation.min_nonlocal_centerline_clearance_m <= track_width_m:
+            raise ConfigError(
+                "track nonlocal centerline clearance must exceed the fixed Level track width"
+            )
         if not isclose(
             self.vehicle.simulation.control_dt_s,
             self.benchmark.controller.period_s,

@@ -4,6 +4,7 @@ from controller_learning.config.loader import (
     load_benchmark_config,
     load_level_config,
     load_project_config,
+    load_track_config,
     load_vehicle_config,
 )
 from controller_learning.config.models import (
@@ -16,6 +17,11 @@ from controller_learning.config.models import (
     ProjectConfig,
     RankingConfig,
     SimulationConfig,
+    TrackConfig,
+    TrackGeneratorConfig,
+    TrackRaceConfig,
+    TrackRepresentationConfig,
+    TrackValidationConfig,
     VehicleConfig,
     VehicleGeometryConfig,
 )
@@ -30,10 +36,16 @@ __all__ = [
     "ProjectConfig",
     "RankingConfig",
     "SimulationConfig",
+    "TrackConfig",
+    "TrackGeneratorConfig",
+    "TrackRaceConfig",
+    "TrackRepresentationConfig",
+    "TrackValidationConfig",
     "VehicleConfig",
     "VehicleGeometryConfig",
     "load_benchmark_config",
     "load_level_config",
     "load_project_config",
+    "load_track_config",
     "load_vehicle_config",
 ]

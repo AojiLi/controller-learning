@@ -6,10 +6,12 @@ from controller_learning.config import (
     ConfigError,
     LevelConfig,
     ProjectConfig,
+    TrackConfig,
     VehicleConfig,
     load_benchmark_config,
     load_level_config,
     load_project_config,
+    load_track_config,
     load_vehicle_config,
 )
 
@@ -18,10 +20,12 @@ __all__ = [
     "ConfigError",
     "LevelConfig",
     "ProjectConfig",
+    "TrackConfig",
     "VehicleConfig",
     "__version__",
     "load_benchmark_config",
     "load_level_config",
     "load_project_config",
+    "load_track_config",
     "load_vehicle_config",
 ]

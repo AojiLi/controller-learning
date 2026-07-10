@@ -17,6 +17,11 @@ from controller_learning.config.models import (
     ProjectConfig,
     RankingConfig,
     SimulationConfig,
+    TrackConfig,
+    TrackGeneratorConfig,
+    TrackRaceConfig,
+    TrackRepresentationConfig,
+    TrackValidationConfig,
     VehicleConfig,
     VehicleGeometryConfig,
 )
@@ -223,6 +228,174 @@ def load_benchmark_config(path: str | Path) -> BenchmarkConfig:
     )
 
 
+def load_track_config(path: str | Path) -> TrackConfig:
+    """Load the fixed-capacity procedural Track configuration."""
+
+    config_path = Path(path)
+    data = _read_toml(config_path)
+    _exact_keys(
+        data,
+        {"schema_version", "representation", "generator", "validation", "race"},
+        "track config",
+    )
+    representation = _section(data, "representation", "track config")
+    _exact_keys(
+        representation,
+        {
+            "arc_spacing_m",
+            "max_track_points",
+            "checkpoint_spacing_m",
+            "max_checkpoints",
+        },
+        "track.representation",
+    )
+    generator = _section(data, "generator", "track config")
+    _exact_keys(
+        generator,
+        {
+            "generator_version",
+            "min_control_points",
+            "max_control_points",
+            "min_radius_m",
+            "max_radius_m",
+            "angular_gap_jitter",
+            "radial_perturbation",
+            "dense_samples_per_control_point",
+            "arc_length_convergence_m",
+            "tail_merge_fraction",
+        },
+        "track.generator",
+    )
+    validation = _section(data, "validation", "track config")
+    _exact_keys(
+        validation,
+        {
+            "min_length_m",
+            "max_length_m",
+            "min_turn_radius_m",
+            "min_nonlocal_centerline_clearance_m",
+            "local_arc_exclusion_m",
+            "start_window_m",
+            "start_max_curvature_1pm",
+        },
+        "track.validation",
+    )
+    race = _section(data, "race", "track config")
+    _exact_keys(
+        race,
+        {
+            "safety_margin_m",
+            "projection_backward_segments",
+            "projection_forward_segments",
+        },
+        "track.race",
+    )
+
+    return TrackConfig(
+        schema_version=_integer(data, "schema_version", "track config"),
+        representation=TrackRepresentationConfig(
+            arc_spacing_m=_number(representation, "arc_spacing_m", "track.representation"),
+            max_track_points=_integer(
+                representation,
+                "max_track_points",
+                "track.representation",
+            ),
+            checkpoint_spacing_m=_number(
+                representation,
+                "checkpoint_spacing_m",
+                "track.representation",
+            ),
+            max_checkpoints=_integer(
+                representation,
+                "max_checkpoints",
+                "track.representation",
+            ),
+        ),
+        generator=TrackGeneratorConfig(
+            generator_version=_string(
+                generator,
+                "generator_version",
+                "track.generator",
+            ),
+            min_control_points=_integer(
+                generator,
+                "min_control_points",
+                "track.generator",
+            ),
+            max_control_points=_integer(
+                generator,
+                "max_control_points",
+                "track.generator",
+            ),
+            min_radius_m=_number(generator, "min_radius_m", "track.generator"),
+            max_radius_m=_number(generator, "max_radius_m", "track.generator"),
+            angular_gap_jitter=_number(
+                generator,
+                "angular_gap_jitter",
+                "track.generator",
+            ),
+            radial_perturbation=_number(
+                generator,
+                "radial_perturbation",
+                "track.generator",
+            ),
+            dense_samples_per_control_point=_integer(
+                generator,
+                "dense_samples_per_control_point",
+                "track.generator",
+            ),
+            arc_length_convergence_m=_number(
+                generator,
+                "arc_length_convergence_m",
+                "track.generator",
+            ),
+            tail_merge_fraction=_number(
+                generator,
+                "tail_merge_fraction",
+                "track.generator",
+            ),
+        ),
+        validation=TrackValidationConfig(
+            min_length_m=_number(validation, "min_length_m", "track.validation"),
+            max_length_m=_number(validation, "max_length_m", "track.validation"),
+            min_turn_radius_m=_number(
+                validation,
+                "min_turn_radius_m",
+                "track.validation",
+            ),
+            min_nonlocal_centerline_clearance_m=_number(
+                validation,
+                "min_nonlocal_centerline_clearance_m",
+                "track.validation",
+            ),
+            local_arc_exclusion_m=_number(
+                validation,
+                "local_arc_exclusion_m",
+                "track.validation",
+            ),
+            start_window_m=_number(validation, "start_window_m", "track.validation"),
+            start_max_curvature_1pm=_number(
+                validation,
+                "start_max_curvature_1pm",
+                "track.validation",
+            ),
+        ),
+        race=TrackRaceConfig(
+            safety_margin_m=_number(race, "safety_margin_m", "track.race"),
+            projection_backward_segments=_integer(
+                race,
+                "projection_backward_segments",
+                "track.race",
+            ),
+            projection_forward_segments=_integer(
+                race,
+                "projection_forward_segments",
+                "track.race",
+            ),
+        ),
+    )
+
+
 def load_project_config(root: str | Path) -> ProjectConfig:
     """Load the complete v0.1 configuration set rooted at a repository path."""
 
@@ -233,4 +406,5 @@ def load_project_config(root: str | Path) -> ProjectConfig:
         load_level_config(root_path / "configs" / "levels" / "level1.toml"),
     )
     benchmark = load_benchmark_config(root_path / "configs" / "benchmark.toml")
-    return ProjectConfig(vehicle=vehicle, levels=levels, benchmark=benchmark)
+    track = load_track_config(root_path / "configs" / "track.toml")
+    return ProjectConfig(vehicle=vehicle, levels=levels, benchmark=benchmark, track=track)
