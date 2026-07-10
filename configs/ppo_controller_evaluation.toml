@@ -1,0 +1,25 @@
+schema_version = 1
+
+[protocol]
+benchmark_version = "0.1"
+level_id = 1
+backend = "mjx_warp"
+validation_track_count = 100
+reset_seed_rule = "validation_row_index_uint32"
+max_episode_steps = 4000
+environment_instances = 1
+fresh_controller_per_episode = true
+
+[inputs]
+selection_config = "configs/ppo_selection.toml"
+selection_report = "benchmarks/v0.1/m7_ppo_selection_report.json"
+export_report = "benchmarks/v0.1/m7_ppo_export_report.json"
+controller_directory = "controllers/ppo"
+
+[replay]
+selection_rule = "first_successful_track_in_fixed_order_else_first_track"
+trajectory_path = "benchmarks/v0.1/m7_ppo_replay_trajectory.json"
+overview_path = "benchmarks/v0.1/m7_ppo_replay_overview.png"
+
+[artifacts]
+report_path = "benchmarks/v0.1/m7_ppo_controller_evaluation_report.json"

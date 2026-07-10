@@ -116,6 +116,45 @@ def _public_config(plugin: Path) -> Any:
     return build_public_controller_config(project, 1, load_controller_config(plugin))
 
 
+def test_transaction_staging_preserves_exported_endpoint_bytes(tmp_path: Path) -> None:
+    direct_plugin = _copy_template(tmp_path / "direct")
+    staged_plugin = _copy_template(tmp_path / "staged")
+    staging = tmp_path / "transaction" / "staging"
+    staging.mkdir(parents=True)
+    actor = _actor()
+    observation = load_ppo_config(PROJECT_ROOT / "configs" / "ppo.toml").observation
+
+    direct = export_numpy_actor_controller(
+        direct_plugin,
+        actor=actor,
+        checkpoint=_checkpoint(),
+        observation_config=observation,
+        public_policy_max_bytes=5 * 1024 * 1024,
+    )
+    staged = export_numpy_actor_controller(
+        staged_plugin,
+        actor=actor,
+        checkpoint=_checkpoint(),
+        observation_config=observation,
+        public_policy_max_bytes=5 * 1024 * 1024,
+        staging_directory=staging,
+    )
+
+    assert direct.policy == staged.policy
+    assert direct.metadata_sha256 == staged.metadata_sha256
+    assert direct.metadata_size_bytes == staged.metadata_size_bytes
+    assert direct.config_sha256 == staged.config_sha256
+    assert direct.config_size_bytes == staged.config_size_bytes
+    for name in ("policy.npz", "metadata.json", "config.toml"):
+        assert (direct_plugin / name).read_bytes() == (staged_plugin / name).read_bytes()
+    assert tuple(staging.iterdir()) == ()
+    assert not any(
+        path.name.endswith((".tmp", ".recovery"))
+        for plugin in (direct_plugin, staged_plugin)
+        for path in plugin.iterdir()
+    )
+
+
 class _OneStepPublicEnv:
     def __init__(self, observation: dict[str, np.ndarray], info: dict[str, Any]) -> None:
         self.project_config = load_project_config(PROJECT_ROOT)

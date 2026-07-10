@@ -278,8 +278,14 @@ def _fsync_directory(path: Path) -> None:
 def save_numpy_actor_npz(
     actor: NumpyDeterministicActor,
     path: str | Path,
+    *,
+    staging_directory: str | Path | None = None,
 ) -> NumpyActorFileEvidence:
-    """Atomically persist and read back one canonical deterministic actor NPZ."""
+    """Atomically persist and read back one canonical deterministic actor NPZ.
+
+    ``staging_directory`` lets a crash-recovery owner contain pre-replace temporary files. The
+    default preserves the original same-directory atomic-write behavior.
+    """
 
     destination = Path(path)
     if destination.suffix != ".npz":
@@ -287,11 +293,15 @@ def save_numpy_actor_npz(
     destination.parent.mkdir(parents=True, exist_ok=True)
     if destination.is_symlink():
         raise NumpyActorArtifactError("refusing to replace a symbolic-link actor path")
+    staging = destination.parent if staging_directory is None else Path(staging_directory)
+    if staging.is_symlink() or not staging.is_dir():
+        raise NumpyActorArtifactError("staging_directory must be a regular existing directory")
+    staging = staging.resolve(strict=True)
     data = canonical_numpy_actor_bytes(actor)
     descriptor, temporary_name = tempfile.mkstemp(
         prefix=f".{destination.name}.",
         suffix=".tmp",
-        dir=destination.parent,
+        dir=staging,
     )
     temporary = Path(temporary_name)
     try:
@@ -302,6 +312,7 @@ def save_numpy_actor_npz(
             file.flush()
             os.fsync(file.fileno())
         os.replace(temporary, destination)
+        _fsync_directory(staging)
         _fsync_directory(destination.parent)
         if destination.read_bytes() != data:
             raise NumpyActorArtifactError("NumPy actor failed exact byte readback")

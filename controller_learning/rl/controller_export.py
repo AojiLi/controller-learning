@@ -311,11 +311,20 @@ def _fsync_directory(path: Path) -> None:
         os.close(descriptor)
 
 
-def _atomic_write(path: Path, data: bytes) -> None:
+def _atomic_write(
+    path: Path,
+    data: bytes,
+    *,
+    staging_directory: str | Path | None = None,
+) -> None:
+    staging = path.parent if staging_directory is None else Path(staging_directory)
+    if staging.is_symlink() or not staging.is_dir():
+        raise PpoControllerExportError("staging_directory must be a regular existing directory")
+    staging = staging.resolve(strict=True)
     descriptor, temporary_name = tempfile.mkstemp(
         prefix=f".{path.name}.",
         suffix=".tmp",
-        dir=path.parent,
+        dir=staging,
     )
     temporary = Path(temporary_name)
     try:
@@ -326,6 +335,7 @@ def _atomic_write(path: Path, data: bytes) -> None:
             file.flush()
             os.fsync(file.fileno())
         os.replace(temporary, path)
+        _fsync_directory(staging)
         _fsync_directory(path.parent)
         if path.read_bytes() != data:
             raise OSError("atomic artifact failed exact readback")
@@ -363,6 +373,7 @@ def export_numpy_actor_controller(
     checkpoint: SelectedCheckpointIdentity,
     observation_config: PpoObservationConfig,
     public_policy_max_bytes: int,
+    staging_directory: str | Path | None = None,
 ) -> PpoControllerExportResult:
     """Activate an unfinalized plugin, committing its finalized config last."""
 
@@ -378,7 +389,11 @@ def export_numpy_actor_controller(
     observation_values = _feature_dict(observation_config)
     del observation_values
 
-    policy = save_numpy_actor_npz(actor, root / PPO_CONTROLLER_POLICY_FILE)
+    policy = save_numpy_actor_npz(
+        actor,
+        root / PPO_CONTROLLER_POLICY_FILE,
+        staging_directory=staging_directory,
+    )
     if policy.size_bytes > maximum or policy.size_bytes > NUMPY_ACTOR_MAX_BYTES:
         raise PpoControllerExportError("canonical policy exceeds the configured public size limit")
     metadata_bytes = _canonical_json_bytes(
@@ -391,7 +406,11 @@ def export_numpy_actor_controller(
     if len(metadata_bytes) > PPO_CONTROLLER_METADATA_MAX_BYTES:
         raise PpoControllerExportError("PPO Controller metadata exceeds its size limit")
     metadata_sha256 = hashlib.sha256(metadata_bytes).hexdigest()
-    _atomic_write(root / PPO_CONTROLLER_METADATA_FILE, metadata_bytes)
+    _atomic_write(
+        root / PPO_CONTROLLER_METADATA_FILE,
+        metadata_bytes,
+        staging_directory=staging_directory,
+    )
     config_bytes = _config_bytes(
         policy=policy,
         metadata_sha256=metadata_sha256,
@@ -402,7 +421,7 @@ def export_numpy_actor_controller(
     )
     # This final atomic replacement is the activation commit. Until it succeeds, the checked-in
     # config remains finalized=false and the Controller refuses to load any staged artifact.
-    _atomic_write(root / "config.toml", config_bytes)
+    _atomic_write(root / "config.toml", config_bytes, staging_directory=staging_directory)
     return PpoControllerExportResult(
         plugin_directory=root,
         policy=policy,
@@ -420,6 +439,7 @@ def export_ppo_controller(
     loaded_checkpoint: object,
     training_config_path: str | Path,
     public_policy_max_bytes: int,
+    staging_directory: str | Path | None = None,
 ) -> PpoControllerExportResult:
     """Convert one verified retained checkpoint into an inference-only Controller.
 
@@ -465,6 +485,7 @@ def export_ppo_controller(
         checkpoint=checkpoint,
         observation_config=training_config.observation,
         public_policy_max_bytes=public_policy_max_bytes,
+        staging_directory=staging_directory,
     )
 
 

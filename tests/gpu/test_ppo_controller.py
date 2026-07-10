@@ -188,6 +188,8 @@ def test_torch_checkpoint_export_matches_plugin_on_real_public_observations(
         device=_device(),
     )
     plugin = _copy_template(tmp_path / "ppo")
+    staging = tmp_path / "transaction-staging"
+    staging.mkdir()
     training_config_path = PROJECT_ROOT / "configs" / "ppo.toml"
     loaded_checkpoint = _save_and_load_checkpoint(
         tmp_path / "run",
@@ -211,7 +213,10 @@ def test_torch_checkpoint_export_matches_plugin_on_real_public_observations(
         loaded_checkpoint=loaded_checkpoint,
         training_config_path=training_config_path,
         public_policy_max_bytes=ppo_config.checkpoint.public_checkpoint_max_bytes,
+        staging_directory=staging,
     )
+    assert tuple(staging.iterdir()) == ()
+    assert not any(path.name.endswith((".tmp", ".recovery")) for path in plugin.iterdir())
     observations, info = _public_observation_corpus()
     plugin_config = load_controller_config(plugin)
     public_config = build_public_controller_config(project, 1, plugin_config)
