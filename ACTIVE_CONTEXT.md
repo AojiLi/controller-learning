@@ -4,10 +4,9 @@ Last updated: 2026-07-11
 
 ## Current Direction
 
-Build v0.1.1 as a maintenance release that closes the public Controller-author workflow and improves
-the portfolio presentation without changing benchmark `0.1`. The accepted M8 result, Test assets,
-formal configuration, and PID/MPC/PPO Controller identities are frozen. No formal Test execution is
-permitted during this work.
+Maintain the released v0.1.1 Controller-author workflow without changing benchmark `0.1`. The
+accepted M8 result, Test assets, formal configuration, and PID/MPC/PPO Controller identities remain
+frozen. No further formal Test execution is permitted.
 
 ## M7 Handoff Evidence
 
@@ -37,17 +36,21 @@ permitted during this work.
 M7 proves end-to-end PPO learning, frozen Validation selection, portable inference-only export, and
 ordinary Controller evaluation/replay. It does not provide final Test comparison or release proof.
 
-## Current Narrow Focus
+## v0.1.1 Release Evidence
 
-The v0.1.1 implementation is complete: informal Level 0/Validation evaluation, same-rollout
-trajectory capture, strict offline replay, hash-pinned M8 interpretation, README restructuring,
-Pages configuration, contribution/citation metadata, and the public stability policy are present.
-The current work is release verification:
-
-1. run the complete CPU and GPU checks without formal Test;
-2. prove every v0.1.0 Controller and accepted M8 artifact identity is unchanged; and
-3. publish only after GitHub CPU CI and Pages deployment are green, then verify v0.1.1 from an
-   anonymous fresh checkout.
+- `evaluate-controller` exposes only Level 0 and Validation, records deterministic rows/seeds,
+  separates CPU/MJX-Warp scope, publishes transactionally under ignored `runs/`, and captures an
+  optional trajectory from the measured rollout without a second episode.
+- `replay` strictly loads the canonical public trajectory, creates deterministic no-overwrite PNG
+  output, and supports display-only interactive playback without simulation.
+- The generated M8 interpretation hash-pins seven accepted CSV/NPZ inputs and passed byte-level
+  rebuild checks. It makes descriptive, non-causal claims and never creates a Test environment.
+- Local release verification passed 1,108 CPU tests, all 69 GPU tests, strict docs/actions/package
+  checks, one MJX-Warp Validation-only CLI smoke, and an anonymous clean-clone Level 0
+  evaluate/replay workflow.
+- Identity audit proved all 14 frozen Controller files, 24 accepted M8 outputs, and five additional
+  protected inputs unchanged. GitHub CPU CI and the Node.js 24 Pages workflow passed on `main`; the
+  HTTPS documentation site was read back successfully.
 
 The v0.1.0 baseline passes the complete 1,086-test local CPU suite, all 69 GPU tests,
 strict documentation/package checks, and GitHub Actions syntax validation. The public release
@@ -111,5 +114,5 @@ Out of scope:
 
 ## Next Step
 
-Run the complete local CPU/GPU, privacy, package, and protected-identity verification suite. Do not
-invoke the formal M8 command.
+No implementation milestone is active. Any v0.2 work requires a separate explicit plan that follows
+the public stability policy and preserves benchmark `0.1` evidence.
