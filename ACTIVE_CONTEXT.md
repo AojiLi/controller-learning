@@ -4,10 +4,10 @@ Last updated: 2026-07-11
 
 ## Current Direction
 
-Finish the v0.1 public release. M0 through M8 are implemented and the sole authorized final Test
-replacement is `COMMITTED`. Attempt 001's zero-episode infrastructure failure and attempt 002's
-accepted result are both disclosed. Release documentation, package metadata, artifact/privacy
-audits, repository visibility, and the v0.1 tag/release remain.
+Preserve the completed v0.1 release. M0 through M8 are implemented, the sole authorized final Test
+replacement is `COMMITTED`, and the repository is public. Attempt 001's zero-episode infrastructure
+failure and attempt 002's accepted result are both disclosed. Documentation, package metadata,
+artifact/privacy audits, local validation, and clean-checkout GitHub CPU CI are complete.
 
 ## M7 Handoff Evidence
 
@@ -39,17 +39,16 @@ ordinary Controller evaluation/replay. It does not provide final Test comparison
 
 ## Current Narrow Focus
 
-1. Commit the 24 accepted formal outputs with the result documentation and v0.1.0 package metadata.
-2. Re-run CPU CI/package/docs checks and complete the final Git/privacy/large-file/link audit.
-3. Push the release candidate, change the sanitized repository to public, record that final state,
-   and create the `v0.1.0` tag and GitHub release.
+1. Keep benchmark `0.1` and its accepted Test result immutable.
+2. Preserve the public Controller and Challenge contracts for v0.1 maintenance.
+3. Start a future version only after its scope and compatibility policy are explicitly planned.
 
-The attempt 002 implementation passes the complete 1,086-test local CPU suite, all 69 GPU tests,
-strict documentation/package checks, and GitHub Actions syntax validation. Independent red-team
-review found no unresolved protocol P0/P1 issue. The release candidate still requires a green
-clean-checkout GitHub CPU CI run. The remaining accepted P2 threat boundary concerns hostile
-concurrent replacement of intermediate parent directories; the trusted single-process
-release-maintainer model and CLI symlink gates remain the declared v0.1 boundary.
+The released implementation passes the complete 1,086-test local CPU suite, all 69 GPU tests,
+strict documentation/package checks, and GitHub Actions syntax validation. The public release
+commit also passed clean-checkout GitHub CPU CI. Independent red-team review found no unresolved
+protocol P0/P1 issue. The remaining accepted P2 threat boundary concerns hostile concurrent
+replacement of intermediate parent directories; the trusted single-process release-maintainer
+model and CLI symlink gates remain the declared v0.1 boundary.
 
 The attempt 002 boundary installs a Test-only audit guard before project imports, captures a
 read-only hash-bound snapshot of every Controller, uses one environment for the fixed 60-episode
@@ -101,10 +100,9 @@ Out of scope:
   MJX-Warp Challenge; no Controller-specific environment path is permitted.
 - Attempt 002 is the accepted benchmark `0.1` result. Later invocations are reproductions and may
   not replace it; no third official attempt is allowed.
-- Repository visibility remains private until final docs, privacy, package, evidence, and release
-  checks pass.
+- Repository visibility is public; the v0.1 documentation, privacy, package, evidence, and release
+  checks passed before the visibility change.
 
 ## Next Step
 
-Commit and validate the release candidate, publish the sanitized repository, then tag and release
-v0.1.0.
+No v0.1 implementation step remains. Define a separate plan before starting post-v0.1 scope.

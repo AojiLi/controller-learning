@@ -2,13 +2,13 @@
 
 Last updated: 2026-07-11
 
-**Status:** M8 final evaluation is complete. The v0.1 public release audit is active.
+**Status:** M0 through M8 are complete, and the v0.1 repository is public.
 
 ## Main Line
 
-Publish the accepted M8 artifacts and finish v0.1. Attempt 001's zero-episode infrastructure
+Maintain the released v0.1 evidence and interfaces. Attempt 001's zero-episode infrastructure
 failure is retained and disclosed. Attempt 002 completed the fixed 20-Track comparison and all
-transaction/artifact gates. The repository remains private only until the final release audit.
+transaction/artifact gates. The accepted artifacts, documentation, and source are public.
 
 ## Completed Evidence
 
@@ -57,17 +57,18 @@ Controller timing/lifecycle, and replay gates.
 
 ## Current Work
 
-- commit the accepted result/replay artifacts, result documentation, and v0.1.0 package metadata;
-- complete the final English documentation, package, privacy, link, and large-file audits;
-- make the repository public only after every v0.1 release gate passes.
+- No v0.1 implementation work remains.
+- Preserve benchmark `0.1`, the accepted Test result, and the public Controller boundary.
+- Treat maintenance fixes as non-performance-changing unless a future benchmark version is
+  explicitly planned.
 
 ## Next Step
 
-Validate and push the release candidate, make the sanitized repository public, then create the
-`v0.1.0` tag and GitHub release.
+Plan any post-v0.1 work as a separate version without changing the published benchmark `0.1`
+result.
 
 ## Risks and Blockers
 
 - The accepted Test result is immutable; no later reproduction can replace it.
-- Public-release claims remain blocked until final documentation, privacy, package, evidence, and
-  repository-visibility checks pass.
+- Linux x86-64 remains the only supported v0.1 platform; macOS, native Windows, and WSL2 require
+  future test evidence before support claims.

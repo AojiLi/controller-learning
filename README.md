@@ -9,8 +9,8 @@ implemented as educational examples; the reusable Challenge and Controller inter
 product.
 
 > **Project status:** M8 is complete. The formal benchmark `0.1` Test comparison passed its
-> protocol and artifact gates: PID completed 20/20 Tracks, MPC 20/20, and PPO 19/20. The v0.1
-> release candidate is undergoing its final public-repository audit.
+> protocol and artifact gates: PID completed 20/20 Tracks, MPC 20/20, and PPO 19/20. Version
+> 0.1.0 is public with the accepted artifacts and reproducibility documentation.
 
 Reviewed machine-readable evidence is available in the
 [M1 CPU report](benchmarks/v0.1/m1_cpu_report.json) and
@@ -311,7 +311,7 @@ The implementation follows strict milestone gates:
 - M5: Level 0/1 and versioned track pools — complete
 - M6: PID and MPC — complete
 - M7: PPO on the official vector environment — complete
-- M8: frozen final Test evaluation — complete; public v0.1 repository release audit active
+- M8: frozen final Test evaluation and public v0.1 repository release — complete
 
 The detailed confirmed design is recorded in [PROJECT_PLAN.md](PROJECT_PLAN.md).
 

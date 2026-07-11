@@ -15,7 +15,7 @@ The project is not a collection of disconnected demos and is not a full autonomo
 - Repository name: `controller-learning`.
 - Python package: `controller_learning`.
 - License: MIT.
-- Development visibility: private until the v0.1 release checklist is satisfied, then public.
+- Repository visibility: public since the v0.1 release checklist was satisfied on 2026-07-11.
 - Current state is milestone-driven and recorded in `STATUS.md`; architecture and v0.1 scope are
   confirmed.
 - Canonical detailed specification: `PROJECT_PLAN.md`.
