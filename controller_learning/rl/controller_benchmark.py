@@ -21,14 +21,17 @@ from controller_learning.evaluation.controller import (
     summarize_compute_times,
 )
 
-CONTROLLER_EVALUATION_CONFIG_SCHEMA_VERSION: Final = 1
+CONTROLLER_EVALUATION_CONFIG_SCHEMA_VERSION: Final = 2
 CONTROLLER_EVALUATION_REPORT_SCHEMA_VERSION: Final = (
-    "controller-learning.m7-ppo-controller-evaluation.v1"
+    "controller-learning.m7-ppo-controller-evaluation.v2"
 )
 FORMAL_VALIDATION_TRACK_COUNT: Final = 100
 FORMAL_MAX_EPISODE_STEPS: Final = 4000
 FORMAL_RESET_SEED_RULE: Final = "validation_row_index_uint32"
 FORMAL_REPLAY_SELECTION_RULE: Final = "first_successful_track_in_fixed_order_else_first_track"
+FORMAL_REPLAY_CAPTURE_METHOD: Final = (
+    "record_fixed_order_episodes_until_first_success_and_retain_selected_evaluation_trajectory"
+)
 FORMAL_CONTROLLER_EXECUTION_MODEL: Final = (
     "one reusable batch-one MJX-Warp environment with one fresh ordinary Controller per episode"
 )
@@ -117,6 +120,7 @@ class PpoControllerEvaluationConfig:
     export_report: str
     controller_directory: str
     replay_selection_rule: str
+    replay_capture_method: str
     trajectory_path: str
     overview_path: str
     report_path: str
@@ -127,7 +131,7 @@ class PpoControllerEvaluationConfig:
             type(self.schema_version) is not int
             or self.schema_version != CONTROLLER_EVALUATION_CONFIG_SCHEMA_VERSION
         ):
-            raise ControllerBenchmarkProtocolError("config schema_version must be exactly 1")
+            raise ControllerBenchmarkProtocolError("config schema_version must be exactly 2")
         expected_scalars = {
             "benchmark_version": (self.benchmark_version, "0.1"),
             "backend": (self.backend, "mjx_warp"),
@@ -135,6 +139,10 @@ class PpoControllerEvaluationConfig:
             "replay_selection_rule": (
                 self.replay_selection_rule,
                 FORMAL_REPLAY_SELECTION_RULE,
+            ),
+            "replay_capture_method": (
+                self.replay_capture_method,
+                FORMAL_REPLAY_CAPTURE_METHOD,
             ),
         }
         for field, (actual, expected) in expected_scalars.items():
@@ -225,7 +233,7 @@ def load_ppo_controller_evaluation_config(
     )
     _exact_keys(
         replay,
-        {"selection_rule", "trajectory_path", "overview_path"},
+        {"selection_rule", "capture_method", "trajectory_path", "overview_path"},
         field="replay",
     )
     _exact_keys(artifacts, {"report_path"}, field="artifacts")
@@ -257,6 +265,7 @@ def load_ppo_controller_evaluation_config(
         export_report=inputs["export_report"],
         controller_directory=inputs["controller_directory"],
         replay_selection_rule=replay["selection_rule"],
+        replay_capture_method=replay["capture_method"],
         trajectory_path=replay["trajectory_path"],
         overview_path=replay["overview_path"],
         report_path=artifacts["report_path"],
@@ -643,7 +652,8 @@ def controller_evaluation_report_findings(
             "no_gradient_updates": True,
             "ordinary_controller_plugin": True,
             "output_crash_recovery_method": FORMAL_OUTPUT_CRASH_RECOVERY_METHOD,
-            "replay_environment_instances": 1,
+            "replay_capture_method": FORMAL_REPLAY_CAPTURE_METHOD,
+            "replay_environment_instances": 0,
             "replay_selection_rule": FORMAL_REPLAY_SELECTION_RULE,
             "reset_seed_rule": FORMAL_RESET_SEED_RULE,
             "test_accessed": False,
@@ -776,7 +786,7 @@ def controller_evaluation_report_findings(
             controller["directory"] != config.controller_directory
             or controller["name"] != "ppo"
             or controller["finalized"] is not True
-            or controller["fresh_instance_count"] != 101
+            or controller["fresh_instance_count"] != 100
             or controller["inference_runtime"] != "numpy"
             or controller["policy_schema_version"] != 1
             or type(controller["policy_size_bytes"]) is not int
@@ -889,7 +899,7 @@ def controller_evaluation_report_findings(
         _exact_keys(
             replay,
             {
-                "evaluation_outcome_matched",
+                "captured_from_evaluation_row",
                 "overview",
                 "reset_seed",
                 "selection_rule",
@@ -906,7 +916,7 @@ def controller_evaluation_report_findings(
             or replay["track_index"] != selected_index
             or replay["track_id"] != selected_row.track_id
             or replay["reset_seed"] != selected_index
-            or replay["evaluation_outcome_matched"] is not True
+            or replay["captured_from_evaluation_row"] is not True
         ):
             raise ControllerBenchmarkProtocolError("replay row differs from the predeclared rule")
         trajectory = replay["trajectory"]
@@ -1013,29 +1023,68 @@ def controller_evaluation_report_findings(
                 "evaluation_wall_s",
                 "first_use_timing",
                 "physics_substeps",
-                "replay_environment_instances",
-                "replay_steps",
-                "replay_wall_s",
+                "captured_replay_episode_wall_s",
+                "captured_replay_steps",
+                "recorded_episode_count",
                 "transitions_per_second",
             },
             field="execution",
         )
         environment_steps = expected_summary["environment_steps"]
         wall = _finite_number(execution["evaluation_wall_s"], field="evaluation_wall_s")
+        environment_instances = _plain_integer(
+            execution["environment_instances"],
+            field="execution.environment_instances",
+            minimum=1,
+        )
+        reported_environment_steps = _plain_integer(
+            execution["environment_steps"],
+            field="execution.environment_steps",
+            minimum=1,
+        )
+        captured_replay_steps = _plain_integer(
+            execution["captured_replay_steps"],
+            field="execution.captured_replay_steps",
+            minimum=1,
+        )
+        recorded_episode_count = _plain_integer(
+            execution["recorded_episode_count"],
+            field="execution.recorded_episode_count",
+            minimum=1,
+        )
+        physics_substeps = _plain_integer(
+            execution["physics_substeps"],
+            field="execution.physics_substeps",
+            minimum=1,
+        )
+        captured_wall = _finite_number(
+            execution["captured_replay_episode_wall_s"],
+            field="captured_replay_episode_wall_s",
+        )
+        first_success_index = next(
+            (index for index, episode in enumerate(episodes) if episode.success),
+            None,
+        )
+        expected_recorded_episode_count = (
+            first_success_index + 1
+            if first_success_index is not None
+            else FORMAL_VALIDATION_TRACK_COUNT
+        )
         if (
-            execution["environment_instances"] != 1
-            or execution["replay_environment_instances"] != 1
-            or execution["environment_steps"] != environment_steps
-            or execution["replay_steps"] != selected_row.steps
-            or execution["physics_substeps"] != 10 * (environment_steps + selected_row.steps)
+            environment_instances != 1
+            or reported_environment_steps != environment_steps
+            or captured_replay_steps != selected_row.steps
+            or recorded_episode_count != expected_recorded_episode_count
+            or physics_substeps != 10 * environment_steps
             or wall <= 0.0
+            or captured_wall <= 0.0
+            or captured_wall > wall
             or not math.isclose(
                 execution["transitions_per_second"],
                 environment_steps / wall,
                 rel_tol=1.0e-12,
                 abs_tol=0.0,
             )
-            or _finite_number(execution["replay_wall_s"], field="replay_wall_s") <= 0.0
         ):
             raise ControllerBenchmarkProtocolError("execution totals differ from raw rows")
         first_use = execution["first_use_timing"]
@@ -1081,7 +1130,7 @@ def controller_evaluation_report_findings(
         expected_memory_phases = (
             "before_environment_create",
             "after_controller_evaluation",
-            "after_replay",
+            "after_replay_capture_validation",
             "after_artifact_render",
         )
         if tuple(sample.get("phase") for sample in samples if isinstance(sample, Mapping)) != (
@@ -1296,6 +1345,7 @@ __all__ = [
     "FORMAL_CONTROLLER_EXECUTION_MODEL",
     "FORMAL_MAX_EPISODE_STEPS",
     "FORMAL_OUTPUT_CRASH_RECOVERY_METHOD",
+    "FORMAL_REPLAY_CAPTURE_METHOD",
     "FORMAL_REPLAY_SELECTION_RULE",
     "FORMAL_RESET_SEED_RULE",
     "FORMAL_VALIDATION_TRACK_COUNT",

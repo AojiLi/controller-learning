@@ -1,4 +1,4 @@
-"""Evaluate the selected PPO as an ordinary Controller and publish one deterministic replay.
+"""Evaluate the selected PPO as an ordinary Controller and publish one selected replay.
 
 The formal workload is fixed by ``configs/ppo_controller_evaluation.toml``. It may read only the
 official Validation manifest and NPZ; Train caches and the Test split are blocked before opening.
@@ -638,7 +638,7 @@ class _MeasuredEnvironment:
 
 @dataclass(slots=True)
 class ExecutionRecorder:
-    """Own measured construction for the evaluation and one replay environment."""
+    """Own measured construction for the one reusable formal evaluation environment."""
 
     environment_factory: Callable[..., Any]
     records: list[_EnvironmentRecord] = field(default_factory=list)
@@ -656,16 +656,13 @@ class ExecutionRecorder:
         return self.create("evaluation", **kwargs)
 
     def first_use_timing(self) -> dict[str, Any]:
-        if len(self.records) != 2 or [record.label for record in self.records] != [
-            "evaluation",
-            "replay",
-        ]:
-            raise RuntimeError("formal execution must contain evaluation then replay")
+        if len(self.records) != 1 or self.records[0].label != "evaluation":
+            raise RuntimeError("formal execution must contain exactly one evaluation environment")
         first = self.records[0]
         if first.first_reset_s is None or first.first_step_s is None:
             raise RuntimeError("first-use reset and step timings were not observed")
-        if not all(record.closed for record in self.records):
-            raise RuntimeError("every formal environment must be closed")
+        if not first.closed:
+            raise RuntimeError("the formal evaluation environment must be closed")
         return {
             "first_environment_create_s": first.create_s,
             "first_reset_s": first.first_reset_s,
@@ -1190,23 +1187,103 @@ def _selected_checkpoint(selection_report: Mapping[str, Any]) -> tuple[int, str]
     raise RuntimeError("selection report does not bind the selected retained checkpoint")
 
 
-def _outcome_matches(recorded: Any, episode: Any, evaluation_identity: Mapping[str, Any]) -> bool:
+def _validate_captured_evaluation_episode(
+    recorded: Any,
+    episode: Any,
+    evaluation_identity: Mapping[str, Any],
+) -> None:
+    """Prove the retained public trajectory and canonical evaluation row share one result."""
+
     result = recorded.result
     info = result.final_info
     lap = float(info["lap_time_s"]) if episode.success else None
-    return bool(
-        result.steps == episode.steps
-        and result.terminated == episode.terminated
-        and result.truncated == episode.truncated
-        and int(info["episode_seed"]) == evaluation_identity["episode_seed"]
-        and int(info["controller_seed"]) == evaluation_identity["controller_seed"]
-        and int(info["track_id"]) == episode.track_id
-        and str(info["benchmark_version"]) == evaluation_identity["benchmark_version"]
-        and bool(info["lap_completed"]) == episode.success
-        and int(info["termination_reason"]) == episode.termination_reason
-        and lap == episode.lap_time_s
-        and math.isclose(result.total_reward, episode.total_reward, rel_tol=0.0, abs_tol=1.0e-6)
-    )
+    comparisons = {
+        "benchmark_version": (
+            str(info["benchmark_version"]),
+            evaluation_identity["benchmark_version"],
+        ),
+        "controller_seed": (
+            int(info["controller_seed"]),
+            evaluation_identity["controller_seed"],
+        ),
+        "episode_seed": (int(info["episode_seed"]), evaluation_identity["episode_seed"]),
+        "lap_completed": (bool(info["lap_completed"]), episode.success),
+        "lap_time_s": (lap, episode.lap_time_s),
+        "steps": (result.steps, episode.steps),
+        "terminated": (result.terminated, episode.terminated),
+        "termination_reason": (
+            int(info["termination_reason"]),
+            episode.termination_reason,
+        ),
+        "track_id": (int(info["track_id"]), episode.track_id),
+        "truncated": (result.truncated, episode.truncated),
+    }
+    mismatches = [field for field, (actual, expected) in comparisons.items() if actual != expected]
+    if not math.isclose(
+        result.total_reward,
+        episode.total_reward,
+        rel_tol=0.0,
+        abs_tol=1.0e-6,
+    ):
+        mismatches.append("total_reward")
+    if mismatches:
+        raise RuntimeError(
+            "captured replay trajectory differs from its source evaluation row: "
+            + ", ".join(mismatches)
+        )
+
+
+@dataclass(slots=True)
+class _EvaluationReplayCapture:
+    """Retain the first successful evaluation trajectory, with row zero as fallback."""
+
+    fallback: Any | None = None
+    fallback_wall_s: float | None = None
+    first_success: Any | None = None
+    first_success_index: int | None = None
+    first_success_wall_s: float | None = None
+    recorded_episode_count: int = 0
+
+    @property
+    def should_record(self) -> bool:
+        """Record the fixed-order prefix until the first successful episode is known."""
+
+        return self.first_success is None
+
+    def observe(self, index: int, recorded: Any, *, wall_s: float) -> None:
+        """Accept one contiguous fixed-order evaluation trajectory exactly once."""
+
+        if type(index) is not int or index != self.recorded_episode_count:
+            raise RuntimeError("replay capture must observe a contiguous fixed-order prefix")
+        if not self.should_record:
+            raise RuntimeError("replay capture cannot continue after the first success")
+        if not math.isfinite(wall_s) or wall_s <= 0.0:
+            raise RuntimeError("recorded evaluation episode wall time must be finite and positive")
+        result = getattr(recorded, "result", None)
+        info = getattr(result, "final_info", None)
+        if not isinstance(info, Mapping) or type(info.get("lap_completed")) is not bool:
+            raise RuntimeError("recorded evaluation episode has invalid public terminal info")
+        if index == 0:
+            self.fallback = recorded
+            self.fallback_wall_s = wall_s
+        if info["lap_completed"]:
+            self.first_success = recorded
+            self.first_success_index = index
+            self.first_success_wall_s = wall_s
+        self.recorded_episode_count += 1
+
+    def selected(self, expected_index: int) -> tuple[Any, float]:
+        """Return the captured episode selected by the frozen replay rule."""
+
+        if type(expected_index) is not int or expected_index < 0:
+            raise TypeError("expected replay index must be a nonnegative integer")
+        if self.first_success is not None:
+            if self.first_success_index != expected_index or self.first_success_wall_s is None:
+                raise RuntimeError("captured first success differs from the replay selection rule")
+            return self.first_success, self.first_success_wall_s
+        if expected_index != 0 or self.fallback is None or self.fallback_wall_s is None:
+            raise RuntimeError("all-failure replay must retain fixed-order row zero")
+        return self.fallback, self.fallback_wall_s
 
 
 def run_benchmark(
@@ -1257,6 +1334,7 @@ def run_benchmark(
         CONTROLLER_EVALUATION_REPORT_SCHEMA_VERSION,
         FORMAL_CONTROLLER_EXECUTION_MODEL,
         FORMAL_OUTPUT_CRASH_RECOVERY_METHOD,
+        FORMAL_REPLAY_CAPTURE_METHOD,
         episode_to_report_row,
         evaluation_summary,
         load_ppo_controller_evaluation_config,
@@ -1417,16 +1495,37 @@ def run_benchmark(
     )
 
     recorder = ExecutionRecorder(environment_factory=CarRacingEnv)
+    replay_capture = _EvaluationReplayCapture()
     episode_identities: list[dict[str, int | str]] = []
 
     def bounded_episode(environment: Any, directory: str, seed: int, **kwargs: Any) -> Any:
-        result = run_controller_episode(
-            environment,
-            directory,
-            seed,
-            max_steps=config.max_episode_steps,
-            **kwargs,
-        )
+        episode_index = len(episode_identities)
+        if replay_capture.should_record:
+            # MJX-Warp contact and constraint atomics are numerically non-bit-exact across
+            # rollouts. Retain the selected public trajectory from this canonical evaluation
+            # instead of claiming that a second simulation can reproduce it exactly.
+            capture_started = time.perf_counter()
+            captured = record_controller_episode(
+                environment,
+                directory,
+                seed,
+                max_steps=config.max_episode_steps,
+                **kwargs,
+            )
+            replay_capture.observe(
+                episode_index,
+                captured,
+                wall_s=time.perf_counter() - capture_started,
+            )
+            result = captured.result
+        else:
+            result = run_controller_episode(
+                environment,
+                directory,
+                seed,
+                max_steps=config.max_episode_steps,
+                **kwargs,
+            )
         episode_identities.append(
             {
                 "benchmark_version": str(result.final_info["benchmark_version"]),
@@ -1462,32 +1561,13 @@ def run_benchmark(
     ]
     selected_replay_index = replay_track_index(rows)
     replay_episode = evaluation.episodes[selected_replay_index]
-    replay_environment = recorder.create(
-        "replay",
-        project_config=project,
-        level_id=config.level_id,
-        track_pool=validation.pool,
-        backend=config.backend,
-    )
-    replay_started = time.perf_counter()
-    try:
-        recorded = record_controller_episode(
-            replay_environment,
-            controller_directory,
-            selected_replay_index,
-            max_steps=config.max_episode_steps,
-            reset_options={"track_index": selected_replay_index},
-        )
-    finally:
-        replay_environment.close()
-    replay_wall_s = time.perf_counter() - replay_started
-    if not _outcome_matches(
+    recorded, captured_replay_episode_wall_s = replay_capture.selected(selected_replay_index)
+    _validate_captured_evaluation_episode(
         recorded,
         replay_episode,
         episode_identities[selected_replay_index],
-    ):
-        raise RuntimeError("deterministic replay outcome differs from its evaluation row")
-    memory.sample("after_replay")
+    )
+    memory.sample("after_replay_capture_validation")
 
     input_paths = {
         **non_validation_input_paths,
@@ -1578,7 +1658,7 @@ def run_benchmark(
             "config_sha256": input_sha256_before["controller_config"],
             "directory": config.controller_directory,
             "finalized": True,
-            "fresh_instance_count": 101,
+            "fresh_instance_count": config.validation_track_count,
             "inference_runtime": "numpy",
             "metadata_sha256": input_sha256_before["controller_metadata"],
             "name": "ppo",
@@ -1596,15 +1676,15 @@ def run_benchmark(
         },
         "evaluation": {"episodes": rows, "summary": summary},
         "execution": {
+            "captured_replay_episode_wall_s": captured_replay_episode_wall_s,
+            "captured_replay_steps": recorded.result.steps,
             "environment_instances": 1,
             "environment_steps": summary["environment_steps"],
             "evaluation_wall_s": evaluation_wall_s,
             "first_use_timing": recorder.first_use_timing(),
             "physics_substeps": project.vehicle.simulation.physics_steps_per_control
-            * (summary["environment_steps"] + recorded.result.steps),
-            "replay_environment_instances": 1,
-            "replay_steps": recorded.result.steps,
-            "replay_wall_s": replay_wall_s,
+            * summary["environment_steps"],
+            "recorded_episode_count": replay_capture.recorded_episode_count,
             "transitions_per_second": summary["environment_steps"] / evaluation_wall_s,
         },
         "memory": memory.report(),
@@ -1619,7 +1699,8 @@ def run_benchmark(
             "no_gradient_updates": True,
             "ordinary_controller_plugin": True,
             "output_crash_recovery_method": FORMAL_OUTPUT_CRASH_RECOVERY_METHOD,
-            "replay_environment_instances": 1,
+            "replay_capture_method": FORMAL_REPLAY_CAPTURE_METHOD,
+            "replay_environment_instances": 0,
             "replay_selection_rule": config.replay_selection_rule,
             "reset_seed_rule": config.reset_seed_rule,
             "test_accessed": False,
@@ -1627,7 +1708,7 @@ def run_benchmark(
             "validation_track_count": config.validation_track_count,
         },
         "replay": {
-            "evaluation_outcome_matched": True,
+            "captured_from_evaluation_row": True,
             "overview": {
                 "all_source_frames_rendered": True,
                 "artifact": overview_record,

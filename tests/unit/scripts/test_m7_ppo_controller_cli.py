@@ -6,6 +6,9 @@ import stat
 import subprocess
 import sys
 from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
 
 PROJECT_ROOT = Path(__file__).parents[3]
 
@@ -319,14 +322,66 @@ def test_canonical_evaluation_config_path_rejects_an_equivalent_alternate(tmp_pa
         raise AssertionError("an alternate formal config path was accepted")
 
 
+def _recorded_episode(*, success: bool) -> SimpleNamespace:
+    return SimpleNamespace(result=SimpleNamespace(final_info={"lap_completed": success}))
+
+
+def test_inline_replay_capture_retains_first_success_from_fixed_order_prefix() -> None:
+    from scripts import benchmark_m7_ppo_controller as benchmark
+
+    capture = benchmark._EvaluationReplayCapture()
+    row_zero = _recorded_episode(success=False)
+    row_one = _recorded_episode(success=False)
+    row_two = _recorded_episode(success=True)
+
+    capture.observe(0, row_zero, wall_s=0.1)
+    capture.observe(1, row_one, wall_s=0.2)
+    capture.observe(2, row_two, wall_s=0.3)
+
+    assert capture.should_record is False
+    assert capture.recorded_episode_count == 3
+    assert capture.selected(2) == (row_two, 0.3)
+    with pytest.raises(RuntimeError, match="cannot continue"):
+        capture.observe(3, _recorded_episode(success=False), wall_s=0.4)
+
+
+def test_inline_replay_capture_handles_row_zero_success_and_rejects_gaps() -> None:
+    from scripts import benchmark_m7_ppo_controller as benchmark
+
+    capture = benchmark._EvaluationReplayCapture()
+    with pytest.raises(RuntimeError, match="contiguous"):
+        capture.observe(1, _recorded_episode(success=False), wall_s=0.1)
+
+    row_zero = _recorded_episode(success=True)
+    capture.observe(0, row_zero, wall_s=0.2)
+
+    assert capture.recorded_episode_count == 1
+    assert capture.selected(0) == (row_zero, 0.2)
+
+
+def test_inline_replay_capture_retains_row_zero_when_no_success_exists() -> None:
+    from scripts import benchmark_m7_ppo_controller as benchmark
+
+    capture = benchmark._EvaluationReplayCapture()
+    row_zero = _recorded_episode(success=False)
+    capture.observe(0, row_zero, wall_s=0.1)
+    capture.observe(1, _recorded_episode(success=False), wall_s=0.2)
+
+    assert capture.should_record is True
+    assert capture.selected(0) == (row_zero, 0.1)
+    with pytest.raises(RuntimeError, match="row zero"):
+        capture.selected(1)
+
+
 def test_source_uses_only_public_controller_paths_and_one_pixi_task() -> None:
     source = (PROJECT_ROOT / "scripts/benchmark_m7_ppo_controller.py").read_text(encoding="utf-8")
     for required in (
         "evaluate_track_batch(",
         "record_controller_episode(",
+        "replay_capture.observe(",
+        '"captured_from_evaluation_row": True',
         "validate_export_report(export_report)",
         "max_steps=config.max_episode_steps",
-        'reset_options={"track_index": selected_replay_index}',
         "transaction.publish_bytes(",
     ):
         assert required in source
@@ -339,6 +394,8 @@ def test_source_uses_only_public_controller_paths_and_one_pixi_task() -> None:
         "atomic_write_bytes(root",
         "atomic_write_json(root",
         "_restore_output_snapshots",
+        'recorder.create("replay"',
+        "deterministic replay outcome differs",
     ):
         assert forbidden not in source
     assert source.index("access_guard.enable_validation_reads()") < source.index(

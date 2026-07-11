@@ -12,6 +12,7 @@ from controller_learning.evaluation import EpisodeEvaluation, summarize_compute_
 from controller_learning.rl.controller_benchmark import (
     CONTROLLER_EVALUATION_REPORT_SCHEMA_VERSION,
     FORMAL_OUTPUT_CRASH_RECOVERY_METHOD,
+    FORMAL_REPLAY_CAPTURE_METHOD,
     ControllerBenchmarkProtocolError,
     episode_to_report_row,
     evaluation_summary,
@@ -112,7 +113,7 @@ def _report() -> tuple[object, dict[str, object]]:
             (
                 "before_environment_create",
                 "after_controller_evaluation",
-                "after_replay",
+                "after_replay_capture_validation",
                 "after_artifact_render",
             )
         )
@@ -164,7 +165,7 @@ def _report() -> tuple[object, dict[str, object]]:
             "config_sha256": config_digest,
             "directory": config.controller_directory,
             "finalized": True,
-            "fresh_instance_count": 101,
+            "fresh_instance_count": 100,
             "inference_runtime": "numpy",
             "metadata_sha256": metadata_digest,
             "name": "ppo",
@@ -175,6 +176,8 @@ def _report() -> tuple[object, dict[str, object]]:
         },
         "evaluation": {"episodes": rows, "summary": summary},
         "execution": {
+            "captured_replay_episode_wall_s": 0.5,
+            "captured_replay_steps": 1,
             "environment_instances": 1,
             "environment_steps": 100,
             "evaluation_wall_s": 10.0,
@@ -184,10 +187,8 @@ def _report() -> tuple[object, dict[str, object]]:
                 "first_step_s": 0.3,
                 "method": "measured around real calls",
             },
-            "physics_substeps": 1010,
-            "replay_environment_instances": 1,
-            "replay_steps": 1,
-            "replay_wall_s": 0.5,
+            "physics_substeps": 1000,
+            "recorded_episode_count": 3,
             "transitions_per_second": 10.0,
         },
         "memory": {
@@ -235,7 +236,8 @@ def _report() -> tuple[object, dict[str, object]]:
             "no_gradient_updates": True,
             "ordinary_controller_plugin": True,
             "output_crash_recovery_method": FORMAL_OUTPUT_CRASH_RECOVERY_METHOD,
-            "replay_environment_instances": 1,
+            "replay_capture_method": FORMAL_REPLAY_CAPTURE_METHOD,
+            "replay_environment_instances": 0,
             "replay_selection_rule": ("first_successful_track_in_fixed_order_else_first_track"),
             "reset_seed_rule": "validation_row_index_uint32",
             "test_accessed": False,
@@ -243,7 +245,7 @@ def _report() -> tuple[object, dict[str, object]]:
             "validation_track_count": 100,
         },
         "replay": {
-            "evaluation_outcome_matched": True,
+            "captured_from_evaluation_row": True,
             "overview": {
                 "all_source_frames_rendered": True,
                 "artifact": _artifact(config.overview_path),
@@ -356,10 +358,14 @@ def test_frozen_config_loads_and_rejects_type_aliases_and_unknown_keys(tmp_path:
     config = load_ppo_controller_evaluation_config(CONFIG_PATH)
     assert config.validation_track_count == 100
     assert config.max_episode_steps == 4000
+    assert config.schema_version == 2
     assert config.replay_selection_rule.endswith("else_first_track")
+    assert config.replay_capture_method == FORMAL_REPLAY_CAPTURE_METHOD
 
     with pytest.raises(ControllerBenchmarkProtocolError, match="schema_version"):
         replace(config, schema_version=True)
+    with pytest.raises(ControllerBenchmarkProtocolError, match="replay_capture_method"):
+        replace(config, replay_capture_method="rerun_selected_episode")
 
     mutated = CONFIG_PATH.read_text(encoding="utf-8") + "\nunknown = 1\n"
     path = tmp_path / "evaluation.toml"
@@ -451,6 +457,24 @@ def test_strict_report_recomputes_all_rows_timing_and_identity_links() -> None:
     mutations.append(changed)
     changed = copy.deepcopy(report)
     changed["protocol"]["output_crash_recovery_method"] = "memory_only_rollback"
+    mutations.append(changed)
+    changed = copy.deepcopy(report)
+    changed["protocol"]["replay_capture_method"] = "rerun_selected_episode"
+    mutations.append(changed)
+    changed = copy.deepcopy(report)
+    changed["replay"]["captured_from_evaluation_row"] = False
+    mutations.append(changed)
+    changed = copy.deepcopy(report)
+    changed["execution"]["recorded_episode_count"] = 4
+    mutations.append(changed)
+    changed = copy.deepcopy(report)
+    changed["execution"]["physics_substeps"] += 10
+    mutations.append(changed)
+    changed = copy.deepcopy(report)
+    changed["execution"]["captured_replay_steps"] = True
+    mutations.append(changed)
+    changed = copy.deepcopy(report)
+    changed["execution"]["captured_replay_episode_wall_s"] = 10.1
     mutations.append(changed)
 
     for mutation in mutations:
