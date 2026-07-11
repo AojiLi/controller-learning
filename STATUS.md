@@ -6,9 +6,10 @@ Last updated: 2026-07-11
 
 ## Main Line
 
-Freeze and commit the Test-only final protocol before any Test performance access, then evaluate
-PID, MPC, and PPO once on the same fixed-order 20-Track Test split. Finish public documentation and
-release audits afterward; the repository is still private.
+Freeze and commit the sole authorized zero-episode replacement, then evaluate PID, MPC, and PPO on
+the same fixed-order 20-Track Test split. Attempt 001 loaded Test but failed before Environment
+creation completed, reset, step, Controller construction, or performance observation. Finish
+public documentation and release audits afterward; the repository is still private.
 
 ## Completed Evidence
 
@@ -48,8 +49,8 @@ Controller timing/lifecycle, and replay gates. Final Test comparison and release
 
 ## Current Work
 
-- commit and push the complete Test-only M8 protocol and rejection tests before performance access;
-- run one formal same-order/same-seed PID/MPC/PPO comparison on all 20 Test Tracks;
+- commit and push attempt 002, its rejection tests, and the canonical attempt 001 failure report;
+- run the sole replacement with the same order/seeds/Controllers on all 20 Test Tracks;
 - publish strict result and replay artifacts without Test-informed tuning or checkpoint changes;
 - complete English README/tutorial/API/reproduction docs, package/privacy cleanup, and release
   audits;
@@ -57,21 +58,18 @@ Controller timing/lifecycle, and replay gates. Final Test comparison and release
 
 ## Next Step
 
-Commit and push the Test-only M8 protocol, which now passes the full 1,063-test CPU CI plus Linux GPU
-and Validation-only smoke checks, then execute the single formal PID/MPC/PPO 20-Track run from that
-clean revision. No formal Test Controller performance has been opened yet.
-
-One initial formal process stopped in `PREPARED` on multiline CUDA runtime evidence, and its first
-recovery process stopped before dependency import when the recovery guard denied GLFW's helper
-subprocess. Both retained empty journals/blobs and never enabled Test reads. The follow-up fixes are
-now covered by process-locked EGL import and early PREPARED-recovery tests.
+The replacement implementation now passes 1,086 CPU tests, all 69 GPU tests, strict docs/package
+checks, and independent red-team review with no unresolved P0/P1 issue. Complete the final
+privacy/lineage/allowlist audit, commit and push attempt 002, then execute it exactly once from that
+clean revision. No Controller performance has been observed on Test. Attempt 001 is retained at
+`TEST_BOUND` with a 0/60 journal, null execution evidence, one canonical `environment_create`
+failure with `workload=null`, and no outputs. Attempt 002 pre-initializes Warp before Test binding;
+its eligibility gate reproduces the predecessor report byte-for-byte.
 
 ## Risks and Blockers
 
-- Any Test performance access before the complete protocol is committed would invalidate the
-  one-shot comparison boundary.
-- Infrastructure failure handling and publication rollback must be predeclared so a failed run
-  cannot become a performance-motivated rerun.
+- Attempt 002 must not run before its complete protocol is committed and pushed.
+- A post-bind attempt 002 failure cannot be retried; a third formal attempt is forbidden.
 - PID, MPC, and PPO artifact/config identities must remain frozen throughout the Test run.
 - Public-release claims remain blocked on final documentation, privacy, package, evidence, and
   repository-visibility checks.

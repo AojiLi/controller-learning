@@ -51,10 +51,14 @@ def test_clean_source_requires_full_revision_and_empty_status(tmp_path: Path) ->
         capture_clean_source(tmp_path, command_runner=dirty)
 
 
-def test_frozen_input_reports_validate_current_m5_m6_m7_chain() -> None:
+def test_frozen_input_reports_validate_current_m5_m6_m7_and_predecessor_chain() -> None:
     reports = load_frozen_input_reports(PROJECT_ROOT, CONFIG)
 
     assert tuple(reports) == tuple(CONFIG.input_paths)
+    assert "m8_attempt_001_failure_report" in reports
+    assert reports["m8_attempt_001_failure_report"].sha256 == (
+        CONFIG.replacement_failure_report_sha256
+    )
     assert len(frozen_input_digest(reports)) == 64
     assert reports["m5_track_admission_report"].payload["status"] == "pass"
     assert reports["m7_controller_report"].payload["runtime"]["selected_gpu"]["uuid"] == (
@@ -446,3 +450,60 @@ def test_committed_snapshot_outer_validation_requires_only_real_quarantine(
     active.mkdir()
     with pytest.raises(RuntimeError, match="active Controller snapshot"):
         validate_committed_controller_snapshot_quarantine(tmp_path)
+
+
+def test_parameterized_attempt_002_snapshot_operations_preserve_predecessor_bytes(
+    tmp_path: Path,
+) -> None:
+    predecessor = tmp_path / "runs/m8_final_controller_snapshot"
+    predecessor_file = predecessor / "controllers/pid/controller.py"
+    predecessor_file.parent.mkdir(parents=True)
+    predecessor_file.write_bytes(b"attempt-001-controller\x00\xff")
+    predecessor_committed = tmp_path / "runs/m8_final_controller_snapshot.committed"
+    predecessor_committed.mkdir()
+    (predecessor_committed / "evidence.bin").write_bytes(b"attempt-001-committed")
+    predecessor_before = predecessor_file.read_bytes()
+    predecessor_committed_before = (predecessor_committed / "evidence.bin").read_bytes()
+
+    active_relative_path = "runs/custom_controller_snapshot_002"
+    committed_relative_path = active_relative_path + ".committed"
+    active = tmp_path / active_relative_path
+    active.mkdir()
+    (active / "partial.bin").write_bytes(b"attempt-002-partial")
+
+    require_controller_snapshot_quarantine_absent(
+        tmp_path,
+        committed_relative_path=committed_relative_path,
+    )
+    aborted = isolate_aborted_controller_snapshot(
+        tmp_path,
+        relative_path=active_relative_path,
+    )
+    assert aborted is not None
+    assert aborted.name.startswith("custom_controller_snapshot_002.abort.")
+    assert (aborted / "partial.bin").read_bytes() == b"attempt-002-partial"
+
+    active.mkdir()
+    (active / "complete.bin").write_bytes(b"attempt-002-complete")
+    retire_committed_controller_snapshot(
+        tmp_path,
+        relative_path=active_relative_path,
+        committed_relative_path=committed_relative_path,
+    )
+    validate_committed_controller_snapshot_quarantine(
+        tmp_path,
+        relative_path=active_relative_path,
+        committed_relative_path=committed_relative_path,
+    )
+
+    assert predecessor_file.read_bytes() == predecessor_before
+    assert (predecessor_committed / "evidence.bin").read_bytes() == (predecessor_committed_before)
+
+
+def test_parameterized_snapshot_rejects_a_mismatched_committed_path(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="active path plus"):
+        retire_committed_controller_snapshot(
+            tmp_path,
+            relative_path="runs/custom_controller_snapshot_002",
+            committed_relative_path="runs/unrelated.committed",
+        )

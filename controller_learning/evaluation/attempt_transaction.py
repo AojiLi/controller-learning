@@ -1,4 +1,4 @@
-"""Durable one-shot transaction for the frozen M8 Test evaluation.
+"""Durable single-attempt transaction for the frozen M8 Test evaluation.
 
 This module owns persistence only.  It does not know where official Track assets live and never
 loads an environment or a Controller.  The caller must durably prepare the transaction before
@@ -23,7 +23,7 @@ from pathlib import Path, PurePosixPath
 from types import MappingProxyType
 from typing import Any, Final, Literal
 
-ATTEMPT_TRANSACTION_SCHEMA_VERSION: Final = "controller-learning.m8-attempt-transaction.v2"
+ATTEMPT_TRANSACTION_SCHEMA_VERSION: Final = "controller-learning.m8-attempt-transaction.v3"
 ARTIFACT_VALIDATION_SCHEMA_VERSION: Final = "controller-learning.m8-artifact-validation.v1"
 FORMAL_ARTIFACT_VALIDATOR_ID: Final = (
     "controller_learning.evaluation.final_report.validate_m8_publication"
@@ -785,11 +785,14 @@ class M8AttemptTransaction:
             "output_allowlist": list(self.output_allowlist),
             "outputs": outputs,
             "recovery_policy": {
-                "accepted_result": "first_complete_protocol_passing_attempt",
+                "accepted_result": "first_complete_protocol_passing_replacement_attempt",
                 "automatic_retry_after_test_bound": False,
                 "completed_attempt_finalizes_from_durable_bytes_only": True,
                 "low_performance_can_trigger_retry": False,
                 "partial_publication_restores_originals_before_republish": True,
+                "replacement_attempt_limit": 1,
+                "replacement_of_run_id": "m8-final-v0-1-001",
+                "third_attempt_allowed": False,
             },
             "schema_version": ATTEMPT_TRANSACTION_SCHEMA_VERSION,
             "transaction_relative_path": self.transaction_relative_path,
@@ -1633,11 +1636,14 @@ class M8AttemptTransaction:
             "rows_per_controller": FORMAL_ROWS_PER_CONTROLLER,
         }
         expected_recovery = {
-            "accepted_result": "first_complete_protocol_passing_attempt",
+            "accepted_result": "first_complete_protocol_passing_replacement_attempt",
             "automatic_retry_after_test_bound": False,
             "completed_attempt_finalizes_from_durable_bytes_only": True,
             "low_performance_can_trigger_retry": False,
             "partial_publication_restores_originals_before_republish": True,
+            "replacement_attempt_limit": 1,
+            "replacement_of_run_id": "m8-final-v0-1-001",
+            "third_attempt_allowed": False,
         }
         if (
             manifest["schema_version"] != ATTEMPT_TRANSACTION_SCHEMA_VERSION

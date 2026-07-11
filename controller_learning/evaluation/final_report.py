@@ -54,16 +54,17 @@ from controller_learning.evaluation.test_assets import TestPoolAccessEvidence
 from controller_learning.evaluation.trajectory import TRAJECTORY_SCHEMA_VERSION
 
 M8_CONTROLLER_RUN_MANIFEST_SCHEMA_VERSION: Final = (
-    "controller-learning.m8-controller-run-manifest.v1"
+    "controller-learning.m8-controller-run-manifest.v2"
 )
 M8_SOURCE_EVIDENCE_SCHEMA_VERSION: Final = "controller-learning.m8-source-evidence.v1"
-M8_CONFIG_EVIDENCE_SCHEMA_VERSION: Final = "controller-learning.m8-config-evidence.v1"
+M8_CONFIG_EVIDENCE_SCHEMA_VERSION: Final = "controller-learning.m8-config-evidence.v2"
 M8_RUNTIME_EVIDENCE_SCHEMA_VERSION: Final = "controller-learning.m8-runtime-evidence.v1"
 M8_MEMORY_EVIDENCE_SCHEMA_VERSION: Final = "controller-learning.m8-memory-evidence.v1"
 M8_EXECUTION_EVIDENCE_SCHEMA_VERSION: Final = "controller-learning.m8-execution-evidence.v1"
-M8_TRANSACTION_EVIDENCE_SCHEMA_VERSION: Final = "controller-learning.m8-transaction-evidence.v1"
+M8_TRANSACTION_EVIDENCE_SCHEMA_VERSION: Final = "controller-learning.m8-transaction-evidence.v2"
 M8_PRIVACY_EVIDENCE_SCHEMA_VERSION: Final = "controller-learning.m8-privacy-evidence.v1"
 M8_TEST_ACCESS_AUDIT_SCHEMA_VERSION: Final = "controller-learning.m8-test-access-audit.v1"
+M8_REPLACEMENT_LINEAGE_SCHEMA_VERSION: Final = "controller-learning.m8-replacement-lineage.v1"
 M8_FINAL_CONFIG_PATH: Final = "configs/final_evaluation.toml"
 M8_PIXI_LOCK_PATH: Final = "pixi.lock"
 M8_REPORT_STATUS_BASIS: Final = "protocol_and_artifact_validation_only"
@@ -86,6 +87,7 @@ _INPUT_REPORT_NAMES: Final = (
     "m7_selection_report",
     "m7_export_report",
     "m7_controller_report",
+    "m8_attempt_001_failure_report",
 )
 _ACCESS_CATEGORIES: Final = ("official_test_asset", "official_test_manifest")
 _REPORT_MAX_BYTES: Final = 8 * 1024 * 1024
@@ -1059,13 +1061,14 @@ class DurableExecutionEvidenceSeal:
 
 @dataclass(frozen=True, slots=True)
 class TransactionEvidence:
-    """Durable one-shot attempt state when staged report bytes receive semantic validation."""
+    """Durable attempt state when staged report bytes receive semantic validation."""
 
     durable_episode_record_count: int = M8_TOTAL_EPISODES
     durable_trajectory_blob_count: int = M8_TOTAL_EPISODES
     formal_output_count: int = 24
     attempt_count: int = 1
     retry_count: int = 0
+    attempt_count_scope: str = "current_replacement_transaction_only"
     observed_phase_sequence: tuple[str, ...] = ("PREPARED", "TEST_BOUND", M8_REPORT_PHASE)
     phase_at_semantic_validation: str = M8_REPORT_PHASE
     required_publication_phase_sequence: tuple[str, ...] = ("ARTIFACTS_VALIDATED", "COMMITTED")
@@ -1088,6 +1091,8 @@ class TransactionEvidence:
                 raise FinalReportArtifactError(f"transaction {field} must be exactly {expected}")
         if self.observed_phase_sequence != ("PREPARED", "TEST_BOUND", M8_REPORT_PHASE):
             raise FinalReportArtifactError("transaction phase sequence differs before staging")
+        if self.attempt_count_scope != "current_replacement_transaction_only":
+            raise FinalReportArtifactError("transaction attempt count scope differs")
         if self.phase_at_semantic_validation != M8_REPORT_PHASE:
             raise FinalReportArtifactError(
                 "staged report must be semantically validated after evaluation completion"
@@ -1175,7 +1180,7 @@ def _validated_input_reports(
     reports: Mapping[str, ArtifactRecord],
 ) -> Mapping[str, ArtifactRecord]:
     if not isinstance(reports, Mapping) or set(reports) != set(_INPUT_REPORT_NAMES):
-        raise FinalReportArtifactError("input reports must contain the five frozen reports")
+        raise FinalReportArtifactError("input reports must contain the six frozen reports")
     result: dict[str, ArtifactRecord] = {}
     for name in _INPUT_REPORT_NAMES:
         record = reports[name]
@@ -1189,6 +1194,96 @@ def _validated_input_reports(
             raise FinalReportArtifactError(f"input report {name!r} differs from frozen config")
         result[name] = record
     return MappingProxyType(result)
+
+
+def _replacement_lineage_payload(
+    config: M8FinalEvaluationConfig,
+    failure_report_record: ArtifactRecord,
+    failure_report_payload: Mapping[str, Any],
+    transaction: TransactionEvidence,
+) -> Mapping[str, object]:
+    """Recompute the public replacement lineage from the frozen predecessor report."""
+
+    from controller_learning.evaluation import replacement
+
+    if not isinstance(failure_report_payload, Mapping):
+        raise TypeError("replacement_failure_report must be a mapping")
+    canonical = replacement.canonical_failure_report_bytes(failure_report_payload)
+    if (
+        failure_report_record.relative_path != config.replacement_failure_report_path
+        or failure_report_record.sha256 != config.replacement_failure_report_sha256
+        or failure_report_record.size_bytes != len(canonical)
+        or hashlib.sha256(canonical).hexdigest() != failure_report_record.sha256
+    ):
+        raise FinalReportArtifactError(
+            "replacement failure report payload differs from its frozen artifact record"
+        )
+    validated = replacement.validate_failure_report_bytes(
+        canonical,
+        expected_sha256=config.replacement_failure_report_sha256,
+    )
+    predecessor = validated["predecessor"]
+    failure = validated["failure"]
+    authorization = validated["authorization"]
+    predecessor_transaction = validated["transaction"]
+    if (
+        predecessor["run_id"] != config.replacement_of_run_id
+        or authorization["successor_run_id"] != config.run_id
+        or authorization["max_replacement_attempts"] != config.replacement_attempt_limit
+        or authorization["third_attempt_allowed"] != config.third_attempt_allowed
+        or predecessor["transaction_phase"] != "TEST_BOUND"
+        or predecessor["journal_record_count"] != 0
+        or predecessor["execution_evidence"] is not None
+        or predecessor["performance_observed"] is not False
+        or failure["infrastructure_phase"] != "environment_create"
+        or failure["workload"] is not None
+        or predecessor_transaction["episode_blob_count"] != 0
+        or predecessor_transaction["execution_seal_present"] is not False
+        or predecessor_transaction["final_staged_present"] is not False
+        or predecessor_transaction["publication_present"] is not False
+    ):
+        raise FinalReportArtifactError("replacement predecessor eligibility differs")
+    if (
+        transaction.attempt_count != 1
+        or transaction.retry_count != 0
+        or transaction.attempt_count_scope != "current_replacement_transaction_only"
+    ):
+        raise FinalReportArtifactError("replacement transaction counts differ")
+    return MappingProxyType(
+        {
+            "authorization": {
+                "replacement_attempt_limit": config.replacement_attempt_limit,
+                "performance_outcome_can_trigger_replacement": authorization[
+                    "performance_outcome_can_trigger_replacement"
+                ],
+                "third_attempt_allowed": config.third_attempt_allowed,
+            },
+            "failure_report": failure_report_record.to_dict(),
+            "predecessor": {
+                "durable_episode_record_count": predecessor["journal_record_count"],
+                "environment_create_completed": False,
+                "environment_reset_count": 0,
+                "environment_step_count": 0,
+                "execution_evidence_present": False,
+                "expected_episode_count": predecessor["expected_episode_count"],
+                "failure": dict(failure),
+                "performance_observed": predecessor["performance_observed"],
+                "plugin_controller_instance_count": 0,
+                "run_id": predecessor["run_id"],
+                "test_pool_load_completed": True,
+                "transaction_phase": predecessor["transaction_phase"],
+            },
+            "schema_version": M8_REPLACEMENT_LINEAGE_SCHEMA_VERSION,
+            "successor": {
+                "automatic_retry_after_test_bound": config.automatic_retry_after_test_bound,
+                "current_transaction_attempt_count": transaction.attempt_count,
+                "current_transaction_attempt_count_scope": transaction.attempt_count_scope,
+                "current_transaction_retry_count": transaction.retry_count,
+                "replacement_attempt_ordinal": 1,
+                "run_id": config.run_id,
+            },
+        }
+    )
 
 
 def _validated_identity(
@@ -1558,6 +1653,7 @@ def canonical_m8_final_report_json_bytes(
     config_evidence: FinalConfigEvidence,
     pixi_lock: ArtifactRecord,
     input_reports: Mapping[str, ArtifactRecord],
+    replacement_failure_report: Mapping[str, Any],
     controller_identities_before: Mapping[str, FrozenControllerIdentity],
     controller_identities_after: Mapping[str, FrozenControllerIdentity],
     test_pool_access: TestPoolAccessEvidence,
@@ -1602,6 +1698,12 @@ def canonical_m8_final_report_json_bytes(
     if not isinstance(privacy, PrivacyEvidence):
         raise TypeError("privacy must be PrivacyEvidence")
     outputs = _validated_global_outputs(protocol_config, output_artifacts)
+    replacement_lineage = _replacement_lineage_payload(
+        protocol_config,
+        inputs["m8_attempt_001_failure_report"],
+        replacement_failure_report,
+        transaction,
+    )
     rank_order = rank_final_controller_results(ordered)
     ranks = {name: rank for rank, name in enumerate(rank_order, start=1)}
     controllers = []
@@ -1653,6 +1755,7 @@ def canonical_m8_final_report_json_bytes(
             "success_rate_pass_gate": False,
         },
         "rank_order": list(rank_order),
+        "replacement_lineage": _thaw_json(replacement_lineage),
         "run_id": protocol_config.run_id,
         "runtime": _public_runtime_payload(runtime, pixi_lock),
         "schema_version": M8_FINAL_REPORT_SCHEMA_VERSION,
@@ -1691,6 +1794,7 @@ def validate_m8_publication(
     config_evidence: FinalConfigEvidence,
     pixi_lock: ArtifactRecord,
     input_reports: Mapping[str, ArtifactRecord],
+    replacement_failure_report: Mapping[str, Any],
     controller_identities_before: Mapping[str, FrozenControllerIdentity],
     controller_identities_after: Mapping[str, FrozenControllerIdentity],
     test_pool_access: TestPoolAccessEvidence,
@@ -1847,6 +1951,7 @@ def validate_m8_publication(
         config_evidence=config_evidence,
         pixi_lock=pixi_lock,
         input_reports=input_reports,
+        replacement_failure_report=replacement_failure_report,
         controller_identities_before=controller_identities_before,
         controller_identities_after=controller_identities_after,
         test_pool_access=test_pool_access,
@@ -1878,6 +1983,7 @@ __all__ = [
     "M8_MEMORY_EVIDENCE_SCHEMA_VERSION",
     "M8_PIXI_LOCK_PATH",
     "M8_PRIVACY_EVIDENCE_SCHEMA_VERSION",
+    "M8_REPLACEMENT_LINEAGE_SCHEMA_VERSION",
     "M8_RUNTIME_EVIDENCE_SCHEMA_VERSION",
     "M8_SOURCE_EVIDENCE_SCHEMA_VERSION",
     "M8_TEST_ACCESS_AUDIT_SCHEMA_VERSION",

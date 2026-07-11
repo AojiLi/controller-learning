@@ -1,4 +1,4 @@
-"""Run the frozen, one-shot M8 PID/MPC/PPO comparison on the official Test pool.
+"""Run the frozen M8 PID/MPC/PPO replacement comparison on the official Test pool.
 
 This entry point is intentionally fail closed.  It installs the Test-asset audit guard before
 importing any project module, durably records every canonical episode before starting the next
@@ -38,12 +38,13 @@ sys.dont_write_bytecode = True
 
 PROJECT_ROOT: Final = Path(__file__).resolve().parents[1]
 CANONICAL_CONFIG: Final = Path("configs/final_evaluation.toml")
-ATTEMPT_RELATIVE_PATH: Final = "runs/m8_final_attempt_transaction"
-SNAPSHOT_RELATIVE_PATH: Final = "runs/m8_final_controller_snapshot"
+ATTEMPT_RELATIVE_PATH: Final = "runs/m8_final_attempt_002_transaction"
+SNAPSHOT_RELATIVE_PATH: Final = "runs/m8_final_controller_snapshot_002"
+COMMITTED_SNAPSHOT_RELATIVE_PATH: Final = SNAPSHOT_RELATIVE_PATH + ".committed"
 FAILURE_EVIDENCE_BLOB: Final = "failures/final-workload.json"
 _PRIVATE_GUARD_MODULE: Final = "_controller_learning_m8_test_access_guard"
 _PRIVATE_ATTEMPT_MODULE: Final = "_controller_learning_m8_attempt_transaction"
-_ATTEMPT_TRANSACTION_SCHEMA: Final = "controller-learning.m8-attempt-transaction.v2"
+_ATTEMPT_TRANSACTION_SCHEMA: Final = "controller-learning.m8-attempt-transaction.v3"
 _ATTEMPT_PHASE_INDEX: Final = {
     "PREPARED": 0,
     "TEST_BOUND": 1,
@@ -187,7 +188,7 @@ class _DurableEvidence:
 
 def _parse_args(argv: Sequence[str] | None = None) -> BenchmarkOptions:
     parser = argparse.ArgumentParser(
-        description="Run the frozen one-shot M8 PID, MPC, and PPO Test comparison"
+        description="Run the frozen M8 PID, MPC, and PPO Test comparison"
     )
     parser.add_argument(
         "--config",
@@ -857,7 +858,7 @@ def _isolate_prepared_controller_snapshot(project_root: Path) -> Path | None:
             ):
                 raise RuntimeError("the runs directory changed during PREPARED recovery")
             active_name = Path(SNAPSHOT_RELATIVE_PATH).name
-            committed_name = active_name + ".committed"
+            committed_name = Path(COMMITTED_SNAPSHOT_RELATIVE_PATH).name
             try:
                 os.stat(committed_name, dir_fd=runs_descriptor, follow_symlinks=False)
             except FileNotFoundError:
@@ -875,7 +876,7 @@ def _isolate_prepared_controller_snapshot(project_root: Path) -> Path | None:
                 return None
             if stat.S_ISLNK(active_metadata.st_mode) or not stat.S_ISDIR(active_metadata.st_mode):
                 raise RuntimeError("the active PREPARED snapshot must be a real directory")
-            quarantine_name = "m8_final_controller_snapshot.abort." + secrets.token_hex(16)
+            quarantine_name = active_name + ".abort." + secrets.token_hex(16)
             try:
                 os.stat(quarantine_name, dir_fd=runs_descriptor, follow_symlinks=False)
             except FileNotFoundError:
@@ -1052,6 +1053,7 @@ def _load_project_api(project_root: Path) -> SimpleNamespace:
             "metrics": "controller_learning.evaluation.final_metrics",
             "physics_mjx_warp": "controller_learning.physics.mjx_warp",
             "preflight": "controller_learning.evaluation.final_preflight",
+            "replacement": "controller_learning.evaluation.replacement",
             "report": "controller_learning.evaluation.final_report",
             "results": "controller_learning.evaluation.final_results",
             "runtime": "controller_learning.evaluation.final_runtime",
@@ -1064,6 +1066,7 @@ def _load_project_api(project_root: Path) -> SimpleNamespace:
         }.items()
     }
     modules["jax"] = importlib.import_module("jax")
+    modules["warp"] = importlib.import_module("warp")
     _assert_project_source_finder_active(root)
     _validate_project_module_provenance(root)
     return SimpleNamespace(**modules)
@@ -1148,6 +1151,14 @@ def _enter_post_bind_phase() -> None:
     if _POST_BIND_COMMANDS_FORBIDDEN:
         raise RuntimeError("the formal process already crossed the TEST_BOUND command latch")
     _POST_BIND_COMMANDS_FORBIDDEN = True
+
+
+def _initialize_warp_runtime(api: SimpleNamespace) -> None:
+    """Initialize Warp exactly once while pre-Test process creation remains available."""
+
+    api.warp.init()
+    if getattr(api.warp._src.context, "runtime", None) is None:
+        raise RuntimeError("Warp runtime did not initialize before TEST_BOUND")
 
 
 def _python_git_revision(project_root: Path) -> str:
@@ -1310,9 +1321,15 @@ def _recover_pre_test_attempt(
     if not recovery_lockdown:
         raise RuntimeError("existing formal transaction was not locked before dependency imports")
     if inspection.phase is not api.attempt.AttemptPhase.COMMITTED:
-        api.preflight.require_controller_snapshot_quarantine_absent(project_root)
+        api.preflight.require_controller_snapshot_quarantine_absent(
+            project_root,
+            committed_relative_path=COMMITTED_SNAPSHOT_RELATIVE_PATH,
+        )
     if inspection.phase is api.attempt.AttemptPhase.PREPARED:
-        api.preflight.isolate_aborted_controller_snapshot(project_root)
+        api.preflight.isolate_aborted_controller_snapshot(
+            project_root,
+            relative_path=SNAPSHOT_RELATIVE_PATH,
+        )
         recovery = transaction.recover()
         if recovery.action != "pre_test_restored":
             raise RuntimeError("PREPARED recovery did not restore the pre-Test state")
@@ -1765,6 +1782,7 @@ def _build_outputs(
         config_evidence=config_evidence,
         pixi_lock=pixi_lock,
         input_reports=input_reports,
+        replacement_failure_report=static.reports["m8_attempt_001_failure_report"].payload,
         controller_identities_before=identities_before,
         controller_identities_after=clean_identities_after,
         test_pool_access=durable.test_pool_access,
@@ -1799,6 +1817,7 @@ def _publication_evidence_kwargs(
         ),
         "pixi_lock": pixi_lock,
         "input_reports": input_reports,
+        "replacement_failure_report": static.reports["m8_attempt_001_failure_report"].payload,
         "controller_identities_before": identities_before,
         "controller_identities_after": identities_after,
         "test_pool_access": durable.test_pool_access,
@@ -1868,7 +1887,10 @@ def _resume_attempt(
     if not inspection.exists:
         raise RuntimeError("attempt recovery requested without a transaction")
     if inspection.phase is not api.attempt.AttemptPhase.COMMITTED:
-        api.preflight.require_controller_snapshot_quarantine_absent(project_root)
+        api.preflight.require_controller_snapshot_quarantine_absent(
+            project_root,
+            committed_relative_path=COMMITTED_SNAPSHOT_RELATIVE_PATH,
+        )
     if (
         inspection.phase is api.attempt.AttemptPhase.TEST_BOUND
         and inspection.journal_record_count < api.attempt.FORMAL_EPISODE_COUNT
@@ -1937,7 +1959,11 @@ def _resume_attempt(
         )
         if not digest:
             raise RuntimeError("committed semantic validation did not return a digest")
-        api.preflight.retire_committed_controller_snapshot(project_root)
+        api.preflight.retire_committed_controller_snapshot(
+            project_root,
+            relative_path=SNAPSHOT_RELATIVE_PATH,
+            committed_relative_path=COMMITTED_SNAPSHOT_RELATIVE_PATH,
+        )
         return results
     elif inspection.phase is api.attempt.AttemptPhase.ARTIFACTS_VALIDATED:
         pass
@@ -1963,7 +1989,11 @@ def _resume_attempt(
         identities_before,
         identities_after,
     )
-    api.preflight.retire_committed_controller_snapshot(project_root)
+    api.preflight.retire_committed_controller_snapshot(
+        project_root,
+        relative_path=SNAPSHOT_RELATIVE_PATH,
+        committed_relative_path=COMMITTED_SNAPSHOT_RELATIVE_PATH,
+    )
     return results
 
 
@@ -1975,7 +2005,10 @@ def _fresh_attempt(
     transaction: object,
 ) -> Mapping[str, object]:
     config = static.config
-    api.preflight.require_controller_snapshot_quarantine_absent(project_root)
+    api.preflight.require_controller_snapshot_quarantine_absent(
+        project_root,
+        committed_relative_path=COMMITTED_SNAPSHOT_RELATIVE_PATH,
+    )
     api.benchmark.validate_formal_output_tree(project_root, config, expected_present=False)
     clean_source = api.preflight.capture_clean_source(
         project_root,
@@ -1989,6 +2022,19 @@ def _fresh_attempt(
     }
     _assert_torch_absent()
 
+    predecessor_report_path = project_root / config.replacement_failure_report_path
+    predecessor_validation = api.replacement.validate_local_predecessor(
+        project_root,
+        predecessor_report_path,
+        expected_sha256=config.replacement_failure_report_sha256,
+    )
+    if (
+        predecessor_validation.eligible is not True
+        or predecessor_validation.report_sha256 != config.replacement_failure_report_sha256
+        or predecessor_validation.successor_run_id != config.run_id
+    ):
+        raise RuntimeError("attempt 001 is not eligible for the frozen replacement attempt")
+
     transaction.prepare()
     try:
         snapshot = api.preflight.create_frozen_controller_snapshot(
@@ -1997,7 +2043,10 @@ def _fresh_attempt(
             relative_path=SNAPSHOT_RELATIVE_PATH,
         )
     except BaseException:
-        api.preflight.isolate_aborted_controller_snapshot(project_root)
+        api.preflight.isolate_aborted_controller_snapshot(
+            project_root,
+            relative_path=SNAPSHOT_RELATIVE_PATH,
+        )
         transaction.recover()
         raise
     api.preflight.validate_frozen_controller_snapshot(snapshot, config)
@@ -2021,6 +2070,7 @@ def _fresh_attempt(
         api.jax,
         frozen_nvidia_smi,
     )
+    _initialize_warp_runtime(api)
     device = api.jax.devices("gpu")[0]
     memory_recorder = api.runtime.FinalMemoryRecorder(
         api.jax,
@@ -2195,7 +2245,11 @@ def _fresh_attempt(
         snapshot.identities,
         identities_after,
     )
-    api.preflight.retire_committed_controller_snapshot(project_root)
+    api.preflight.retire_committed_controller_snapshot(
+        project_root,
+        relative_path=SNAPSHOT_RELATIVE_PATH,
+        committed_relative_path=COMMITTED_SNAPSHOT_RELATIVE_PATH,
+    )
     return reconstructed_results
 
 
@@ -2246,7 +2300,10 @@ def run_benchmark(
     if inspection.exists:
         results = _resume_attempt(api, root, static, transaction)
     else:
-        api.preflight.require_controller_snapshot_quarantine_absent(root)
+        api.preflight.require_controller_snapshot_quarantine_absent(
+            root,
+            committed_relative_path=COMMITTED_SNAPSHOT_RELATIVE_PATH,
+        )
         _assert_active_snapshot_absent(root)
         results = _fresh_attempt(api, guard, root, static, transaction)
 
@@ -2262,7 +2319,11 @@ def run_benchmark(
         post_publication_identities,
         require_clean=False,
     )
-    api.preflight.validate_committed_controller_snapshot_quarantine(root)
+    api.preflight.validate_committed_controller_snapshot_quarantine(
+        root,
+        relative_path=SNAPSHOT_RELATIVE_PATH,
+        committed_relative_path=COMMITTED_SNAPSHOT_RELATIVE_PATH,
+    )
     _assert_torch_absent()
     committed = transaction.inspect()
     if (

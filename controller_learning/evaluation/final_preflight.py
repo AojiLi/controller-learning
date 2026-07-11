@@ -23,11 +23,11 @@ from controller_learning.evaluation.final_benchmark import (
     M8FinalEvaluationConfig,
 )
 
-M8_CONTROLLER_SNAPSHOT_RELATIVE_PATH: Final = "runs/m8_final_controller_snapshot"
+M8_CONTROLLER_SNAPSHOT_RELATIVE_PATH: Final = "runs/m8_final_controller_snapshot_002"
 M8_COMMITTED_CONTROLLER_SNAPSHOT_RELATIVE_PATH: Final = (
-    "runs/m8_final_controller_snapshot.committed"
+    "runs/m8_final_controller_snapshot_002.committed"
 )
-M8_ABORTED_CONTROLLER_SNAPSHOT_PREFIX: Final = "m8_final_controller_snapshot.abort."
+M8_ABORTED_CONTROLLER_SNAPSHOT_PREFIX: Final = "m8_final_controller_snapshot_002.abort."
 
 CommandRunner = Callable[[Sequence[str], Path], str]
 
@@ -179,10 +179,12 @@ def load_frozen_input_reports(
     project_root: str | Path,
     config: M8FinalEvaluationConfig,
 ) -> Mapping[str, FrozenInputReport]:
-    """Load and semantically validate the five pre-Test M5/M6/M7 reports."""
+    """Load and validate the six frozen pre-Test and predecessor reports."""
 
     if not isinstance(config, M8FinalEvaluationConfig):
         raise TypeError("config must be an M8FinalEvaluationConfig")
+    from controller_learning.evaluation import replacement
+
     root = Path(project_root).resolve(strict=True)
     reports: dict[str, FrozenInputReport] = {}
     payloads: dict[str, Mapping[str, Any]] = {}
@@ -190,6 +192,11 @@ def load_frozen_input_reports(
         path = root / relative
         digest, size, content = sha256_regular_file(path)
         payload = _strict_json_object(content, name=name)
+        if name == "m8_attempt_001_failure_report":
+            replacement.validate_failure_report_bytes(
+                content,
+                expected_sha256=config.replacement_failure_report_sha256,
+            )
         reports[name] = FrozenInputReport(name, relative, digest, size, payload)
         payloads[name] = payload
 
@@ -284,6 +291,7 @@ def frozen_input_digest(reports: Mapping[str, FrozenInputReport]) -> str:
         "m7_selection_report",
         "m7_export_report",
         "m7_controller_report",
+        "m8_attempt_001_failure_report",
     }:
         raise ValueError("frozen input reports are incomplete")
     rows = [
@@ -352,6 +360,34 @@ def _ensure_runs_directory_descriptor(project_root: Path) -> int:
         os.close(root_descriptor)
 
 
+def _snapshot_entry_name(relative_path: str, *, field_name: str) -> str:
+    relative = PurePosixPath(relative_path)
+    if (
+        not isinstance(relative_path, str)
+        or relative.is_absolute()
+        or relative.as_posix() != relative_path
+        or len(relative.parts) != 2
+        or relative.parts[0] != "runs"
+        or any(part in {"", ".", ".."} for part in relative.parts)
+    ):
+        raise ValueError(f"{field_name} must be a normalized child of ignored runs/")
+    return relative.parts[1]
+
+
+def _snapshot_state_names(
+    relative_path: str,
+    committed_relative_path: str,
+) -> tuple[str, str]:
+    active_name = _snapshot_entry_name(relative_path, field_name="Controller snapshot")
+    committed_name = _snapshot_entry_name(
+        committed_relative_path,
+        field_name="committed Controller snapshot",
+    )
+    if committed_name != active_name + ".committed":
+        raise ValueError("committed Controller snapshot must be the active path plus '.committed'")
+    return active_name, committed_name
+
+
 def create_frozen_controller_snapshot(
     project_root: str | Path,
     config: M8FinalEvaluationConfig,
@@ -363,25 +399,16 @@ def create_frozen_controller_snapshot(
     if not isinstance(config, M8FinalEvaluationConfig):
         raise TypeError("config must be an M8FinalEvaluationConfig")
     root = Path(project_root).resolve(strict=True)
-    relative = PurePosixPath(relative_path)
-    if (
-        not isinstance(relative_path, str)
-        or relative.is_absolute()
-        or relative.as_posix() != relative_path
-        or len(relative.parts) != 2
-        or relative.parts[0] != "runs"
-        or any(part in {"", ".", ".."} for part in relative.parts)
-    ):
-        raise ValueError("Controller snapshot must be a normalized child of ignored runs/")
+    active_name = _snapshot_entry_name(relative_path, field_name="Controller snapshot")
     snapshot_root = root / relative_path
     runs_descriptor = _ensure_runs_directory_descriptor(root)
     directory_descriptors: dict[tuple[str, ...], int] = {}
     try:
-        os.mkdir(relative.parts[1], 0o700, dir_fd=runs_descriptor)
+        os.mkdir(active_name, 0o700, dir_fd=runs_descriptor)
         os.fsync(runs_descriptor)
         active_descriptor = _open_real_child_directory(
             runs_descriptor,
-            relative.parts[1],
+            active_name,
         )
         directory_descriptors[()] = active_descriptor
         for name in M8_CONTROLLER_ORDER:
@@ -516,22 +543,27 @@ def _fsync_aborted_snapshot_quarantines(runs_descriptor: int) -> None:
     os.fsync(runs_descriptor)
 
 
-def _unique_aborted_snapshot_name(runs_descriptor: int) -> str:
+def _unique_aborted_snapshot_name(runs_descriptor: int, *, prefix: str) -> str:
     for _attempt in range(128):
-        name = M8_ABORTED_CONTROLLER_SNAPSHOT_PREFIX + secrets.token_hex(16)
+        name = prefix + secrets.token_hex(16)
         if not _directory_entry_exists(runs_descriptor, name):
             return name
     raise RuntimeError("could not allocate a unique aborted snapshot quarantine")
 
 
-def isolate_aborted_controller_snapshot(project_root: str | Path) -> Path | None:
-    """Atomically isolate the fixed active snapshot before retiring a PREPARED attempt."""
+def isolate_aborted_controller_snapshot(
+    project_root: str | Path,
+    *,
+    relative_path: str = M8_CONTROLLER_SNAPSHOT_RELATIVE_PATH,
+) -> Path | None:
+    """Atomically isolate the selected active snapshot before retiring PREPARED state."""
 
     root = Path(project_root).resolve(strict=True)
+    active_name = _snapshot_entry_name(relative_path, field_name="Controller snapshot")
     runs_descriptor = _open_runs_directory(root)
     if runs_descriptor is None:
         return None
-    active_name = Path(M8_CONTROLLER_SNAPSHOT_RELATIVE_PATH).name
+    aborted_prefix = active_name + ".abort."
     try:
         if not _directory_entry_exists(runs_descriptor, active_name):
             _fsync_aborted_snapshot_quarantines(runs_descriptor)
@@ -541,7 +573,10 @@ def isolate_aborted_controller_snapshot(project_root: str | Path) -> Path | None
             dir_fd=runs_descriptor,
             follow_symlinks=False,
         )
-        quarantine_name = _unique_aborted_snapshot_name(runs_descriptor)
+        quarantine_name = _unique_aborted_snapshot_name(
+            runs_descriptor,
+            prefix=aborted_prefix,
+        )
         os.rename(
             active_name,
             quarantine_name,
@@ -563,30 +598,44 @@ def isolate_aborted_controller_snapshot(project_root: str | Path) -> Path | None
         os.close(runs_descriptor)
 
 
-def require_controller_snapshot_quarantine_absent(project_root: str | Path) -> None:
-    """Fail closed if a prior COMMITTED snapshot quarantine exists before Test."""
+def require_controller_snapshot_quarantine_absent(
+    project_root: str | Path,
+    *,
+    committed_relative_path: str = M8_COMMITTED_CONTROLLER_SNAPSHOT_RELATIVE_PATH,
+) -> None:
+    """Fail closed if the selected COMMITTED snapshot quarantine exists before Test."""
 
     root = Path(project_root).resolve(strict=True)
+    quarantine_name = _snapshot_entry_name(
+        committed_relative_path,
+        field_name="committed Controller snapshot",
+    )
     descriptor = _open_runs_directory(root)
     if descriptor is None:
         return
     try:
-        quarantine_name = Path(M8_COMMITTED_CONTROLLER_SNAPSHOT_RELATIVE_PATH).name
         if _directory_entry_exists(descriptor, quarantine_name):
             raise RuntimeError("a COMMITTED Controller snapshot quarantine already exists")
     finally:
         os.close(descriptor)
 
 
-def retire_committed_controller_snapshot(project_root: str | Path) -> None:
-    """Atomically quarantine the fixed snapshot after a durable ``COMMITTED`` transition."""
+def retire_committed_controller_snapshot(
+    project_root: str | Path,
+    *,
+    relative_path: str = M8_CONTROLLER_SNAPSHOT_RELATIVE_PATH,
+    committed_relative_path: str = M8_COMMITTED_CONTROLLER_SNAPSHOT_RELATIVE_PATH,
+) -> None:
+    """Atomically quarantine the selected snapshot after durable ``COMMITTED``."""
 
     root = Path(project_root).resolve(strict=True)
+    active_name, quarantine_name = _snapshot_state_names(
+        relative_path,
+        committed_relative_path,
+    )
     descriptor = _open_runs_directory(root)
     if descriptor is None:
         raise RuntimeError("COMMITTED snapshot retirement requires exactly one snapshot state")
-    active_name = Path(M8_CONTROLLER_SNAPSHOT_RELATIVE_PATH).name
-    quarantine_name = Path(M8_COMMITTED_CONTROLLER_SNAPSHOT_RELATIVE_PATH).name
     try:
         active_exists = _directory_entry_exists(descriptor, active_name)
         quarantine_exists = _directory_entry_exists(descriptor, quarantine_name)
@@ -640,15 +689,22 @@ def retire_committed_controller_snapshot(project_root: str | Path) -> None:
         os.close(descriptor)
 
 
-def validate_committed_controller_snapshot_quarantine(project_root: str | Path) -> None:
-    """Require the post-publication active-absent, real-quarantine state."""
+def validate_committed_controller_snapshot_quarantine(
+    project_root: str | Path,
+    *,
+    relative_path: str = M8_CONTROLLER_SNAPSHOT_RELATIVE_PATH,
+    committed_relative_path: str = M8_COMMITTED_CONTROLLER_SNAPSHOT_RELATIVE_PATH,
+) -> None:
+    """Require the selected post-publication active-absent, real-quarantine state."""
 
     root = Path(project_root).resolve(strict=True)
+    active_name, quarantine_name = _snapshot_state_names(
+        relative_path,
+        committed_relative_path,
+    )
     descriptor = _open_runs_directory(root)
     if descriptor is None:
         raise RuntimeError("COMMITTED Controller snapshot quarantine is missing")
-    active_name = Path(M8_CONTROLLER_SNAPSHOT_RELATIVE_PATH).name
-    quarantine_name = Path(M8_COMMITTED_CONTROLLER_SNAPSHOT_RELATIVE_PATH).name
     try:
         if _directory_entry_exists(descriptor, active_name):
             raise RuntimeError("active Controller snapshot remains after COMMITTED retirement")

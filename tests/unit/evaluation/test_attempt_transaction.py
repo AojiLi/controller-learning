@@ -392,6 +392,18 @@ def test_prepare_is_canonical_and_pre_test_recovery_removes_absent_outputs(
         + b"\n"
         == payload
     )
+    parsed = json.loads(payload)
+    assert parsed["schema_version"] == "controller-learning.m8-attempt-transaction.v3"
+    assert parsed["recovery_policy"] == {
+        "accepted_result": "first_complete_protocol_passing_replacement_attempt",
+        "automatic_retry_after_test_bound": False,
+        "completed_attempt_finalizes_from_durable_bytes_only": True,
+        "low_performance_can_trigger_retry": False,
+        "partial_publication_restores_originals_before_republish": True,
+        "replacement_attempt_limit": 1,
+        "replacement_of_run_id": "m8-final-v0-1-001",
+        "third_attempt_allowed": False,
+    }
 
     recovery = _transaction(tmp_path).recover()
 

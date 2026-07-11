@@ -10,9 +10,10 @@ product.
 
 > **Project status:** M7 is complete. PPO trained through the official 1,024-world vector
 > environment, passed frozen Validation selection, and was exported as an ordinary Torch-free
-> Controller plugin. The M8 Test-only comparison protocol and public documentation are being
-> prepared. PID, MPC, and PPO have not been formally evaluated on Test, and no formal Test
-> comparison has been published. The public v0.1 release remains pending.
+> Controller plugin. M8 attempt 001 loaded the fixed Test pool but stopped during Environment
+> creation, before reset, stepping, Controller construction, or any performance observation. One
+> zero-episode infrastructure replacement, attempt 002, is frozen and pending. No formal Test
+> comparison has been published, and the public v0.1 release remains pending.
 
 Reviewed machine-readable evidence is available in the
 [M1 CPU report](benchmarks/v0.1/m1_cpu_report.json) and
@@ -26,7 +27,10 @@ environment path is measured in the
 in the [M6 Controller report](benchmarks/v0.1/m6_controller_report.json). PPO evidence is in the
 [M7 selection report](benchmarks/v0.1/m7_ppo_selection_report.json),
 [export report](benchmarks/v0.1/m7_ppo_export_report.json), and
-[ordinary Controller report](benchmarks/v0.1/m7_ppo_controller_evaluation_report.json).
+[ordinary Controller report](benchmarks/v0.1/m7_ppo_controller_evaluation_report.json). The
+canonical [M8 attempt 001 failure report](benchmarks/v0.1/m8_attempt_001_failure_report.json)
+records the retained zero-episode infrastructure failure and the exact authorization boundary for
+attempt 002.
 
 ## Why This Project Exists
 
@@ -57,7 +61,7 @@ observation-only geometry, PID and MPC designs, DebugDraw output, and timing int
 The [PPO tutorial](docs/ppo.md) covers the official training stack, DLPack exchange, NEXT_STEP
 rollout masks, frozen checkpoint selection, NumPy export, and replay.
 The [Evaluation Protocol](docs/evaluation.md) defines the fixed M8 PID/MPC/PPO comparison, ranking,
-metrics, same-rollout replay, and one-shot attempt policy. The
+metrics, same-rollout replay, and single authorized replacement policy. The
 [Reproducibility Guide](docs/reproducibility.md) separates CPU development from formal NVIDIA GPU
 work and explains how to add a Controller without tuning on Test.
 

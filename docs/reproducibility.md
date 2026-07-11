@@ -5,8 +5,10 @@ configuration, Controller files, benchmark manifests, Track IDs, seeds, runtime 
 metric samples, and derived reports. A matching command without those identities is only a similar
 experiment.
 
-Formal Test results are still pending. The commands and artifact layout below document the frozen
-workflow without inventing performance.
+Formal Test results are still pending. Attempt 001 loaded Test but failed during Environment
+creation before reset, stepping, Controller construction, or any performance observation. The
+commands and artifact layout below document the single authorized replacement without inventing
+performance.
 
 ## Supported platform
 
@@ -86,10 +88,11 @@ pixi run -e gpu benchmark-m8-controllers
 ```
 
 The task is implemented, while its formal Test result is still pending. It must not run until the
-complete Test-only implementation and rejection tests are frozen in a clean commit, the Controller
-identities are fixed, and Validation-only CPU/GPU checks pass. Once an official report is
-published, a local invocation is a reproduction attempt; it cannot replace the first accepted
-official result.
+attempt 002 implementation, canonical attempt 001 failure report, and rejection tests are frozen in
+a clean commit; the Controller identities remain fixed; and Validation-only CPU/GPU checks pass.
+Attempt 002 is the sole authorized zero-episode infrastructure replacement. A failure after its
+Test binding cannot be retried, and no third official attempt is allowed. Once an official report
+is published, a local invocation is a reproduction attempt; it cannot replace the accepted result.
 
 ## Author a Controller without Test leakage
 
@@ -143,8 +146,8 @@ The formal evaluator additionally binds:
 
 - `configs/final_evaluation.toml` and `pixi.lock` hashes;
 - every declared file in `controllers/pid`, `controllers/mpc`, and `controllers/ppo`;
-- the M5 Track-admission, M6 Controller, and M7 PPO input reports, including the exported policy
-  identity;
+- the M5 Track-admission, M6 Controller, M7 PPO, and canonical M8 attempt 001 failure reports,
+  including the exported policy identity and zero-episode predecessor transaction;
 - the Test manifest and fixed asset identity after the one-way Test transition; and
 - OS, CPU, GPU model, driver, CUDA, Python, JAX, MuJoCo/MJX-Warp, Warp, CasADi, and PyTorch
   versions relevant to the run.
@@ -170,7 +173,7 @@ from pathlib import Path
 
 import numpy as np
 
-path = Path("results/0.1/pid/m8-final-v0-1-001/metrics.npz")
+path = Path("results/0.1/pid/m8-final-v0-1-002/metrics.npz")
 with np.load(path, allow_pickle=False) as metrics:
     print(metrics.files)
     print(metrics["track_id"])

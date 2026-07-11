@@ -96,7 +96,7 @@ train-ppo = { cmd = "python scripts/train_ppo.py", description = "Train PPO on t
 benchmark-m7-ppo = { cmd = "python scripts/benchmark_m7_ppo.py", description = "Select the frozen PPO checkpoint on Validation and compare it with random actions" }
 export-m7-ppo-controller = { cmd = "python scripts/export_m7_ppo_controller.py", description = "Export the selected PPO checkpoint as a hash-bound inference-only Controller" }
 benchmark-m7-ppo-controller = { cmd = "python scripts/benchmark_m7_ppo_controller.py", description = "Evaluate the selected PPO through the ordinary Controller Runner and publish one replay" }
-benchmark-m8-controllers = { cmd = "python -I -B -S scripts/benchmark_m8_controllers.py", description = "Run the one-shot formal M8 PID, MPC, and PPO Test comparison" }
+benchmark-m8-controllers = { cmd = "python -I -B -S scripts/benchmark_m8_controllers.py", description = "Run the frozen M8 PID, MPC, and PPO Test comparison" }
 
 [tool.pixi.environments]
 default = { features = ["cpu", "dev"], solve-group = "cpu" }

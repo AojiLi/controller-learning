@@ -378,15 +378,23 @@ def publication() -> SyntheticPublication:
         (PROJECT_ROOT / "pixi.lock").read_bytes(),
         "application/yaml",
     )
-    input_reports = {
-        name: ArtifactRecord.from_bytes(
+    input_reports: dict[str, ArtifactRecord] = {}
+    replacement_failure_payload: Mapping[str, object] | None = None
+    for name, path in config.input_paths.items():
+        if name == "m8_attempt_001_failure_report":
+            content = (PROJECT_ROOT / path).read_bytes()
+            replacement_failure_payload = json.loads(content)
+            schema = replacement_failure_payload["schema_version"]
+        else:
+            content = f'{{"synthetic_input":"{name}"}}\n'.encode("ascii")
+            schema = f"controller-learning.synthetic-{name}.v1"
+        input_reports[name] = ArtifactRecord.from_bytes(
             path,
-            f'{{"synthetic_input":"{name}"}}\n'.encode("ascii"),
+            content,
             "application/json",
-            f"controller-learning.synthetic-{name}.v1",
+            schema,
         )
-        for name, path in config.input_paths.items()
-    }
+    assert replacement_failure_payload is not None
     execution = ExecutionEvidence.from_results(
         results,
         wall_time_s=10.0,
@@ -412,6 +420,7 @@ def publication() -> SyntheticPublication:
         "config_evidence": config_evidence,
         "pixi_lock": pixi_lock,
         "input_reports": input_reports,
+        "replacement_failure_report": replacement_failure_payload,
         "controller_identities_before": identities,
         "controller_identities_after": identities,
         "test_pool_access": test_pool_access,
@@ -541,6 +550,11 @@ def test_typed_evidence_rejects_uuid_failures_retries_and_denied_access(
         replace(execution, numerical_failure_count=1)
     with pytest.raises(FinalReportArtifactError, match="retry_count"):
         replace(execution, retry_count=1)
+    with pytest.raises(FinalReportArtifactError, match="attempt count scope"):
+        replace(
+            publication.evidence["transaction"],
+            attempt_count_scope="all_formal_attempts",
+        )
     with pytest.raises(FinalReportArtifactError, match="denied_event_count"):
         replace(publication.evidence["test_access_audit"], denied_event_count=1)
     with pytest.raises(FinalReportArtifactError, match="guarded load"):
@@ -574,7 +588,7 @@ def test_controller_manifest_is_canonical_and_exactly_recomputed(
         )
         assert parsed["schema_version"] == M8_CONTROLLER_RUN_MANIFEST_SCHEMA_VERSION
         assert parsed["output_artifact_count"] == 6
-        assert len(parsed["frozen_input_reports"]) == 5
+        assert len(parsed["frozen_input_reports"]) == 6
         assert parsed["runtime"]["selected_gpu"]["uuid"] == "redacted"
         assert parsed["runtime"]["pixi"]["lock_sha256"] == publication.evidence["pixi_lock"].sha256
         assert parsed["reset_seeds"] == list(range(20))
@@ -606,6 +620,45 @@ def test_global_report_has_protocol_status_rank_rows_and_complete_artifacts(
     assert parsed["output_artifact_count"] == len(parsed["output_artifacts"]) == 23
     assert parsed["controller_identities"]["unchanged"] is True
     assert parsed["test_pool_access"]["loaded_splits"] == ["test"]
+    lineage = parsed["replacement_lineage"]
+    assert lineage["schema_version"] == "controller-learning.m8-replacement-lineage.v1"
+    assert lineage["predecessor"]["run_id"] == "m8-final-v0-1-001"
+    assert lineage["predecessor"]["transaction_phase"] == "TEST_BOUND"
+    assert lineage["predecessor"]["test_pool_load_completed"] is True
+    assert lineage["predecessor"]["durable_episode_record_count"] == 0
+    assert lineage["predecessor"]["environment_create_completed"] is False
+    assert lineage["predecessor"]["environment_reset_count"] == 0
+    assert lineage["predecessor"]["environment_step_count"] == 0
+    assert lineage["predecessor"]["plugin_controller_instance_count"] == 0
+    assert lineage["predecessor"]["performance_observed"] is False
+    assert lineage["predecessor"]["failure"]["workload"] is None
+    assert lineage["successor"]["run_id"] == "m8-final-v0-1-002"
+    assert lineage["successor"]["current_transaction_attempt_count"] == 1
+    assert lineage["successor"]["current_transaction_retry_count"] == 0
+    assert lineage["authorization"]["third_attempt_allowed"] is False
+
+
+def test_global_report_rejects_replacement_failure_payload_drift(
+    publication: SyntheticPublication,
+) -> None:
+    report_path = publication.config.report_path
+    records = {
+        path: _artifact_record(path, publication.outputs[path])
+        for path in formal_output_paths(publication.config)
+        if path != report_path
+    }
+    replacement_report = json.loads(json.dumps(publication.evidence["replacement_failure_report"]))
+    replacement_report["predecessor"]["performance_observed"] = True
+
+    with pytest.raises(FinalReportArtifactError, match="failure report payload differs"):
+        canonical_m8_final_report_json_bytes(
+            publication.results,
+            **{
+                **publication.evidence,
+                "replacement_failure_report": replacement_report,
+            },  # type: ignore[arg-type]
+            output_artifacts=records,
+        )
 
 
 @pytest.mark.parametrize(

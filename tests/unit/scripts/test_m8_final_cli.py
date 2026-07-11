@@ -41,7 +41,6 @@ def reset_formal_process_latches(cli_module, monkeypatch: pytest.MonkeyPatch) ->
     monkeypatch.setattr(cli_module, "_FORMAL_ENTRY_CONSUMED", False)
     monkeypatch.setattr(cli_module, "_POST_BIND_COMMANDS_FORBIDDEN", False)
     monkeypatch.setattr(cli_module, "_PROJECT_SOURCE_FINDER", None)
-    monkeypatch.setattr(cli_module, "_active_attempt_transaction_exists", lambda _root: False)
     yield
     sys.modules.pop(cli_module._PRIVATE_ATTEMPT_MODULE, None)
 
@@ -66,7 +65,7 @@ def _call_names(function: ast.FunctionDef) -> list[str]:
 
 
 def _m8_output_allowlist() -> tuple[str, ...]:
-    run_id = "m8-final-v0-1-001"
+    run_id = "m8-final-v0-1-002"
     outputs = {
         "benchmarks/v0.1/m8_final_evaluation_report.json",
         "benchmarks/v0.1/m8_final_results.csv",
@@ -102,7 +101,7 @@ def _make_prepared_transaction(project_root: Path) -> object:
     )
     transaction = M8AttemptTransaction(
         project_root,
-        transaction_relative_path="runs/m8_final_attempt_transaction",
+        transaction_relative_path="runs/m8_final_attempt_002_transaction",
         output_allowlist=_m8_output_allowlist(),
         identity=AttemptIdentity(
             source_revision="a" * 40,
@@ -225,6 +224,8 @@ def test_run_installs_exact_source_finder_and_site_route_before_project_api() ->
     )
     assert "site.addsitedir" not in SOURCE
     assert "controller_learning.physics.mjx_warp" in SOURCE
+    assert "controller_learning.evaluation.replacement" in SOURCE
+    assert 'modules["warp"] = importlib.import_module("warp")' in SOURCE
 
 
 def test_project_source_finder_accepts_only_exact_regular_python_sources(
@@ -261,6 +262,46 @@ def test_project_source_finder_accepts_only_exact_regular_python_sources(
 def test_canonical_root_binding_rejects_an_alternate_project(cli_module, tmp_path: Path) -> None:
     with pytest.raises(RuntimeError, match="bound to the project root"):
         cli_module._canonical_project_root(tmp_path)
+
+
+def test_attempt_001_is_only_a_byte_preserved_predecessor(
+    cli_module,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    project_root = tmp_path / "project"
+    runs = project_root / "runs"
+    predecessor_transaction = runs / "m8_final_attempt_transaction"
+    predecessor_snapshot = runs / "m8_final_controller_snapshot"
+    (predecessor_transaction / "nested").mkdir(parents=True)
+    predecessor_snapshot.mkdir()
+    (predecessor_transaction / "manifest.json").write_bytes(b"predecessor-manifest\x00\xff")
+    (predecessor_transaction / "nested/state.bin").write_bytes(b"predecessor-state")
+    (predecessor_snapshot / "controller.bin").write_bytes(b"predecessor-snapshot\x00\xfe")
+
+    def tree_bytes(root: Path) -> tuple[tuple[str, bytes], ...]:
+        return tuple(
+            (path.relative_to(root).as_posix(), path.read_bytes())
+            for path in sorted(root.rglob("*"))
+            if path.is_file()
+        )
+
+    before = tree_bytes(runs)
+    monkeypatch.setattr(cli_module, "PROJECT_ROOT", project_root)
+
+    assert cli_module._active_attempt_transaction_exists(project_root) is False
+    cli_module._assert_active_snapshot_absent(project_root)
+    assert tree_bytes(runs) == before
+
+    (project_root / cli_module.ATTEMPT_RELATIVE_PATH).mkdir()
+    assert cli_module._active_attempt_transaction_exists(project_root) is True
+    assert tree_bytes(predecessor_transaction) == (
+        ("manifest.json", b"predecessor-manifest\x00\xff"),
+        ("nested/state.bin", b"predecessor-state"),
+    )
+    assert tree_bytes(predecessor_snapshot) == (
+        ("controller.bin", b"predecessor-snapshot\x00\xfe"),
+    )
 
 
 def test_project_module_provenance_rejects_shadow_and_namespace_modules(
@@ -510,7 +551,11 @@ def test_transaction_uses_exact_frozen_output_allowlist(cli_module, tmp_path: Pa
         "source_revision": "a" * 40,
         "source_tree_sha256": "e" * 64,
     }
-    assert captured["transaction_relative_path"] == "runs/m8_final_attempt_transaction"
+    assert captured["transaction_relative_path"] == "runs/m8_final_attempt_002_transaction"
+    assert cli_module.SNAPSHOT_RELATIVE_PATH == "runs/m8_final_controller_snapshot_002"
+    assert cli_module.COMMITTED_SNAPSHOT_RELATIVE_PATH == (
+        "runs/m8_final_controller_snapshot_002.committed"
+    )
     assert captured["output_allowlist"] == output_paths
     assert len(captured["output_allowlist"]) == 24
 
@@ -571,7 +616,9 @@ def test_recovery_refuses_incomplete_test_bound_before_reconstruction(
             FORMAL_EPISODE_COUNT=60,
             IncompleteTestAttemptError=Incomplete,
         ),
-        preflight=SimpleNamespace(require_controller_snapshot_quarantine_absent=lambda _root: None),
+        preflight=SimpleNamespace(
+            require_controller_snapshot_quarantine_absent=lambda _root, **_kwargs: None
+        ),
     )
     with pytest.raises(Incomplete):
         cli_module._resume_attempt(api, tmp_path, SimpleNamespace(), transaction)
@@ -594,8 +641,10 @@ def test_prepared_recovery_isolates_snapshot_before_transaction_retirement(
             AttemptPhase=SimpleNamespace(PREPARED=prepared, COMMITTED=committed),
         ),
         preflight=SimpleNamespace(
-            require_controller_snapshot_quarantine_absent=lambda _root: events.append("gate"),
-            isolate_aborted_controller_snapshot=lambda _root: events.append("isolate"),
+            require_controller_snapshot_quarantine_absent=lambda _root, **_kwargs: events.append(
+                "gate"
+            ),
+            isolate_aborted_controller_snapshot=lambda _root, **_kwargs: events.append("isolate"),
         ),
     )
 
@@ -629,8 +678,8 @@ def test_prepared_recovery_preserves_transaction_when_snapshot_isolation_fails(
             AttemptPhase=SimpleNamespace(PREPARED=prepared, COMMITTED=committed),
         ),
         preflight=SimpleNamespace(
-            require_controller_snapshot_quarantine_absent=lambda _root: None,
-            isolate_aborted_controller_snapshot=lambda _root: (_ for _ in ()).throw(
+            require_controller_snapshot_quarantine_absent=lambda _root, **_kwargs: None,
+            isolate_aborted_controller_snapshot=lambda _root, **_kwargs: (_ for _ in ()).throw(
                 OSError("isolation failed")
             ),
         ),
@@ -654,7 +703,7 @@ def test_early_prepared_recovery_never_cleans_test_bound_state(
     project_root = tmp_path / "project"
     transaction = _make_prepared_transaction(project_root)
     transaction.bind_test()
-    snapshot = project_root / "runs/m8_final_controller_snapshot"
+    snapshot = project_root / "runs/m8_final_controller_snapshot_002"
     snapshot.mkdir()
     state_temporary = transaction.transaction_directory / ".state.json.recovery-token.tmp"
     state_temporary.write_bytes(b"durable interrupted state write")
@@ -691,7 +740,7 @@ def test_prepared_recovery_finishes_before_a_spawn_capable_dependency_import(
 ) -> None:
     project_root = tmp_path / "project"
     transaction = _make_prepared_transaction(project_root)
-    snapshot = project_root / "runs/m8_final_controller_snapshot"
+    snapshot = project_root / "runs/m8_final_controller_snapshot_002"
     snapshot.mkdir()
     dependency_marker = project_root / "dependency-imported"
     code = r"""
@@ -751,7 +800,7 @@ else:
     assert not dependency_marker.exists()
     assert not transaction.transaction_directory.exists()
     assert not snapshot.exists()
-    quarantines = tuple((project_root / "runs").glob("m8_final_controller_snapshot.abort.*"))
+    quarantines = tuple((project_root / "runs").glob("m8_final_controller_snapshot_002.abort.*"))
     assert len(quarantines) == 1 and quarantines[0].is_dir()
 
 
@@ -766,6 +815,62 @@ def test_existing_attempt_recovery_requires_early_lockdown(cli_module, tmp_path:
             tmp_path,
             recovery_lockdown=False,
         )
+
+
+def test_fresh_attempt_validates_exact_predecessor_before_prepare(
+    cli_module,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    captured: dict[str, object] = {}
+    prepare_called = False
+
+    def validate(project_root, report_path, *, expected_sha256):
+        captured.update(
+            project_root=project_root,
+            report_path=report_path,
+            expected_sha256=expected_sha256,
+        )
+        return SimpleNamespace(eligible=False)
+
+    def prepare() -> None:
+        nonlocal prepare_called
+        prepare_called = True
+
+    config = SimpleNamespace(
+        run_id="m8-final-v0-1-002",
+        replacement_failure_report_path="benchmarks/v0.1/predecessor.json",
+        replacement_failure_report_sha256="b" * 64,
+    )
+    api = SimpleNamespace(
+        benchmark=SimpleNamespace(
+            M8_CONTROLLER_ORDER=(),
+            validate_formal_output_tree=lambda *_args, **_kwargs: None,
+        ),
+        controller_identity=SimpleNamespace(capture_frozen_controller_identity=lambda *_args: None),
+        preflight=SimpleNamespace(
+            require_controller_snapshot_quarantine_absent=lambda _root, **_kwargs: None,
+            capture_clean_source=lambda _root, **_kwargs: SimpleNamespace(revision="a" * 40),
+        ),
+        replacement=SimpleNamespace(validate_local_predecessor=validate),
+    )
+    monkeypatch.setattr(cli_module, "_assert_torch_absent", lambda: None)
+
+    with pytest.raises(RuntimeError, match="not eligible"):
+        cli_module._fresh_attempt(
+            api,
+            object(),
+            tmp_path,
+            SimpleNamespace(config=config, source_revision="a" * 40),
+            SimpleNamespace(prepare=prepare),
+        )
+
+    assert captured == {
+        "project_root": tmp_path,
+        "report_path": tmp_path / "benchmarks/v0.1/predecessor.json",
+        "expected_sha256": "b" * 64,
+    }
+    assert prepare_called is False
 
 
 def test_fresh_snapshot_creation_failure_isolates_before_recovering_transaction(
@@ -788,12 +893,21 @@ def test_fresh_snapshot_creation_failure_isolates_before_recovering_transaction(
             )
         ),
         preflight=SimpleNamespace(
-            require_controller_snapshot_quarantine_absent=lambda _root: events.append("gate"),
+            require_controller_snapshot_quarantine_absent=lambda _root, **_kwargs: events.append(
+                "gate"
+            ),
             capture_clean_source=lambda _root, **_kwargs: SimpleNamespace(revision="a" * 40),
             create_frozen_controller_snapshot=lambda *_args, **_kwargs: (
                 events.append("create") or (_ for _ in ()).throw(CreationFailed("creation failed"))
             ),
-            isolate_aborted_controller_snapshot=lambda _root: events.append("isolate"),
+            isolate_aborted_controller_snapshot=lambda _root, **_kwargs: events.append("isolate"),
+        ),
+        replacement=SimpleNamespace(
+            validate_local_predecessor=lambda *_args, **_kwargs: SimpleNamespace(
+                eligible=True,
+                report_sha256="b" * 64,
+                successor_run_id="m8-final-v0-1-002",
+            )
         ),
     )
     transaction = SimpleNamespace(
@@ -807,7 +921,14 @@ def test_fresh_snapshot_creation_failure_isolates_before_recovering_transaction(
             api,
             object(),
             tmp_path,
-            SimpleNamespace(config=object(), source_revision="a" * 40),
+            SimpleNamespace(
+                config=SimpleNamespace(
+                    run_id="m8-final-v0-1-002",
+                    replacement_failure_report_path="predecessor.json",
+                    replacement_failure_report_sha256="b" * 64,
+                ),
+                source_revision="a" * 40,
+            ),
             transaction,
         )
     assert events[-4:] == ["prepare", "create", "isolate", "recover"]
@@ -833,14 +954,21 @@ def test_fresh_snapshot_isolation_failure_does_not_recover_prepared_transaction(
             capture_frozen_controller_identity=lambda *_args: object()
         ),
         preflight=SimpleNamespace(
-            require_controller_snapshot_quarantine_absent=lambda _root: None,
+            require_controller_snapshot_quarantine_absent=lambda _root, **_kwargs: None,
             capture_clean_source=lambda _root, **_kwargs: SimpleNamespace(revision="a" * 40),
             create_frozen_controller_snapshot=lambda *_args, **_kwargs: (_ for _ in ()).throw(
                 RuntimeError("creation failed")
             ),
-            isolate_aborted_controller_snapshot=lambda _root: (_ for _ in ()).throw(
+            isolate_aborted_controller_snapshot=lambda _root, **_kwargs: (_ for _ in ()).throw(
                 OSError("isolation failed")
             ),
+        ),
+        replacement=SimpleNamespace(
+            validate_local_predecessor=lambda *_args, **_kwargs: SimpleNamespace(
+                eligible=True,
+                report_sha256="b" * 64,
+                successor_run_id="m8-final-v0-1-002",
+            )
         ),
     )
     transaction = SimpleNamespace(prepare=lambda: None, recover=recover)
@@ -851,10 +979,125 @@ def test_fresh_snapshot_isolation_failure_does_not_recover_prepared_transaction(
             api,
             object(),
             tmp_path,
-            SimpleNamespace(config=object(), source_revision="a" * 40),
+            SimpleNamespace(
+                config=SimpleNamespace(
+                    run_id="m8-final-v0-1-002",
+                    replacement_failure_report_path="predecessor.json",
+                    replacement_failure_report_sha256="b" * 64,
+                ),
+                source_revision="a" * 40,
+            ),
             transaction,
         )
     assert recover_called is False
+
+
+def test_warp_initialization_is_exactly_once_after_runtime_and_before_test_bind() -> None:
+    source = ast.get_source_segment(SOURCE, _function("_fresh_attempt"))
+    initializer = ast.get_source_segment(SOURCE, _function("_initialize_warp_runtime"))
+    assert source is not None
+    assert initializer is not None
+    runtime = source.index("collect_final_runtime_evidence")
+    warp_init = source.index("_initialize_warp_runtime(api)")
+    post_bind = source.index("_enter_post_bind_phase")
+    bind_test = source.index("transaction.bind_test()")
+
+    assert runtime < warp_init < post_bind < bind_test
+    assert initializer.count("api.warp.init()") == 1
+    assert 'getattr(api.warp._src.context, "runtime", None)' in initializer
+
+
+def test_warp_initialization_failure_leaves_attempt_prepared(
+    cli_module,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    class WarpInitializationFailed(RuntimeError):
+        pass
+
+    events: list[str] = []
+    phase = "ABSENT"
+
+    def prepare() -> None:
+        nonlocal phase
+        phase = "PREPARED"
+        events.append("prepare")
+
+    def init_warp() -> None:
+        events.append("warp.init")
+        raise WarpInitializationFailed("warp initialization failed")
+
+    snapshot = SimpleNamespace(identities={}, directories={})
+    config = SimpleNamespace(
+        benchmark_version="0.1",
+        run_id="m8-final-v0-1-002",
+        test_track_count=20,
+        replacement_failure_report_path="benchmarks/predecessor.json",
+        replacement_failure_report_sha256="b" * 64,
+    )
+    api = SimpleNamespace(
+        benchmark=SimpleNamespace(
+            M8_CONTROLLER_ORDER=(),
+            validate_formal_output_tree=lambda *_args, **_kwargs: events.append("outputs"),
+        ),
+        config=SimpleNamespace(
+            load_project_config=lambda _root: SimpleNamespace(
+                benchmark=SimpleNamespace(version="0.1", test_track_count=20)
+            )
+        ),
+        controller_identity=SimpleNamespace(capture_frozen_controller_identity=lambda *_args: None),
+        jax=SimpleNamespace(
+            devices=lambda _platform: pytest.fail("JAX device queried after failure")
+        ),
+        preflight=SimpleNamespace(
+            require_controller_snapshot_quarantine_absent=lambda _root, **_kwargs: events.append(
+                "snapshot-gate"
+            ),
+            capture_clean_source=lambda _root, **_kwargs: SimpleNamespace(revision="a" * 40),
+            create_frozen_controller_snapshot=lambda *_args, **_kwargs: (
+                events.append("snapshot-create") or snapshot
+            ),
+            validate_frozen_controller_snapshot=lambda *_args: events.append("snapshot-validate"),
+        ),
+        replacement=SimpleNamespace(
+            validate_local_predecessor=lambda *_args, **_kwargs: (
+                events.append("predecessor-validate")
+                or SimpleNamespace(
+                    eligible=True,
+                    report_sha256="b" * 64,
+                    successor_run_id="m8-final-v0-1-002",
+                )
+            )
+        ),
+        runtime=SimpleNamespace(
+            resolve_nvidia_smi_executable=lambda: events.append("nvidia-resolve") or "/nvidia-smi",
+            collect_final_runtime_evidence=lambda *_args: (
+                events.append("runtime-evidence") or ({}, "private-uuid")
+            ),
+        ),
+        warp=SimpleNamespace(init=init_warp),
+    )
+    guard = SimpleNamespace(
+        freeze_nvidia_smi_executable=lambda executable: (
+            events.append(f"nvidia-freeze:{executable}") or executable
+        )
+    )
+    transaction = SimpleNamespace(
+        prepare=prepare,
+        bind_test=lambda: pytest.fail("TEST_BOUND must not be reached"),
+    )
+    static = SimpleNamespace(config=config, source_revision="a" * 40)
+    monkeypatch.setattr(cli_module, "_assert_torch_absent", lambda: None)
+    monkeypatch.setattr(cli_module, "_validate_static_stability", lambda *_args, **_kwargs: None)
+
+    with pytest.raises(WarpInitializationFailed, match="initialization failed"):
+        cli_module._fresh_attempt(api, guard, tmp_path, static, transaction)
+
+    assert phase == "PREPARED"
+    assert events.index("predecessor-validate") < events.index("prepare")
+    assert events.index("runtime-evidence") < events.index("warp.init")
+    assert events.count("warp.init") == 1
+    assert cli_module._POST_BIND_COMMANDS_FORBIDDEN is False
 
 
 def test_transaction_absent_rejects_any_active_snapshot_entry(
@@ -897,7 +1140,9 @@ def test_recovery_requires_post_close_seal_even_with_all_60_rows(
             AttemptPhase=SimpleNamespace(TEST_BOUND=test_bound, COMMITTED=committed),
             FORMAL_EPISODE_COUNT=60,
         ),
-        preflight=SimpleNamespace(require_controller_snapshot_quarantine_absent=lambda _root: None),
+        preflight=SimpleNamespace(
+            require_controller_snapshot_quarantine_absent=lambda _root, **_kwargs: None
+        ),
     )
     with pytest.raises(MissingSeal, match="sealed=false"):
         cli_module._resume_attempt(api, tmp_path, SimpleNamespace(), transaction)
@@ -945,7 +1190,7 @@ def test_committed_recovery_uses_verified_source_when_snapshot_is_absent(
     monkeypatch.setattr(cli_module, "_publication_evidence_kwargs", lambda *_args: {})
     cleanup_events: list[Path] = []
     api.preflight = SimpleNamespace(
-        retire_committed_controller_snapshot=lambda root: cleanup_events.append(root)
+        retire_committed_controller_snapshot=lambda root, **_kwargs: cleanup_events.append(root)
     )
     monkeypatch.setattr(
         cli_module,
@@ -999,7 +1244,9 @@ def test_partial_publication_is_restored_before_clean_source_gate(
         controller_identity=SimpleNamespace(
             capture_frozen_controller_identity=lambda _root, _name: object()
         ),
-        preflight=SimpleNamespace(require_controller_snapshot_quarantine_absent=lambda _root: None),
+        preflight=SimpleNamespace(
+            require_controller_snapshot_quarantine_absent=lambda _root, **_kwargs: None
+        ),
     )
 
     def stop_after_restore(*_args):

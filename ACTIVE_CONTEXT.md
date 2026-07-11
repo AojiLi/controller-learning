@@ -4,10 +4,11 @@ Last updated: 2026-07-11
 
 ## Current Direction
 
-Execute M8: freeze and commit the Test-only final evaluation protocol before any Test performance
-access, then run one formal fixed-order 20-Track comparison of PID, MPC, and PPO. M0 through M7 are
-complete. Public documentation, cleanup, and repository publication remain pending and must not be
-claimed before the v0.1 release checklist passes.
+Execute the sole authorized M8 replacement attempt, then finish release work. Attempt 001 loaded
+the fixed Test pool but stopped during Environment creation before reset, step, Controller
+construction, or performance observation. Attempt 002 retains the frozen comparison and adds only
+pre-bind Warp initialization, predecessor lineage/eligibility gates, and disclosure. M0 through M7
+are complete. Public documentation, cleanup, and repository publication remain pending.
 
 ## M7 Handoff Evidence
 
@@ -39,31 +40,34 @@ ordinary Controller evaluation/replay. It does not provide final Test comparison
 
 ## Current Narrow Focus
 
-1. Freeze and commit the now-implemented protocol plus configuration while Test performance remains
-   unopened. The repository-wide CPU CI passes 1,063 tests, and the Linux/NVIDIA GPU environment plus
-   Validation-only racing/PPO Controller smoke tests pass.
-2. Run one formal PID/MPC/PPO evaluation over the same 20 fixed Test Tracks and persist the strict
-   report and selected replay artifacts without tuning from Test results.
+1. Freeze, validate, commit, and push attempt 002 plus the canonical attempt 001 failure report.
+   Prove the retained predecessor remains byte-identical and eligible before any new Test access.
+2. Run attempt 002 exactly once over the same 20 fixed Test Tracks and persist the strict report
+   and selected replay artifacts without tuning from Test results. A third attempt is forbidden.
 3. Finish English public documentation, release/package/privacy audits, and the v0.1 cleanup
    checklist. Make the repository public only after all release gates pass.
 
-The implemented boundary installs a Test-only audit guard before project imports, captures a
+The attempt 002 implementation passes the complete 1,086-test CPU suite, all 69 GPU tests, strict
+documentation, package, and GitHub Actions checks. Independent red-team review found no unresolved
+P0/P1 issue. The remaining accepted P2 threat boundary concerns hostile concurrent replacement of
+intermediate parent directories; the trusted single-process release-maintainer model and CLI
+symlink gates remain the declared v0.1 boundary.
+
+The attempt 002 boundary installs a Test-only audit guard before project imports, captures a
 read-only hash-bound snapshot of every Controller, uses one environment for the fixed 60-episode
 order, fsyncs each canonical trajectory/journal pair, and requires a typed post-close execution
 seal before deterministic artifact construction can recover. Exactly 24 outputs must pass semantic
 recomputation before transactional publication. The durable `COMMITTED` transaction is retained,
 and the runtime Controller snapshot is atomically quarantined under ignored `runs/` after
-publication so an interrupted cleanup remains recoverable without rerunning Test. Test-pool loading
-then closes all Track reads and all process creation except the fixed `nvidia-smi` VRAM query.
-Independent red-team review drove the PID-binding, nested-seal, journal-reload,
-partial-publication, private-bootstrap, post-bind access, and cleanup-crash fixes.
+publication so an interrupted cleanup remains recoverable without rerunning Test. Attempt 002
+initializes Warp before the one-way Test binding; Test-pool loading then closes all Track reads and
+all process creation except the fixed `nvidia-smi` VRAM query.
 
-The first formal-process invocation stopped in `PREPARED` before Test reads because JAX reported a
-multiline CUDA runtime string. Its recovery invocation then exposed a GLFW helper subprocess that
-the deterministic recovery guard correctly denied. Both paths retained zero journal/blob records
-and never enabled Test reads. The frozen follow-up normalizes the public CUDA runtime evidence,
-performs PREPARED cleanup before dependency imports, and fixes the headless MuJoCo import route to
-EGL so later deterministic recovery also remains process-free.
+Attempt 001 retained `TEST_BOUND`, a 0/60 journal, null execution evidence, and exactly one
+sanitized `environment_create` failure with `workload=null`. It loaded Test geometry but did not
+create an environment, reset, step, instantiate a Controller, or observe performance. Its
+transaction and original Controller snapshot remain read-only. The canonical failure report binds
+their hashes and authorizes only attempt 002.
 
 ## Scope Boundaries
 
@@ -90,15 +94,14 @@ Out of scope:
   selection phase. Test results may be reported but may not feed back into v0.1 Controller changes.
 - PID, MPC, and PPO must use the ordinary Controller interface and the same formal four-wheel
   MJX-Warp Challenge; no Controller-specific environment path is permitted.
-- Test performance remains unopened until the complete protocol and its rejection tests are in a
-  clean committed revision.
-- The final Test protocol runs once across all three Controllers and 20 Tracks. Any infrastructure
-  failure must be reported and handled by the predeclared policy, not silently converted into a
-  performance-motivated rerun.
+- No Test performance has been observed. Attempt 001's Test load and zero-episode failure are
+  disclosed; attempt 002 must be in a clean committed revision before it runs.
+- Attempt 002 runs once across all three Controllers and 20 Tracks. Its post-bind failure must be
+  retained and cannot be converted into a retry; no third formal attempt is allowed.
 - Repository visibility remains private until final docs, privacy, package, evidence, and release
   checks pass.
 
 ## Next Step
 
-Commit and push the CPU/GPU-smoke-verified Test-only protocol without opening Test; then execute the
-single formal PID/MPC/PPO 20-Track comparison from that clean revision.
+Complete the final privacy/lineage/allowlist audit, commit and push attempt 002, then execute it
+exactly once from that clean revision.

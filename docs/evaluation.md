@@ -4,8 +4,10 @@ Controller Learning benchmark `0.1` compares trusted Controller plugins under on
 four-wheel car, one Level 1 Challenge, and one versioned set of Tracks. Reward is useful for
 training diagnostics, but it is never the ranking score.
 
-The formal M8 Test result is still pending. This page documents the protocol before the Test run;
-it does not contain or imply PID, MPC, or PPO Test performance.
+The formal M8 Test result is still pending. Attempt 001 loaded the fixed Test pool, then stopped in
+Environment creation before reset, stepping, Controller construction, or any performance
+observation. This page documents the frozen attempt 002 protocol; it does not contain or imply
+PID, MPC, or PPO Test performance.
 
 ## Benchmark 0.1 split contract
 
@@ -56,11 +58,16 @@ The row order, root seeds `0..19`, Controller order, Controller directories, ful
 identities, source revision, Pixi lock, input reports, and protocol configuration are bound before
 Test is opened. A plugin cannot retain state between episodes or change Challenge settings.
 
+Attempt 002 initializes Warp before the one-way Test binding. This eagerly performs the runtime's
+platform probe while ordinary pre-Test process creation is still available; after binding, the
+only permitted child process is the hash-bound `nvidia-smi` memory query. The change does not alter
+the Environment, vehicle, Tracks, Controller boundary, episode order, seeds, metrics, or ranking.
+
 Each episode starts from rest, runs at 20 Hz, and ends on success, off-track, invalid action, or the
 Challenge timeout. The formal cap is 4,000 Controller steps. Controller initialization and each
 complete `compute_control` call are timed separately; the per-step soft deadline is 50 ms.
 
-An unexpected plugin, recorder, or callback exception invalidates the one-shot attempt. The
+An unexpected plugin, recorder, or callback exception invalidates attempt 002. The
 transaction preserves a bounded, path-sanitized failure record and does not invent a terminal row,
 continue with a different execution path, or retry automatically. Initialization above 30 seconds
 is recorded as a soft diagnostic and does not by itself change ranking or protocol status.
@@ -132,7 +139,7 @@ false parity assumptions across repeated MJX-Warp rollouts.
 Each Controller owns one directory:
 
 ```text
-results/0.1/<controller>/m8-final-v0-1-001/
+results/0.1/<controller>/m8-final-v0-1-002/
 ├── results.csv
 ├── summary.json
 ├── run_manifest.json
@@ -157,13 +164,30 @@ beside them preserves the corresponding public trajectory. Three comparison arti
 `benchmarks/v0.1/`: the strict M8 report, the Controller comparison CSV, and a row-0 path comparison
 PNG. The formal publication allowlist contains exactly these 24 files.
 
-## One-shot attempt and crash policy
+## Attempt lineage and crash policy
 
-The official result is the first complete attempt that passes the frozen protocol and artifact
-integrity checks. Controller performance is never a retry condition.
+Attempt 001 (`m8-final-v0-1-001`) crossed `TEST_BOUND` and loaded the verified Test pool. Its first
+Environment creation triggered Warp's lazy platform probe, which attempted an unauthorized helper
+process after the process guard was sealed. The guard rejected it. The retained transaction has an
+empty episode journal, one canonical failure blob with `workload=null`, no reset or step, no
+Controller construction, no execution-evidence seal, no staged artifacts, and no published
+outputs. Consequently, it exposed no Controller outcome, success, lap time, or other performance
+signal. The canonical
+[attempt 001 failure report](https://github.com/AojiLi/controller-learning/blob/main/benchmarks/v0.1/m8_attempt_001_failure_report.json)
+binds those facts, the retained transaction tree, the unchanged Controller identities, and the
+replacement authorization. The final global JSON repeats this evidence in a strictly recomputed
+`replacement_lineage` block, so its current-transaction attempt count cannot be read as the total
+formal-attempt count.
+
+The repository owner authorized exactly one zero-episode infrastructure replacement:
+`m8-final-v0-1-002`. Its accepted result is the first complete attempt 002 result that passes the
+otherwise unchanged frozen protocol and artifact-integrity checks. The only implementation changes
+permitted by that authorization are pre-bind Warp initialization, replacement lineage evidence,
+replacement eligibility gates, and replacement documentation. Controller performance is never a
+retry condition, and a third attempt is forbidden.
 
 Before Test access is durably bound, a failed preparation may restore prior outputs and restart.
-After the one-way `TEST_BOUND` transition:
+After attempt 002's one-way `TEST_BOUND` transition:
 
 - automatic retry is forbidden;
 - an incomplete episode journal is preserved for explicit investigation rather than silently
@@ -175,14 +199,15 @@ After the one-way `TEST_BOUND` transition:
 
 The transaction advances monotonically through `PREPARED`, `TEST_BOUND`,
 `EVALUATION_COMPLETE`, `ARTIFACTS_VALIDATED`, and `COMMITTED`. Partial publication is restored from
-durable backups. A successful process retains the ignored `COMMITTED` transaction as recovery
-evidence and atomically moves the runtime Controller snapshot to an ignored quarantine; it does not
-recursively delete that snapshot during the formal process. A crash is not permission to tune,
-change a Controller, select a different checkpoint, or discard an unfavorable completed result.
+durable backups. A successful process retains the ignored attempt 002 `COMMITTED` transaction as
+recovery evidence and atomically moves the runtime Controller snapshot to an ignored quarantine;
+it does not recursively delete that snapshot during the formal process. A crash is not permission
+to tune, change a Controller, select a different checkpoint, or discard an unfavorable completed
+result.
 
 ## Current status
 
-The formal Test comparison has not run, and no Test success rate or lap time is currently claimed.
+The authorized replacement has not run, and no Test success rate or lap time is currently claimed.
 The release-maintainer command is:
 
 ```bash
@@ -190,6 +215,7 @@ pixi run -e gpu benchmark-m8-controllers
 ```
 
 It is present in the locked Pixi task set, but it must be invoked only from the clean committed
-protocol revision. A result is official only after the strict report and all 24 artifacts pass the
+attempt 002 protocol revision after the local predecessor gate reproduces the published failure
+report exactly. A result is official only after the strict report and all 24 artifacts pass the
 publication gates. See [Reproducibility](reproducibility.md) for the development and release
 workflows.

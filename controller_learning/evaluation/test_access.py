@@ -1,4 +1,4 @@
-"""Process-wide Test-only filesystem guard for the one-shot M8 evaluation."""
+"""Process-wide Test-only filesystem guard for the frozen M8 evaluation."""
 
 from __future__ import annotations
 

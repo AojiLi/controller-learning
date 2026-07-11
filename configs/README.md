@@ -54,8 +54,10 @@ phase, and no M7 performance path loads or evaluates Test geometry.
 MJX-Warp, Controller-major order `PID -> MPC -> PPO`, all 20 Test manifest rows, reset seeds
 `0..19`, a fresh plugin instance per episode, and one shared batch-one Environment for all 60
 episodes. It also fixes the ranking, public-sample metric definitions, Test row-0 same-rollout
-replay rule, one-shot attempt policy, post-close execution-evidence seal, Controller directories,
-input reports, and exact output paths.
+replay rule, replacement attempt policy, post-close execution-evidence seal, Controller
+directories, input reports, and exact output paths. Schema v2 also binds the canonical zero-episode
+attempt 001 failure report, authorizes exactly one replacement (`m8-final-v0-1-002`), requires Warp
+runtime initialization before Test binding, and forbids a third attempt.
 
 The release-maintainer task is:
 
@@ -63,6 +65,8 @@ The release-maintainer task is:
 pixi run -e gpu benchmark-m8-controllers
 ```
 
-No formal Test result has been published yet. The task is not a tuning loop: Controllers, learned
-assets, configuration, dependencies, and source must be frozen before Test access. An undesirable
-performance result cannot trigger a retry or a v0.1 Controller change.
+No formal Test result has been published yet. Attempt 001 loaded Test but stopped during
+Environment creation before reset, stepping, Controller construction, or performance observation.
+The task is not a tuning loop: Controllers, learned assets, configuration, dependencies, and
+source are unchanged for the single authorized replacement. An undesirable performance result
+cannot trigger a retry or a v0.1 Controller change.

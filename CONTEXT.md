@@ -223,9 +223,12 @@ pixi run -e gpu benchmark-m8-controllers
 
 The four M7 commands above implement formal Train-only optimization, frozen Validation selection,
 hash-bound inference-only Controller export, and ordinary Controller evaluation/replay respectively.
-The M8 command is a one-shot release-maintainer workflow guarded by a clean revision, immutable
-Controller snapshots, Test-only process access, durable episode and post-close evidence, semantic
-validation of exactly 24 outputs, and no automatic retry after Test binding. It is not routine
+The M8 command is a release-maintainer workflow guarded by a clean revision, immutable Controller
+snapshots, Test-only process access, durable episode and post-close evidence, semantic validation
+of exactly 24 outputs, and no automatic retry after Test binding. Attempt 001 loaded Test but
+stopped during Environment creation with zero journal rows and no performance observation. The
+owner-authorized attempt 002 is its sole replacement, pre-initializes Warp before Test binding,
+requires exact read-only predecessor lineage, and forbids a third attempt. It is not routine
 development or tuning tooling.
 CPU CI currently checks formatting, lint, CPU tests, installed wheel contents, strict docs, GitHub
 Actions syntax, and package metadata. GPU verification remains local for v0.1 and produces
@@ -315,11 +318,13 @@ geometry/speed-planning utilities, bounded-iteration CasADi/IPOPT MPC configurat
 batch-one formal evaluator semantics, and the reviewed Level 0/Validation timing protocol. M7 fixed
 the public PPO feature/reward wrappers, NEXT_STEP-aware training semantics, frozen Train-only PPO
 configuration, Validation-only checkpoint selection, inference-only NumPy export, and ordinary
-Controller replay protocol. The next unfrozen performance protocol is M8's final Test-only
-PID/MPC/PPO comparison. Its implementation fixes one shared environment, 60 Controller-major
-episodes, same-row Track/seed identity, typed transition metrics, row-zero same-rollout replay,
-post-close runtime/memory/access evidence, and transactional publication. The implementation must
-be frozen in a clean commit before the command may open Test or observe Controller performance.
+Controller replay protocol. M8's final Test-only PID/MPC/PPO comparison fixes one shared
+environment, 60 Controller-major episodes, same-row Track/seed identity, typed transition metrics,
+row-zero same-rollout replay, post-close runtime/memory/access evidence, and transactional
+publication. Attempt 001 reached Test loading but failed in Environment creation before reset,
+step, Controller construction, or performance. Attempt 002 retains every performance-affecting
+input and adds only the authorized pre-bind Warp initialization and lineage gates. Its
+implementation must be frozen in a clean commit before the replacement may run.
 
 ## External Reference
 

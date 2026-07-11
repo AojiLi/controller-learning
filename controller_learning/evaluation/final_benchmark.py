@@ -11,9 +11,10 @@ from pathlib import Path, PurePosixPath
 from types import MappingProxyType
 from typing import Any, Final
 
-M8_FINAL_CONFIG_SCHEMA_VERSION: Final = 1
-M8_FINAL_REPORT_SCHEMA_VERSION: Final = "controller-learning.m8-final-evaluation.v1"
-M8_FINAL_RUN_ID: Final = "m8-final-v0-1-001"
+M8_FINAL_CONFIG_SCHEMA_VERSION: Final = 2
+M8_FINAL_REPORT_SCHEMA_VERSION: Final = "controller-learning.m8-final-evaluation.v2"
+M8_FINAL_RUN_ID: Final = "m8-final-v0-1-002"
+M8_PREDECESSOR_RUN_ID: Final = "m8-final-v0-1-001"
 M8_CONTROLLER_ORDER: Final = ("pid", "mpc", "ppo")
 M8_TEST_TRACK_COUNT: Final = 20
 M8_TOTAL_EPISODES: Final = len(M8_CONTROLLER_ORDER) * M8_TEST_TRACK_COUNT
@@ -28,7 +29,16 @@ M8_CONTROLLER_EXCEPTION_POLICY: Final = (
 )
 M8_CONTROLLER_INIT_LIMIT_POLICY: Final = "record_soft_diagnostic_and_continue"
 M8_REPLAY_CAPTURE_METHOD: Final = "record_all_canonical_episodes_retain_predeclared_row_zero"
-M8_ACCEPTED_RESULT_RULE: Final = "first_complete_protocol_passing_attempt"
+M8_ACCEPTED_RESULT_RULE: Final = "first_complete_protocol_passing_replacement_attempt"
+M8_REPLACEMENT_ELIGIBILITY_RULE: Final = (
+    "predecessor_test_bound_zero_journal_null_execution_evidence_only_canonical_"
+    "environment_create_workload_null_failure_no_outputs_seal_or_staged_artifacts"
+)
+M8_REPLACEMENT_FAILURE_REPORT_PATH: Final = "benchmarks/v0.1/m8_attempt_001_failure_report.json"
+M8_ATTEMPT_001_FAILURE_REPORT_SHA256: Final = (
+    "60bdb6d038b27867b13e1a12455b46e6717d1840bff65f1e072de06692645235"
+)
+M8_PRE_TEST_INITIALIZATION: Final = "warp.init_before_test_bind"
 M8_METRIC_SAMPLE_RULES: Final = MappingProxyType(
     {
         "aggregate_weighting": "transition_weighted",
@@ -107,7 +117,7 @@ def _expected_controller_directory(name: str) -> str:
 
 @dataclass(frozen=True, slots=True)
 class M8FinalEvaluationConfig:
-    """Exact immutable inputs, execution rules, and output paths for the one-shot Test run."""
+    """Exact immutable inputs, rules, and outputs for the authorized replacement Test run."""
 
     run_id: str
     benchmark_version: str
@@ -155,6 +165,14 @@ class M8FinalEvaluationConfig:
     automatic_retry_after_test_bound: bool
     performance_outcome_can_trigger_retry: bool
     completed_workload_can_only_finalize_from_durable_journal_and_execution_evidence: bool
+    replacement_authorized: bool
+    replacement_of_run_id: str
+    replacement_attempt_limit: int
+    replacement_eligibility_rule: str
+    replacement_failure_report_path: str
+    replacement_failure_report_sha256: str
+    pre_test_initialization: str
+    third_attempt_allowed: bool
     controller_directories: Mapping[str, str]
     controller_aggregate_sha256: Mapping[str, str]
     controller_config_sha256: Mapping[str, str]
@@ -168,8 +186,13 @@ class M8FinalEvaluationConfig:
     schema_version: int = M8_FINAL_CONFIG_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
-        if type(self.schema_version) is not int or self.schema_version != 1:
-            raise FinalBenchmarkProtocolError("final config schema_version must be exactly 1")
+        if (
+            type(self.schema_version) is not int
+            or self.schema_version != M8_FINAL_CONFIG_SCHEMA_VERSION
+        ):
+            raise FinalBenchmarkProtocolError(
+                f"final config schema_version must be exactly {M8_FINAL_CONFIG_SCHEMA_VERSION}"
+            )
         if self.run_id != M8_FINAL_RUN_ID:
             raise FinalBenchmarkProtocolError(f"run_id must be exactly {M8_FINAL_RUN_ID!r}")
         expected_scalars = {
@@ -200,6 +223,18 @@ class M8FinalEvaluationConfig:
                 M8_REPLAY_CAPTURE_METHOD,
             ),
             "accepted_result": (self.accepted_result, M8_ACCEPTED_RESULT_RULE),
+            "replacement_of_run_id": (
+                self.replacement_of_run_id,
+                M8_PREDECESSOR_RUN_ID,
+            ),
+            "replacement_eligibility_rule": (
+                self.replacement_eligibility_rule,
+                M8_REPLACEMENT_ELIGIBILITY_RULE,
+            ),
+            "pre_test_initialization": (
+                self.pre_test_initialization,
+                M8_PRE_TEST_INITIALIZATION,
+            ),
             **{
                 field: (getattr(self, field), expected)
                 for field, expected in M8_METRIC_SAMPLE_RULES.items()
@@ -222,6 +257,7 @@ class M8FinalEvaluationConfig:
             "projection_forward_segments": (self.projection_forward_segments, 12),
             "replay_test_row_index": (self.replay_test_row_index, 0),
             "replay_environment_instances": (self.replay_environment_instances, 0),
+            "replacement_attempt_limit": (self.replacement_attempt_limit, 1),
         }
         for field, (actual, expected) in exact_integers.items():
             if type(actual) is not int or actual != expected:
@@ -234,6 +270,7 @@ class M8FinalEvaluationConfig:
             "fresh_controller_per_episode",
             "same_track_and_reset_seed_for_each_controller",
             "completed_workload_can_only_finalize_from_durable_journal_and_execution_evidence",
+            "replacement_authorized",
         ):
             if getattr(self, field) is not True:
                 raise FinalBenchmarkProtocolError(f"{field} must be true")
@@ -243,9 +280,31 @@ class M8FinalEvaluationConfig:
             "test_informed_tuning_allowed",
             "success_rate_pass_gate",
             "realtime_qualification_required_for_pass",
+            "third_attempt_allowed",
         ):
             if getattr(self, field) is not False:
                 raise FinalBenchmarkProtocolError(f"{field} must be false")
+
+        if (
+            _safe_relative_path(
+                self.replacement_failure_report_path,
+                field="replacement_failure_report_path",
+                suffix=".json",
+            )
+            != M8_REPLACEMENT_FAILURE_REPORT_PATH
+        ):
+            raise FinalBenchmarkProtocolError(
+                "replacement_failure_report_path must be exactly "
+                f"{M8_REPLACEMENT_FAILURE_REPORT_PATH!r}"
+            )
+        if (
+            _sha256(
+                self.replacement_failure_report_sha256,
+                field="replacement_failure_report_sha256",
+            )
+            != M8_ATTEMPT_001_FAILURE_REPORT_SHA256
+        ):
+            raise FinalBenchmarkProtocolError("attempt 001 failure report hash differs")
         exact_floats = {
             "compute_deadline_s": (self.compute_deadline_s, 0.05),
             "controller_init_soft_limit_s": (self.controller_init_soft_limit_s, 30.0),
@@ -319,10 +378,11 @@ class M8FinalEvaluationConfig:
             "m7_selection_report": "benchmarks/v0.1/m7_ppo_selection_report.json",
             "m7_export_report": "benchmarks/v0.1/m7_ppo_export_report.json",
             "m7_controller_report": ("benchmarks/v0.1/m7_ppo_controller_evaluation_report.json"),
+            "m8_attempt_001_failure_report": M8_REPLACEMENT_FAILURE_REPORT_PATH,
         }
         inputs = dict(self.input_paths)
         if set(inputs) != set(expected_inputs):
-            raise FinalBenchmarkProtocolError("input_paths differ from the five frozen reports")
+            raise FinalBenchmarkProtocolError("input_paths differ from the six frozen reports")
         for name, expected in expected_inputs.items():
             actual = _safe_relative_path(
                 inputs[name],
@@ -331,6 +391,10 @@ class M8FinalEvaluationConfig:
             )
             if actual != expected:
                 raise FinalBenchmarkProtocolError(f"input path {name!r} differs")
+        if inputs["m8_attempt_001_failure_report"] != self.replacement_failure_report_path:
+            raise FinalBenchmarkProtocolError(
+                "replacement failure report must be the frozen M8 input report"
+            )
         object.__setattr__(self, "input_paths", MappingProxyType(inputs))
 
         expected_outputs = {
@@ -387,6 +451,7 @@ def load_m8_final_evaluation_config(path: str | Path) -> M8FinalEvaluationConfig
             "metrics",
             "replay",
             "retry",
+            "replacement",
             "controllers",
             "test_assets",
             "inputs",
@@ -398,6 +463,7 @@ def load_m8_final_evaluation_config(path: str | Path) -> M8FinalEvaluationConfig
     metrics = _table(data, "metrics")
     replay = _table(data, "replay")
     retry = _table(data, "retry")
+    replacement = _table(data, "replacement")
     controllers = _table(data, "controllers")
     test_assets = _table(data, "test_assets")
     inputs = _table(data, "inputs")
@@ -463,6 +529,20 @@ def load_m8_final_evaluation_config(path: str | Path) -> M8FinalEvaluationConfig
         },
         field="retry",
     )
+    _exact_keys(
+        replacement,
+        {
+            "authorized",
+            "replacement_of_run_id",
+            "replacement_attempt_limit",
+            "eligibility_rule",
+            "failure_report_path",
+            "failure_report_sha256",
+            "pre_test_initialization",
+            "third_attempt_allowed",
+        },
+        field="replacement",
+    )
     _exact_keys(controllers, set(M8_CONTROLLER_ORDER), field="controllers")
     controller_directories: dict[str, str] = {}
     for name in M8_CONTROLLER_ORDER:
@@ -488,6 +568,7 @@ def load_m8_final_evaluation_config(path: str | Path) -> M8FinalEvaluationConfig
             "m7_selection_report",
             "m7_export_report",
             "m7_controller_report",
+            "m8_attempt_001_failure_report",
         },
         field="inputs",
     )
@@ -621,6 +702,24 @@ def load_m8_final_evaluation_config(path: str | Path) -> M8FinalEvaluationConfig
                     "completed_workload_can_only_finalize_from_durable_journal_and_execution_evidence"
                 ),
             )
+        ),
+        replacement_authorized=_plain_boolean(
+            replacement["authorized"],
+            field="replacement.authorized",
+        ),
+        replacement_of_run_id=replacement["replacement_of_run_id"],
+        replacement_attempt_limit=_plain_integer(
+            replacement["replacement_attempt_limit"],
+            field="replacement.replacement_attempt_limit",
+            minimum=1,
+        ),
+        replacement_eligibility_rule=replacement["eligibility_rule"],
+        replacement_failure_report_path=replacement["failure_report_path"],
+        replacement_failure_report_sha256=replacement["failure_report_sha256"],
+        pre_test_initialization=replacement["pre_test_initialization"],
+        third_attempt_allowed=_plain_boolean(
+            replacement["third_attempt_allowed"],
+            field="replacement.third_attempt_allowed",
         ),
         controller_directories=controller_directories,
         controller_aggregate_sha256=controller_aggregate_sha256,
@@ -787,6 +886,7 @@ def _source_snapshot(value: object, *, field: str) -> Mapping[str, Any]:
 
 __all__ = [
     "M8_ACCEPTED_RESULT_RULE",
+    "M8_ATTEMPT_001_FAILURE_REPORT_SHA256",
     "M8_CONTROLLER_EXCEPTION_POLICY",
     "M8_CONTROLLER_EXECUTION_MODEL",
     "M8_CONTROLLER_INIT_LIMIT_POLICY",
@@ -797,7 +897,11 @@ __all__ = [
     "M8_FINAL_REPORT_SCHEMA_VERSION",
     "M8_FINAL_RUN_ID",
     "M8_METRIC_SAMPLE_RULES",
+    "M8_PREDECESSOR_RUN_ID",
+    "M8_PRE_TEST_INITIALIZATION",
     "M8_RANKING_RULE",
+    "M8_REPLACEMENT_ELIGIBILITY_RULE",
+    "M8_REPLACEMENT_FAILURE_REPORT_PATH",
     "M8_REPLAY_CAPTURE_METHOD",
     "M8_RESET_SEED_RULE",
     "M8_TEST_TRACK_COUNT",

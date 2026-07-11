@@ -1,5 +1,5 @@
-schema_version = 1
-run_id = "m8-final-v0-1-001"
+schema_version = 2
+run_id = "m8-final-v0-1-002"
 
 [protocol]
 benchmark_version = "0.1"
@@ -49,10 +49,20 @@ capture_method = "record_all_canonical_episodes_retain_predeclared_row_zero"
 replay_environment_instances = 0
 
 [retry]
-accepted_result = "first_complete_protocol_passing_attempt"
+accepted_result = "first_complete_protocol_passing_replacement_attempt"
 automatic_retry_after_test_bound = false
 performance_outcome_can_trigger_retry = false
 completed_workload_can_only_finalize_from_durable_journal_and_execution_evidence = true
+
+[replacement]
+authorized = true
+replacement_of_run_id = "m8-final-v0-1-001"
+replacement_attempt_limit = 1
+eligibility_rule = "predecessor_test_bound_zero_journal_null_execution_evidence_only_canonical_environment_create_workload_null_failure_no_outputs_seal_or_staged_artifacts"
+failure_report_path = "benchmarks/v0.1/m8_attempt_001_failure_report.json"
+failure_report_sha256 = "60bdb6d038b27867b13e1a12455b46e6717d1840bff65f1e072de06692645235"
+pre_test_initialization = "warp.init_before_test_bind"
+third_attempt_allowed = false
 
 [controllers.pid]
 directory = "controllers/pid"
@@ -79,6 +89,7 @@ m6_report = "benchmarks/v0.1/m6_controller_report.json"
 m7_selection_report = "benchmarks/v0.1/m7_ppo_selection_report.json"
 m7_export_report = "benchmarks/v0.1/m7_ppo_export_report.json"
 m7_controller_report = "benchmarks/v0.1/m7_ppo_controller_evaluation_report.json"
+m8_attempt_001_failure_report = "benchmarks/v0.1/m8_attempt_001_failure_report.json"
 
 [outputs]
 results_root = "results/0.1"

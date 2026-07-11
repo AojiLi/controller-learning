@@ -1158,6 +1158,14 @@ v0.1 不维护 self-hosted GPU runner。
 
 ### M8：评测、作品展示与公开发布
 
+实施记录（2026-07-11）：正式 attempt 001 已绑定并加载固定 Test pool，但在首次环境创建时
+因 Warp 延迟平台探测触发受保护的辅助进程而停止。其 journal 为 0/60，未执行 reset、step
+或 Controller，也未产生性能信息、execution seal、staged artifact 或公开输出。仓库所有者
+明确批准一次且仅一次零 episode 基础设施替代 attempt 002：只允许在 Test 绑定前初始化
+Warp、增加前序 lineage/eligibility 门禁与相应文档；Controller、配置、policy、Test 几何与
+哈希、顺序、seeds、backend、车辆、metrics、ranking 和 24 个输出规则保持不变。attempt 002
+绑定 Test 后不得自动重试，性能不得触发重试，不允许第三次正式 attempt。
+
 目标：
 
 - Level 1 正式 Test 评测。
