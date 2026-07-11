@@ -40,7 +40,7 @@ ordinary Controller evaluation/replay. It does not provide final Test comparison
 ## Current Narrow Focus
 
 1. Freeze and commit the now-implemented protocol plus configuration while Test performance remains
-   unopened. The repository-wide CPU CI passes 1,055 tests, and the Linux/NVIDIA GPU environment plus
+   unopened. The repository-wide CPU CI passes 1,063 tests, and the Linux/NVIDIA GPU environment plus
    Validation-only racing/PPO Controller smoke tests pass.
 2. Run one formal PID/MPC/PPO evaluation over the same 20 fixed Test Tracks and persist the strict
    report and selected replay artifacts without tuning from Test results.
@@ -57,6 +57,13 @@ publication so an interrupted cleanup remains recoverable without rerunning Test
 then closes all Track reads and all process creation except the fixed `nvidia-smi` VRAM query.
 Independent red-team review drove the PID-binding, nested-seal, journal-reload,
 partial-publication, private-bootstrap, post-bind access, and cleanup-crash fixes.
+
+The first formal-process invocation stopped in `PREPARED` before Test reads because JAX reported a
+multiline CUDA runtime string. Its recovery invocation then exposed a GLFW helper subprocess that
+the deterministic recovery guard correctly denied. Both paths retained zero journal/blob records
+and never enabled Test reads. The frozen follow-up normalizes the public CUDA runtime evidence,
+performs PREPARED cleanup before dependency imports, and fixes the headless MuJoCo import route to
+EGL so later deterministic recovery also remains process-free.
 
 ## Scope Boundaries
 

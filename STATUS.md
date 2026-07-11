@@ -57,9 +57,14 @@ Controller timing/lifecycle, and replay gates. Final Test comparison and release
 
 ## Next Step
 
-Commit and push the Test-only M8 protocol, which now passes the full 1,055-test CPU CI plus Linux GPU
+Commit and push the Test-only M8 protocol, which now passes the full 1,063-test CPU CI plus Linux GPU
 and Validation-only smoke checks, then execute the single formal PID/MPC/PPO 20-Track run from that
 clean revision. No formal Test Controller performance has been opened yet.
+
+One initial formal process stopped in `PREPARED` on multiline CUDA runtime evidence, and its first
+recovery process stopped before dependency import when the recovery guard denied GLFW's helper
+subprocess. Both retained empty journals/blobs and never enabled Test reads. The follow-up fixes are
+now covered by process-locked EGL import and early PREPARED-recovery tests.
 
 ## Risks and Blockers
 

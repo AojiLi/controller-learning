@@ -30,6 +30,8 @@ from typing import Any, Final
 
 # These process policies must exist before JAX, MuJoCo, or any project module can be imported.
 os.environ.setdefault("CUDA_DEVICE_ORDER", "PCI_BUS_ID")
+os.environ.setdefault("MUJOCO_GL", "egl")
+os.environ.setdefault("PYOPENGL_PLATFORM", "egl")
 os.environ.setdefault("XLA_PYTHON_CLIENT_PREALLOCATE", "false")
 os.environ.setdefault("PYTHONDONTWRITEBYTECODE", "1")
 sys.dont_write_bytecode = True
@@ -40,6 +42,15 @@ ATTEMPT_RELATIVE_PATH: Final = "runs/m8_final_attempt_transaction"
 SNAPSHOT_RELATIVE_PATH: Final = "runs/m8_final_controller_snapshot"
 FAILURE_EVIDENCE_BLOB: Final = "failures/final-workload.json"
 _PRIVATE_GUARD_MODULE: Final = "_controller_learning_m8_test_access_guard"
+_PRIVATE_ATTEMPT_MODULE: Final = "_controller_learning_m8_attempt_transaction"
+_ATTEMPT_TRANSACTION_SCHEMA: Final = "controller-learning.m8-attempt-transaction.v2"
+_ATTEMPT_PHASE_INDEX: Final = {
+    "PREPARED": 0,
+    "TEST_BOUND": 1,
+    "EVALUATION_COMPLETE": 2,
+    "ARTIFACTS_VALIDATED": 3,
+    "COMMITTED": 4,
+}
 _FAILURE_EVIDENCE_SCHEMA: Final = "controller-learning.m8-workload-failure.v1"
 _FAILURE_DETAIL_MAX_CHARS: Final = 512
 _FAILURE_TRACEBACK_MAX_CHARS: Final = 4096
@@ -495,6 +506,8 @@ def _prepare_isolated_python_runtime(project_root: Path) -> None:
         )
     if os.environ.get("PYTHONDONTWRITEBYTECODE") != "1":
         raise RuntimeError("formal M8 requires its fixed bytecode environment policy")
+    if os.environ.get("MUJOCO_GL") != "egl" or os.environ.get("PYOPENGL_PLATFORM") != "egl":
+        raise RuntimeError("formal M8 requires the fixed headless EGL import route")
     if any(name in sys.modules for name in ("site", "sitecustomize", "usercustomize")):
         raise RuntimeError("formal M8 rejects site and startup customization modules")
     cache = _create_isolated_import_cache(root)
@@ -560,6 +573,367 @@ def _install_project_source_finder(project_root: Path) -> _ProjectSourceFinder:
     _PROJECT_SOURCE_FINDER = finder
     _assert_project_source_finder_active(root)
     return finder
+
+
+def _load_private_attempt_transaction_module(project_root: Path) -> ModuleType:
+    """Load the stdlib-only transaction code from its exact regular source file."""
+
+    root = _canonical_project_root(project_root)
+    _assert_project_not_imported()
+    source = root / "controller_learning/evaluation/attempt_transaction.py"
+    _require_regular_project_python_path(root, source)
+    if _PRIVATE_ATTEMPT_MODULE in sys.modules:
+        raise RuntimeError("the private PREPARED recovery module was already loaded")
+    module = _load_private_module(_PRIVATE_ATTEMPT_MODULE, source)
+    spec = module.__spec__
+    loader = module.__loader__
+    if (
+        type(module) is not ModuleType
+        or module.__file__ != str(source)
+        or spec is None
+        or spec.origin != str(source)
+        or type(loader) is not importlib.machinery.SourceFileLoader
+        or loader.path != str(source)
+    ):
+        sys.modules.pop(_PRIVATE_ATTEMPT_MODULE, None)
+        raise RuntimeError("the private PREPARED recovery module provenance differs")
+    _assert_project_not_imported()
+    return module
+
+
+def _prepared_transaction_from_durable_manifest(
+    project_root: Path,
+) -> tuple[ModuleType, object, object]:
+    """Reconstruct an existing transaction from its own pre-Test durable identity."""
+
+    root = _canonical_project_root(project_root)
+    module = _load_private_attempt_transaction_module(root)
+    transaction_directory = root / ATTEMPT_RELATIVE_PATH
+    manifest = module._read_canonical_json(
+        transaction_directory / "manifest.json",
+        field_name="transaction manifest",
+    )
+    identity_mapping = manifest.get("identity")
+    output_allowlist = manifest.get("output_allowlist")
+    if not isinstance(identity_mapping, Mapping) or set(identity_mapping) != {
+        "config_sha256",
+        "input_sha256",
+        "pixi_lock_sha256",
+        "source_revision",
+        "source_tree_sha256",
+    }:
+        raise RuntimeError("PREPARED transaction identity keys differ")
+    if (
+        not isinstance(output_allowlist, list)
+        or len(output_allowlist) != 24
+        or any(type(value) is not str for value in output_allowlist)
+    ):
+        raise RuntimeError("PREPARED transaction output allowlist must contain 24 paths")
+    identity = module.AttemptIdentity(**dict(identity_mapping))
+    transaction = module.M8AttemptTransaction(
+        root,
+        transaction_relative_path=ATTEMPT_RELATIVE_PATH,
+        output_allowlist=output_allowlist,
+        identity=identity,
+    )
+    inspection = transaction.inspect()
+    if not inspection.exists:
+        raise RuntimeError("the locked formal transaction disappeared during early recovery")
+    return module, transaction, inspection
+
+
+def _read_canonical_json_no_follow(
+    path: Path,
+    *,
+    field_name: str,
+    parent_descriptor: int | None = None,
+) -> tuple[Mapping[str, Any], bytes]:
+    """Read one canonical JSON object without following links or mutating its directory."""
+
+    try:
+        before = (
+            path.lstat()
+            if parent_descriptor is None
+            else os.stat(path.name, dir_fd=parent_descriptor, follow_symlinks=False)
+        )
+    except (FileNotFoundError, OSError) as error:
+        raise RuntimeError(f"{field_name} is missing or unreadable") from error
+    if stat.S_ISLNK(before.st_mode) or not stat.S_ISREG(before.st_mode):
+        raise RuntimeError(f"{field_name} must be a non-symlink regular file")
+    descriptor = os.open(
+        path if parent_descriptor is None else path.name,
+        os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0),
+        dir_fd=parent_descriptor,
+    )
+    try:
+        opened = os.fstat(descriptor)
+        chunks: list[bytes] = []
+        while chunk := os.read(descriptor, 1024 * 1024):
+            chunks.append(chunk)
+        opened_after = os.fstat(descriptor)
+    finally:
+        os.close(descriptor)
+    try:
+        after = (
+            path.lstat()
+            if parent_descriptor is None
+            else os.stat(path.name, dir_fd=parent_descriptor, follow_symlinks=False)
+        )
+    except (FileNotFoundError, OSError) as error:
+        raise RuntimeError(f"{field_name} changed while it was read") from error
+    identity_fields = (
+        "st_dev",
+        "st_ino",
+        "st_mode",
+        "st_uid",
+        "st_gid",
+        "st_size",
+        "st_ctime_ns",
+        "st_mtime_ns",
+    )
+    if any(
+        getattr(left, name) != getattr(right, name)
+        for left, right in ((before, opened), (opened, opened_after), (opened_after, after))
+        for name in identity_fields
+    ):
+        raise RuntimeError(f"{field_name} changed while it was read")
+    payload = b"".join(chunks)
+    if len(payload) != opened.st_size:
+        raise RuntimeError(f"{field_name} size changed while it was read")
+
+    def reject_constant(value: str) -> None:
+        raise ValueError(f"forbidden JSON constant {value}")
+
+    def reject_duplicates(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        result: dict[str, Any] = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError(f"duplicate JSON key {key!r}")
+            result[key] = value
+        return result
+
+    try:
+        value = json.loads(
+            payload,
+            parse_constant=reject_constant,
+            object_pairs_hook=reject_duplicates,
+        )
+    except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as error:
+        raise RuntimeError(f"{field_name} is not strict JSON") from error
+    if not isinstance(value, Mapping) or _canonical_json_bytes(value) != payload:
+        raise RuntimeError(f"{field_name} is not canonical JSON")
+    return value, payload
+
+
+def _peek_attempt_phase_read_only(project_root: Path) -> str:
+    """Validate enough durable identity to classify phase without transaction-tree writes."""
+
+    root = _canonical_project_root(project_root)
+    directory_flags = (
+        os.O_RDONLY
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_DIRECTORY", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+    )
+    root_metadata = root.lstat()
+    root_descriptor = os.open(root, directory_flags)
+    try:
+        opened_root = os.fstat(root_descriptor)
+        if (root_metadata.st_dev, root_metadata.st_ino) != (
+            opened_root.st_dev,
+            opened_root.st_ino,
+        ):
+            raise RuntimeError("the project root changed during the read-only phase peek")
+        try:
+            runs_metadata = os.stat("runs", dir_fd=root_descriptor, follow_symlinks=False)
+            runs_descriptor = os.open("runs", directory_flags, dir_fd=root_descriptor)
+        except (FileNotFoundError, OSError) as error:
+            raise RuntimeError("the formal runs directory is missing or unreadable") from error
+        try:
+            opened_runs = os.fstat(runs_descriptor)
+            if (
+                stat.S_ISLNK(runs_metadata.st_mode)
+                or not stat.S_ISDIR(runs_metadata.st_mode)
+                or (runs_metadata.st_dev, runs_metadata.st_ino)
+                != (opened_runs.st_dev, opened_runs.st_ino)
+            ):
+                raise RuntimeError("the formal runs directory changed during phase peek")
+            transaction_name = Path(ATTEMPT_RELATIVE_PATH).name
+            try:
+                transaction_metadata = os.stat(
+                    transaction_name,
+                    dir_fd=runs_descriptor,
+                    follow_symlinks=False,
+                )
+                transaction_descriptor = os.open(
+                    transaction_name,
+                    directory_flags,
+                    dir_fd=runs_descriptor,
+                )
+            except (FileNotFoundError, OSError) as error:
+                raise RuntimeError(
+                    "the locked formal transaction is missing or unreadable"
+                ) from error
+            try:
+                opened_transaction = os.fstat(transaction_descriptor)
+                if (
+                    stat.S_ISLNK(transaction_metadata.st_mode)
+                    or not stat.S_ISDIR(transaction_metadata.st_mode)
+                    or (transaction_metadata.st_dev, transaction_metadata.st_ino)
+                    != (opened_transaction.st_dev, opened_transaction.st_ino)
+                ):
+                    raise RuntimeError("the locked formal transaction changed during phase peek")
+                manifest, manifest_bytes = _read_canonical_json_no_follow(
+                    Path("manifest.json"),
+                    field_name="transaction manifest",
+                    parent_descriptor=transaction_descriptor,
+                )
+                state, _state_bytes = _read_canonical_json_no_follow(
+                    Path("state.json"),
+                    field_name="transaction state",
+                    parent_descriptor=transaction_descriptor,
+                )
+            finally:
+                os.close(transaction_descriptor)
+        finally:
+            os.close(runs_descriptor)
+    finally:
+        os.close(root_descriptor)
+    expected_state_keys = {
+        "evidence",
+        "identity",
+        "manifest_sha256",
+        "phase",
+        "phase_index",
+        "schema_version",
+    }
+    phase = state.get("phase")
+    if (
+        set(state) != expected_state_keys
+        or not isinstance(phase, str)
+        or phase not in _ATTEMPT_PHASE_INDEX
+        or state.get("phase_index") != _ATTEMPT_PHASE_INDEX[phase]
+        or state.get("schema_version") != _ATTEMPT_TRANSACTION_SCHEMA
+        or manifest.get("schema_version") != _ATTEMPT_TRANSACTION_SCHEMA
+        or manifest.get("transaction_relative_path") != ATTEMPT_RELATIVE_PATH
+        or state.get("identity") != manifest.get("identity")
+        or state.get("manifest_sha256") != hashlib.sha256(manifest_bytes).hexdigest()
+        or (phase in {"PREPARED", "TEST_BOUND"} and state.get("evidence") is not None)
+    ):
+        raise RuntimeError("the read-only formal transaction phase identity differs")
+    return phase
+
+
+def _isolate_prepared_controller_snapshot(project_root: Path) -> Path | None:
+    """Quarantine the active PREPARED snapshot through one same-parent dirfd rename."""
+
+    root = _canonical_project_root(project_root)
+    flags = (
+        os.O_RDONLY
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_DIRECTORY", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+    )
+    root_descriptor = os.open(root, flags)
+    try:
+        root_metadata = root.lstat()
+        opened_root = os.fstat(root_descriptor)
+        if (
+            stat.S_ISLNK(root_metadata.st_mode)
+            or not stat.S_ISDIR(opened_root.st_mode)
+            or (root_metadata.st_dev, root_metadata.st_ino)
+            != (opened_root.st_dev, opened_root.st_ino)
+        ):
+            raise RuntimeError("the formal project root changed during PREPARED recovery")
+        runs_metadata = os.stat("runs", dir_fd=root_descriptor, follow_symlinks=False)
+        if stat.S_ISLNK(runs_metadata.st_mode) or not stat.S_ISDIR(runs_metadata.st_mode):
+            raise RuntimeError("PREPARED snapshot recovery requires a real runs directory")
+        runs_descriptor = os.open("runs", flags, dir_fd=root_descriptor)
+        try:
+            opened_runs = os.fstat(runs_descriptor)
+            if (runs_metadata.st_dev, runs_metadata.st_ino) != (
+                opened_runs.st_dev,
+                opened_runs.st_ino,
+            ):
+                raise RuntimeError("the runs directory changed during PREPARED recovery")
+            active_name = Path(SNAPSHOT_RELATIVE_PATH).name
+            committed_name = active_name + ".committed"
+            try:
+                os.stat(committed_name, dir_fd=runs_descriptor, follow_symlinks=False)
+            except FileNotFoundError:
+                pass
+            else:
+                raise RuntimeError("PREPARED recovery found a COMMITTED snapshot quarantine")
+            try:
+                active_metadata = os.stat(
+                    active_name,
+                    dir_fd=runs_descriptor,
+                    follow_symlinks=False,
+                )
+            except FileNotFoundError:
+                os.fsync(runs_descriptor)
+                return None
+            if stat.S_ISLNK(active_metadata.st_mode) or not stat.S_ISDIR(active_metadata.st_mode):
+                raise RuntimeError("the active PREPARED snapshot must be a real directory")
+            quarantine_name = "m8_final_controller_snapshot.abort." + secrets.token_hex(16)
+            try:
+                os.stat(quarantine_name, dir_fd=runs_descriptor, follow_symlinks=False)
+            except FileNotFoundError:
+                pass
+            else:  # pragma: no cover - 128-bit collision is not practically reachable
+                raise RuntimeError("the PREPARED snapshot quarantine name collided")
+            os.rename(
+                active_name,
+                quarantine_name,
+                src_dir_fd=runs_descriptor,
+                dst_dir_fd=runs_descriptor,
+            )
+            quarantine_metadata = os.stat(
+                quarantine_name,
+                dir_fd=runs_descriptor,
+                follow_symlinks=False,
+            )
+            try:
+                os.stat(active_name, dir_fd=runs_descriptor, follow_symlinks=False)
+            except FileNotFoundError:
+                pass
+            else:
+                raise RuntimeError("the active PREPARED snapshot remained after quarantine")
+            identity_fields = ("st_dev", "st_ino", "st_mode", "st_uid", "st_gid")
+            if any(
+                getattr(active_metadata, field) != getattr(quarantine_metadata, field)
+                for field in identity_fields
+            ):
+                raise RuntimeError("the PREPARED snapshot inode changed during quarantine")
+            os.fsync(runs_descriptor)
+            return root / "runs" / quarantine_name
+        finally:
+            os.close(runs_descriptor)
+    finally:
+        os.close(root_descriptor)
+
+
+def _recover_prepared_attempt_before_dependencies(
+    project_root: Path,
+    *,
+    recovery_lockdown: bool,
+) -> None:
+    """Retire only PREPARED state before site, GPU, MuJoCo, or project imports."""
+
+    if not recovery_lockdown:
+        return
+    if _peek_attempt_phase_read_only(project_root) != "PREPARED":
+        return
+    module, transaction, inspection = _prepared_transaction_from_durable_manifest(project_root)
+    if inspection.phase is not module.AttemptPhase.PREPARED:
+        return
+    _isolate_prepared_controller_snapshot(project_root)
+    recovery = transaction.recover()
+    if recovery.action != "pre_test_restored":
+        raise RuntimeError("early PREPARED recovery did not restore the pre-Test state")
+    raise PreparedRecoveryRerunRequired(
+        "PREPARED formal state was cleaned before dependency imports; rerun is required"
+    )
 
 
 def _assert_project_source_finder_active(project_root: Path) -> None:
@@ -1846,8 +2220,12 @@ def run_benchmark(
 ) -> Mapping[str, object]:
     root = _canonical_project_root(project_root)
     guard = _consume_bootstrap_guard(root)
-    _install_project_source_finder(root)
     _remove_project_import_root(root)
+    _recover_prepared_attempt_before_dependencies(
+        root,
+        recovery_lockdown=_EARLY_RECOVERY_LOCKDOWN,
+    )
+    _install_project_source_finder(root)
     _configure_gpu_site_packages(root)
     config_path = _canonical_config_path(root, options.config)
     api = _load_project_api(root)

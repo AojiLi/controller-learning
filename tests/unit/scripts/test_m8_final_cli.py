@@ -4,6 +4,8 @@ import ast
 import hashlib
 import importlib.util
 import os
+import shutil
+import subprocess
 import sys
 import tomllib
 from pathlib import Path
@@ -33,11 +35,15 @@ def cli_module():
 
 @pytest.fixture(autouse=True)
 def reset_formal_process_latches(cli_module, monkeypatch: pytest.MonkeyPatch) -> None:
+    sys.modules.pop(cli_module._PRIVATE_ATTEMPT_MODULE, None)
     monkeypatch.setattr(cli_module, "_BOOTSTRAP_STATE", None)
     monkeypatch.setattr(cli_module, "_EARLY_RECOVERY_LOCKDOWN", False)
     monkeypatch.setattr(cli_module, "_FORMAL_ENTRY_CONSUMED", False)
     monkeypatch.setattr(cli_module, "_POST_BIND_COMMANDS_FORBIDDEN", False)
     monkeypatch.setattr(cli_module, "_PROJECT_SOURCE_FINDER", None)
+    monkeypatch.setattr(cli_module, "_active_attempt_transaction_exists", lambda _root: False)
+    yield
+    sys.modules.pop(cli_module._PRIVATE_ATTEMPT_MODULE, None)
 
 
 def _function(name: str) -> ast.FunctionDef:
@@ -59,6 +65,58 @@ def _call_names(function: ast.FunctionDef) -> list[str]:
     return names
 
 
+def _m8_output_allowlist() -> tuple[str, ...]:
+    run_id = "m8-final-v0-1-001"
+    outputs = {
+        "benchmarks/v0.1/m8_final_evaluation_report.json",
+        "benchmarks/v0.1/m8_final_results.csv",
+        "benchmarks/v0.1/m8_test_row_000_comparison.png",
+    }
+    for controller in ("pid", "mpc", "ppo"):
+        base = f"results/0.1/{controller}/{run_id}"
+        outputs.update(
+            {
+                f"{base}/metrics.npz",
+                f"{base}/results.csv",
+                f"{base}/run_manifest.json",
+                f"{base}/selected_replays/test_row_000_trajectory.json",
+                f"{base}/summary.json",
+                f"{base}/telemetry.png",
+                f"{base}/trajectory.png",
+            }
+        )
+    return tuple(sorted(outputs))
+
+
+def _make_prepared_transaction(project_root: Path) -> object:
+    from controller_learning.evaluation.attempt_transaction import (
+        AttemptIdentity,
+        M8AttemptTransaction,
+    )
+
+    evaluation = project_root / "controller_learning/evaluation"
+    evaluation.mkdir(parents=True)
+    shutil.copy2(
+        PROJECT_ROOT / "controller_learning/evaluation/attempt_transaction.py",
+        evaluation / "attempt_transaction.py",
+    )
+    transaction = M8AttemptTransaction(
+        project_root,
+        transaction_relative_path="runs/m8_final_attempt_transaction",
+        output_allowlist=_m8_output_allowlist(),
+        identity=AttemptIdentity(
+            source_revision="a" * 40,
+            source_tree_sha256="b" * 64,
+            config_sha256="c" * 64,
+            pixi_lock_sha256="d" * 64,
+            input_sha256="e" * 64,
+        ),
+    )
+    prepared = transaction.prepare()
+    assert prepared.phase is not None and prepared.phase.value == "PREPARED"
+    return transaction
+
+
 def test_top_level_is_stdlib_only_and_sets_import_policy_first() -> None:
     imports = [node for node in TREE.body if isinstance(node, (ast.Import, ast.ImportFrom))]
     imported_names = []
@@ -76,6 +134,8 @@ def test_top_level_is_stdlib_only_and_sets_import_policy_first() -> None:
         token: SOURCE.index(f'os.environ.setdefault("{token}"')
         for token in (
             "CUDA_DEVICE_ORDER",
+            "MUJOCO_GL",
+            "PYOPENGL_PLATFORM",
             "XLA_PYTHON_CLIENT_PREALLOCATE",
             "PYTHONDONTWRITEBYTECODE",
         )
@@ -144,6 +204,8 @@ def test_formal_startup_requires_exact_isolated_no_site_gpu_python() -> None:
         "Path(sys.base_prefix) != gpu_prefix",
         '"LD_LIBRARY_PATH"',
         '"LD_PRELOAD"',
+        'os.environ.get("MUJOCO_GL") != "egl"',
+        'os.environ.get("PYOPENGL_PLATFORM") != "egl"',
     ):
         assert requirement in prepare_source
 
@@ -152,12 +214,15 @@ def test_run_installs_exact_source_finder_and_site_route_before_project_api() ->
     source = ast.get_source_segment(SOURCE, _function("run_benchmark"))
     assert source is not None
     consume = source.index("_consume_bootstrap_guard")
-    finder = source.index("_install_project_source_finder")
     first_remove = source.index("_remove_project_import_root")
+    prepared_recovery = source.index("_recover_prepared_attempt_before_dependencies")
+    finder = source.index("_install_project_source_finder")
     site_setup = source.index("_configure_gpu_site_packages")
     load_api = source.index("_load_project_api")
     second_remove = source.index("_remove_project_import_root", first_remove + 1)
-    assert consume < finder < first_remove < site_setup < load_api < second_remove
+    assert (
+        consume < first_remove < prepared_recovery < finder < site_setup < load_api < second_remove
+    )
     assert "site.addsitedir" not in SOURCE
     assert "controller_learning.physics.mjx_warp" in SOURCE
 
@@ -579,6 +644,115 @@ def test_prepared_recovery_preserves_transaction_when_snapshot_isolation_fails(
             recovery_lockdown=True,
         )
     assert recover_called is False
+
+
+def test_early_prepared_recovery_never_cleans_test_bound_state(
+    cli_module,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    project_root = tmp_path / "project"
+    transaction = _make_prepared_transaction(project_root)
+    transaction.bind_test()
+    snapshot = project_root / "runs/m8_final_controller_snapshot"
+    snapshot.mkdir()
+    state_temporary = transaction.transaction_directory / ".state.json.recovery-token.tmp"
+    state_temporary.write_bytes(b"durable interrupted state write")
+
+    def tree_snapshot() -> tuple[tuple[str, str, bytes | None], ...]:
+        rows: list[tuple[str, str, bytes | None]] = []
+        for path in sorted(transaction.transaction_directory.rglob("*")):
+            relative = path.relative_to(transaction.transaction_directory).as_posix()
+            metadata = path.lstat()
+            if path.is_dir():
+                rows.append((relative, f"directory:{metadata.st_mode:o}", None))
+            else:
+                rows.append((relative, f"file:{metadata.st_mode:o}", path.read_bytes()))
+        return tuple(rows)
+
+    before = tree_snapshot()
+    monkeypatch.setattr(cli_module, "PROJECT_ROOT", project_root)
+    monkeypatch.setattr(cli_module, "_assert_project_not_imported", lambda: None)
+
+    cli_module._recover_prepared_attempt_before_dependencies(
+        project_root,
+        recovery_lockdown=True,
+    )
+
+    assert tree_snapshot() == before
+    assert state_temporary.read_bytes() == b"durable interrupted state write"
+    assert transaction.transaction_directory.is_dir()
+    assert snapshot.is_dir()
+    assert cli_module._PRIVATE_ATTEMPT_MODULE not in sys.modules
+
+
+def test_prepared_recovery_finishes_before_a_spawn_capable_dependency_import(
+    tmp_path: Path,
+) -> None:
+    project_root = tmp_path / "project"
+    transaction = _make_prepared_transaction(project_root)
+    snapshot = project_root / "runs/m8_final_controller_snapshot"
+    snapshot.mkdir()
+    dependency_marker = project_root / "dependency-imported"
+    code = r"""
+import importlib.util
+import subprocess
+import sys
+from pathlib import Path
+
+script, project, marker = map(Path, sys.argv[1:])
+spec = importlib.util.spec_from_file_location("_m8_prepared_recovery_probe", script)
+module = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = module
+spec.loader.exec_module(module)
+module.PROJECT_ROOT = project
+module._consume_bootstrap_guard = lambda _root: object()
+module._EARLY_RECOVERY_LOCKDOWN = True
+module._install_project_source_finder = lambda _root: None
+module._configure_gpu_site_packages = lambda _root: None
+
+def spawn_capable_dependency_import(_root):
+    marker.write_text("dependency import reached", encoding="utf-8")
+    subprocess.run(("/bin/true",), check=True)
+
+module._load_project_api = spawn_capable_dependency_import
+
+def deny_spawn(event, _args):
+    if event == "subprocess.Popen":
+        raise RuntimeError("recovery process creation is forbidden")
+
+sys.addaudithook(deny_spawn)
+try:
+    module.run_benchmark(module.BenchmarkOptions(), project_root=project)
+except module.PreparedRecoveryRerunRequired:
+    print("prepared-recovered-before-dependencies")
+else:
+    raise AssertionError("PREPARED recovery did not require a new process")
+"""
+    completed = subprocess.run(
+        (
+            sys.executable,
+            "-I",
+            "-B",
+            "-S",
+            "-c",
+            code,
+            str(SCRIPT_PATH),
+            str(project_root),
+            str(dependency_marker),
+        ),
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+
+    assert completed.stdout.strip() == "prepared-recovered-before-dependencies"
+    assert not dependency_marker.exists()
+    assert not transaction.transaction_directory.exists()
+    assert not snapshot.exists()
+    quarantines = tuple((project_root / "runs").glob("m8_final_controller_snapshot.abort.*"))
+    assert len(quarantines) == 1 and quarantines[0].is_dir()
 
 
 def test_existing_attempt_recovery_requires_early_lockdown(cli_module, tmp_path: Path) -> None:

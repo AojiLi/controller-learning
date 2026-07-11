@@ -93,6 +93,27 @@ def _safe_nonempty_string(value: object, *, field: str) -> str:
     return result
 
 
+def _safe_collapsed_nonempty_string(value: object, *, field: str) -> str:
+    """Collapse whitespace while preserving the public-text safety boundary."""
+
+    if not isinstance(value, str) or not value.strip():
+        raise FinalRuntimeEvidenceError(f"{field} must be a non-empty string")
+    if any(not character.isprintable() and not character.isspace() for character in value):
+        raise FinalRuntimeEvidenceError(f"{field} contains private or unsafe text")
+
+    result = " ".join(value.split())
+    compact = "".join(value.split())
+    for candidate in (value, result, compact):
+        if (
+            _GPU_UUID.search(candidate) is not None
+            or _POSIX_ABSOLUTE_PATH.search(candidate) is not None
+            or _WINDOWS_ABSOLUTE_PATH.search(candidate) is not None
+            or _FILE_URI.search(candidate) is not None
+        ):
+            raise FinalRuntimeEvidenceError(f"{field} contains private or unsafe text")
+    return _safe_nonempty_string(result, field=field)
+
+
 def _private_safe_value(value: object) -> bool:
     if value is None or isinstance(value, bool):
         return True
@@ -682,7 +703,7 @@ def _cuda_runtime(device: Any) -> str:
     if not isinstance(runtime, str) or not runtime.strip() or "cuda" not in runtime.lower():
         raise RuntimeError("JAX does not report a CUDA runtime")
     try:
-        return _safe_nonempty_string(runtime, field="CUDA runtime")
+        return _safe_collapsed_nonempty_string(runtime, field="CUDA runtime")
     except FinalRuntimeEvidenceError as error:
         raise RuntimeError("JAX CUDA runtime evidence is unsafe") from error
 

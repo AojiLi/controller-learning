@@ -284,7 +284,7 @@ def _runtime_device() -> SimpleNamespace:
         id=0,
         platform="gpu",
         device_kind="NVIDIA Test GPU",
-        client=SimpleNamespace(platform_version="CUDA 12.8.0"),
+        client=SimpleNamespace(platform_version="PJRT C API\ncuda 12090"),
     )
 
 
@@ -342,13 +342,31 @@ def test_collect_final_runtime_evidence_is_strict_mapped_and_redacted(
         "driver_version": "570.2",
         "memory_total_mib": 48000.0,
     }
-    assert public["cuda_runtime"] == "CUDA 12.8.0"
+    assert public["cuda_runtime"] == "PJRT C API cuda 12090"
     assert public["cuda_driver"] == "570.2"
     assert public["jax_device"]["id"] == 0
     assert public["cpu_model"] == "Test CPU"
     assert runtime_evidence_is_private_safe(public)
     assert GPU_1_UUID not in repr(public)
     validate_final_runtime_evidence(public)
+
+
+@pytest.mark.parametrize(
+    "runtime",
+    (
+        f"PJRT C API\ncuda 12090\n{GPU_0_UUID}",
+        "PJRT C API\ncuda 12090\n/home/user/private/runtime.txt",
+        "PJRT C API\ncuda 12090\nfile:///home/user/private/runtime.txt",
+        "PJRT C API\ncuda 12090\x00",
+        "PJRT C API\ncuda 12090\x1b[31m",
+        "PJRT C API\ncuda 12090\nGPU-12345678-1234-1234-\n1234-123456789abc",
+    ),
+)
+def test_cuda_runtime_rejects_private_or_unsafe_multiline_content(runtime: str) -> None:
+    device = SimpleNamespace(client=SimpleNamespace(platform_version=runtime))
+
+    with pytest.raises(RuntimeError, match="CUDA runtime evidence is unsafe"):
+        runtime_module._cuda_runtime(device)
 
 
 def test_cpu_model_prefers_linux_model_name_over_architecture_fallback(
