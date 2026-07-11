@@ -312,7 +312,7 @@ def _run_command(command: Sequence[str], *, cwd: Path | None = None) -> str:
         )
     except (OSError, subprocess.SubprocessError) as error:
         raise RuntimeError(f"command failed: {' '.join(command)}") from error
-    return completed.stdout.strip()
+    return completed.stdout.rstrip("\r\n")
 
 
 def _source_snapshot(project_root: Path) -> dict[str, Any]:

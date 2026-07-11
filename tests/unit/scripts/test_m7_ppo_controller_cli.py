@@ -45,6 +45,17 @@ def test_cli_import_sets_allocator_policy_without_importing_gpu_stacks() -> None
     assert completed.returncode == 0, completed.stderr
 
 
+def test_run_command_preserves_git_porcelain_leading_status_column() -> None:
+    from scripts import benchmark_m7_ppo_controller as benchmark
+
+    output = benchmark._run_command(
+        (sys.executable, "-c", "import sys; sys.stdout.write(' M tracked\\n')"),
+        cwd=PROJECT_ROOT,
+    )
+
+    assert output == " M tracked"
+
+
 def test_guard_blocks_non_validation_assets_before_read(tmp_path: Path) -> None:
     official = tmp_path / "official" / "v0.1"
     cache = tmp_path / "cache"

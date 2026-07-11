@@ -37,6 +37,15 @@ def test_cli_import_sets_allocator_policy_and_does_not_import_gpu_or_training_mo
     assert completed.returncode == 0, completed.stderr
 
 
+def test_run_command_preserves_git_porcelain_leading_status_column() -> None:
+    output = benchmark._run_command(
+        (sys.executable, "-c", "import sys; sys.stdout.write(' M tracked\\n')"),
+        cwd=PROJECT_ROOT,
+    )
+
+    assert output == " M tracked"
+
+
 def test_validation_guard_allows_only_two_read_only_files(tmp_path: Path) -> None:
     official = tmp_path / "official" / "v0.1"
     cache_root = tmp_path / "cache"

@@ -38,6 +38,15 @@ from scripts import export_m7_ppo_controller as export_cli
 PROJECT_ROOT = Path(__file__).parents[3]
 
 
+def test_run_command_preserves_git_porcelain_leading_status_column() -> None:
+    output = export_cli._run_command(
+        (sys.executable, "-c", "import sys; sys.stdout.write(' M tracked\\n')"),
+        cwd=PROJECT_ROOT,
+    )
+
+    assert output == " M tracked"
+
+
 def _record(path: str, digest: str, size: int = 10) -> dict[str, Any]:
     return ArtifactRecord(relative_path=path, sha256=digest, size_bytes=size).to_dict()
 
