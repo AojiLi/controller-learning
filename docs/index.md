@@ -6,9 +6,11 @@ tracks, pluggable Controllers, and reproducible evaluation.
 The project is being implemented through explicit milestone gates. Published documentation will
 only claim features and performance that have passed their corresponding tests and benchmarks.
 
-M6 is complete: PID and MPC use the public Controller boundary and formal MJX-Warp evaluator. PID
-completed its fixed 10-Track Validation prefix, and MPC completed 95 of 100 fixed Validation
-Tracks. M7 PPO training on the official vector environment is active.
+M7 is complete: PPO trained on the official 1,024-world vector environment, a frozen Validation
+selection chose update 70 at 95/100 successes against a 0/100 seeded-random baseline, and the
+Torch-free exported plugin completed 99/100 Validation Tracks through the ordinary batch-one
+Controller Runner. No Controller has been evaluated on Test and Test performance remains unopened;
+M8 final evaluation and release remain pending.
 
 ## Design Principles
 
@@ -25,4 +27,6 @@ The measured M3 representation and Challenge semantics are documented in
 environment run are documented in [Gymnasium and Controller Platform](environment.md). The
 observation-only PID and MPC examples are explained in
 [Classical Controllers: PID and MPC](controllers.md), together with the measured M6 success,
-timing, and memory evidence.
+timing, and memory evidence. The official RL path, NEXT_STEP masks, DLPack bridge, frozen
+checkpoint selection, NumPy export, and replay are documented in
+[PPO: GPU Training to Controller Plugin](ppo.md).

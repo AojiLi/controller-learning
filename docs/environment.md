@@ -1,9 +1,10 @@
 # Gymnasium and Controller Platform
 
 M4 exposed the physical four-wheel Challenge through one vector state machine and one thin
-single-world adapter. Classical Controllers, later PPO training, and evaluation all use this same
+single-world adapter. Classical Controllers, PPO training, and evaluation all use this same
 transition path; there is no simplified RL environment. M5 extends that same vector state machine
-with deterministic device-native TrackPool selection and masked replacement.
+with deterministic device-native TrackPool selection and masked replacement, and M7 trains PPO
+through public wrappers around the unchanged vector environment.
 
 ## Quick Simulation
 
@@ -158,6 +159,13 @@ local code in v0.1; they are not sandboxed.
 training and evaluation backend and retains JAX arrays for actions, observations, pending-reset
 state, episode identities, and numeric info. After warmup, tests disallow both host-to-device and
 device-to-host transfers across an active step and a mixed-world autoreset step.
+
+For PPO, public reward and local-track observation wrappers remain outside the Challenge. Numerical
+leaves cross from JAX to Torch and actions return through same-device DLPack views; the public
+`benchmark_version` string remains a validated string because DLPack has no string dtype. The
+rollout collector explicitly masks each NEXT_STEP reset-only slot out of GAE and optimization while
+preserving the preceding terminal transition. See
+[PPO: GPU Training to Controller Plugin](ppo.md) for the complete M7 data path and evidence.
 
 Run the contracts locally with:
 

@@ -8,6 +8,10 @@ replace the simulation truth.
 This page explains how the examples are assembled and how to inspect them without using hidden
 Track, Race Core, Environment, or simulator state.
 
+The inference-only PPO example uses the same plugin lifecycle and public boundary. Its GPU training,
+frozen Validation selection, NumPy export, and ordinary Controller evaluation are documented in
+[PPO: GPU Training to Controller Plugin](ppo.md).
+
 ## Run the examples
 
 Install the default Pixi environment, then run either Controller on the fixed Level 0 Track:

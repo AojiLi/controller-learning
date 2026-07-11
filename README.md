@@ -4,13 +4,14 @@
 pluggable controllers, and reproducible evaluation.**
 
 Controller Learning is a benchmark and teaching platform for developing and comparing race-car
-controllers under one environment, vehicle, task, and evaluation protocol. PID and MPC are
-implemented as educational examples, while PPO is the active milestone; the reusable Challenge and
-Controller interface are the core product.
+controllers under one environment, vehicle, task, and evaluation protocol. PID, MPC, and PPO are
+implemented as educational examples; the reusable Challenge and Controller interface are the core
+product.
 
-> **Project status:** M6 is complete. PID and MPC now run through the same public Controller and
-> formal MJX-Warp evaluation path; MPC completed 95 of 100 fixed Validation Tracks. M7 PPO training
-> on the official vector environment is active.
+> **Project status:** M7 is complete. PPO trained through the official 1,024-world vector
+> environment, passed frozen Validation selection, and was exported as an ordinary Torch-free
+> Controller plugin. No Controller has been evaluated on Test and Test performance remains
+> unopened; M8 final evaluation and public v0.1 release remain pending.
 
 Reviewed machine-readable evidence is available in the
 [M1 CPU report](benchmarks/v0.1/m1_cpu_report.json) and
@@ -21,7 +22,10 @@ environment path is measured in the
 [M4 environment report](benchmarks/v0.1/m4_environment_report.json). M5 evidence is in the
 [Track admission report](benchmarks/v0.1/m5_track_admission_report.json) and
 [TrackPool GPU report](benchmarks/v0.1/m5_track_pool_report.json). Classical Controller evidence is
-in the [M6 Controller report](benchmarks/v0.1/m6_controller_report.json).
+in the [M6 Controller report](benchmarks/v0.1/m6_controller_report.json). PPO evidence is in the
+[M7 selection report](benchmarks/v0.1/m7_ppo_selection_report.json),
+[export report](benchmarks/v0.1/m7_ppo_export_report.json), and
+[ordinary Controller report](benchmarks/v0.1/m7_ppo_controller_evaluation_report.json).
 
 ## Why This Project Exists
 
@@ -36,7 +40,7 @@ explicit and reproducible:
 - the same official environment for classical control, training, and evaluation; and
 - public benchmark tracks, seeds, manifests, metrics, and replays.
 
-## Planned v0.1 Stack
+## v0.1 Stack
 
 - MuJoCo MJCF and MJX-Warp
 - JAX and Gymnasium
@@ -44,11 +48,13 @@ explicit and reproducible:
 - PyTorch for PPO
 - Pixi on Linux with Python 3.11
 
-Controller success rates will only be documented after the corresponding milestone benchmarks
-pass.
+Controller success rates below are documented only where the corresponding milestone benchmark
+passed.
 
 The [Classical Controllers tutorial](docs/controllers.md) explains the Controller lifecycle,
 observation-only geometry, PID and MPC designs, DebugDraw output, and timing interpretation.
+The [PPO tutorial](docs/ppo.md) covers the official training stack, DLPack exchange, NEXT_STEP
+rollout masks, frozen checkpoint selection, NumPy export, and replay.
 
 ## Development Setup
 
@@ -89,8 +95,8 @@ The repository separates five responsibilities:
 4. **Controller** contains trusted plugins that only use the public interface.
 5. **Evaluation** produces reproducible metrics, manifests, plots, and replays.
 
-PPO will train directly against the official `VecCarRacingEnv`; the project will not maintain a
-second simplified training environment.
+PPO trains directly against the official `VecCarRacingEnv`; the project does not maintain a second
+simplified training environment.
 
 ## Verified GPU Result
 
@@ -191,6 +197,39 @@ fresh Controller instances. Peak sampled process VRAM was 396 MiB, and JAX live 
 zero after each controller/split group. Only Level 0 and Validation assets were loaded; Test was not
 accessed. See [Classical Controllers](docs/controllers.md) for the designs and measurement scope.
 
+## Verified M7 PPO Result
+
+The formal run `m7-formal-v0-1-001` trained one PyTorch PPO through public wrappers around a
+long-lived 1,024-world `VecCarRacingEnv`. It completed 80 updates and 10,466,653 valid Train
+transitions at 56,245.788 end-to-end valid transitions/s, including configured durable logging and
+checkpoint boundaries. The final update's recent Train success rate was 0.9513, and peak sampled
+process VRAM was 1,180 MiB.
+
+Frozen Validation selection evaluated eight predeclared checkpoints without gradient updates.
+Update 70 completed 95 of 100 Tracks with a 24.331579 s mean successful lap time; the seeded
+uniform-random baseline completed 0 of 100. The selected actor was exported as a canonical
+120,968-byte NumPy policy with SHA-256
+`f3054e95c6d357f571425ad69b9ac16c713e24b9f09b7768e7a648af84731a4b`. The ordinary batch-one
+Controller Runner then completed 99 of 100 Validation Tracks, with a 24.316667 s mean successful
+lap time and 0.260/0.305/0.332 ms compute P50/P95/P99 across 48,709 calls. There were no 50 ms
+deadline misses; peak sampled process VRAM was 364 MiB.
+
+The 100-world selection and batch-one Controller runs are separate execution protocols. MJX-Warp
+contact and constraint atomics are not rollout-bit-deterministic, so closed-loop trajectories are
+not claimed to be bit-identical across widths or repeated runs. The policy was frozen in both
+phases, so the result difference does not represent additional learning. Neither phase evaluated a
+Controller on Test.
+
+![M7 PPO training and Validation selection curve](benchmarks/v0.1/m7_training_curve.png)
+
+The published replay is Validation row 0 (Track ID `1000000`), captured directly from its
+483-step evaluated episode:
+
+![M7 PPO Validation replay overview](benchmarks/v0.1/m7_ppo_replay_overview.png)
+
+See [PPO: GPU Training to Controller Plugin](docs/ppo.md) for the method, commands, artifact chain,
+and measurement scope. Final Test evaluation and the PID/MPC/PPO comparison remain M8 work.
+
 ## Roadmap
 
 The implementation follows strict milestone gates:
@@ -202,8 +241,8 @@ The implementation follows strict milestone gates:
 - M4: Gymnasium environments and Controller platform — complete
 - M5: Level 0/1 and versioned track pools — complete
 - M6: PID and MPC — complete
-- M7: PPO on the official vector environment — active
-- M8: evaluation, documentation, and public v0.1 release
+- M7: PPO on the official vector environment — complete
+- M8: final Test evaluation, public documentation, and v0.1 release — pending
 
 The detailed confirmed design is recorded in [PROJECT_PLAN.md](PROJECT_PLAN.md).
 

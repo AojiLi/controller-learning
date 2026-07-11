@@ -1,14 +1,14 @@
 # Project Status
 
-Last updated: 2026-07-10
+Last updated: 2026-07-11
 
-**Status:** M6 is complete. M7 PPO and GPU training are active.
+**Status:** M7 is complete. M8 final evaluation and release work are active.
 
 ## Main Line
 
-Train one PyTorch PPO directly on the official 1,024-world `VecCarRacingEnv`, record reproducible
-local training evidence, export the selected checkpoint as a normal Controller plugin, and prove it
-learns beyond seeded random actions without touching Test.
+Freeze and commit the Test-only final protocol before any Test performance access, then evaluate
+PID, MPC, and PPO once on the same fixed-order 20-Track Test split. Finish public documentation and
+release audits afterward; the repository is still private.
 
 ## Completed Evidence
 
@@ -23,42 +23,50 @@ learns beyond seeded random actions without touching Test.
   verified the reproducible Train cache, and measured 210,372 transitions/s on the full GPU pool.
 - M6 added observation-only geometry and speed planning, PID, and constrained CasADi/IPOPT MPC with
   configs, DebugDraw, tests, and an English tutorial.
-- The formal M6 report passed 34/34 gates. PID completed Level 0 and 10/10 Validation-prefix Tracks;
-  MPC completed Level 0 and 95/100 full Validation Tracks. All five MPC failures were timeouts.
-- MPC compute timing was 32.373/39.892/44.347 ms at P50/P95/P99 with a 0.0967% soft-deadline miss
-  rate. PID P99 was 0.401 ms with no misses.
-- The M6 run checked 234,358 public transitions through four MJX-Warp backends and 112 fresh
-  Controller instances. It recorded no non-finite output or invalid action, 396 MiB peak process
-  VRAM, zero post-group JAX live bytes, fixed row ordering/seeds, and no Test access.
-- Current local validation passes 547 CPU/default tests, all 23 GPU tests, strict documentation,
-  official-asset verification, Actions linting, and release-package checks.
+- M7 trained PPO at clean source `86f8f384` through one official 1,024-world environment for 80
+  updates and 10,466,653 valid transitions. It measured 56,245.788 valid transitions/s, 1,180 MiB
+  peak sampled process VRAM, and no numerical errors.
+- Frozen candidate updates `[10, 20, 30, 40, 50, 60, 70, 80]` were evaluated once on Validation.
+  Update 70 achieved 95/100 successes and was selected; the seeded random baseline achieved 0/100.
+- The exported inference-only policy is SHA-256
+  `f3054e95c6d357f571425ad69b9ac16c713e24b9f09b7768e7a648af84731a4b`.
+- The ordinary Controller run at clean source `1b434f4` completed 99/100 Validation Tracks with a
+  24.316667 s mean successful lap time over 48,709 steps. Compute P50/P95/P99 was
+  0.260/0.305/0.332 ms with zero deadline misses; peak sampled process VRAM was 364 MiB and final
+  JAX live bytes were zero.
+- Replay v2 captured fixed-order row 0 inline from that evaluation, with no cherry-pick or second
+  rollout. The earlier formal v1 attempt failed on MJX-Warp atomic nondeterminism and fully rolled
+  back before v2 was frozen.
+- One pre-formal capacity-only Validation-loader diagnostic inspected fixed shape without creating
+  an environment, running a policy, or observing performance. Formal selection began with zero
+  prior Validation opens in its process.
+- M7 performance paths never accessed Test. Routine asset verification may hash Test assets but
+  does not run Controllers or reveal Test performance.
 
-M6 therefore clears the public classical-Controller, fixed Validation success, timing, lifecycle,
-and formal evaluation gates. PPO learning remains unproven until M7.
+M7 therefore clears PPO learning, frozen Validation selection, inference-only export, ordinary
+Controller timing/lifecycle, and replay gates. Final Test comparison and release proof remain M8.
 
 ## Current Work
 
-- strict PPO config and a verified Train-only asset loader;
-- public local-track observation and reward wrappers;
-- numeric JAX-to-Torch DLPack compatibility with public string info preserved;
-- NEXT_STEP-aware rollout masks and GAE;
-- CleanRL-style PPO, CSV/TensorBoard logging, and atomic checkpoints;
-- 1,024-world smoke/full training, Validation selection, random baseline, replay, and Controller
-  export.
+- freeze and commit the complete Test-only M8 protocol and rejection tests before performance
+  access;
+- run one formal same-order/same-seed PID/MPC/PPO comparison on all 20 Test Tracks;
+- publish strict result and replay artifacts without Test-informed tuning or checkpoint changes;
+- complete English README/tutorial/API/reproduction docs, package/privacy cleanup, and release
+  audits;
+- make the repository public only after every v0.1 release gate passes.
 
 ## Next Step
 
-Implement the M7 configuration and Train-only pool loader with mutation and Test-access guards,
-then add the public wrapper stack before the PPO optimizer.
+Freeze, test, and commit the Test-only M8 final evaluation protocol before any Test performance
+access, then execute the single formal PID/MPC/PPO 20-Track run.
 
 ## Risks and Blockers
 
-- Stock Gymnasium `JaxToTorch` fails on the public NumPy string `benchmark_version`; the compatible
-  bridge must preserve the full info whitelist without host-copying numeric hot-path values.
-- NEXT_STEP reset-only slots must be excluded from GAE and PPO losses or training semantics are
-  wrong across episode boundaries.
-- The all-split asset verifier reads Test and is forbidden in M7 training/selection paths.
-- Reward/feature weights, PPO hyperparameters, and training budget need Train-only evidence before
-  they are frozen for Validation selection.
-- The 272.8 MB Train NPZ remains local and ignored; run directories and intermediate checkpoints
-  must not enter Git.
+- Any Test performance access before the complete protocol is committed would invalidate the
+  one-shot comparison boundary.
+- Infrastructure failure handling and publication rollback must be predeclared so a failed run
+  cannot become a performance-motivated rerun.
+- PID, MPC, and PPO artifact/config identities must remain frozen throughout the Test run.
+- Public-release claims remain blocked on final documentation, privacy, package, evidence, and
+  repository-visibility checks.

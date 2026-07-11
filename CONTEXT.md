@@ -214,12 +214,17 @@ pixi run -e gpu validate-track-driveability
 pixi run -e gpu build-track-assets
 pixi run -e gpu benchmark-track-pool
 pixi run -e gpu benchmark-controllers
+pixi run -e gpu train-ppo
+pixi run -e gpu benchmark-m7-ppo
+pixi run -e gpu export-m7-ppo-controller
+pixi run -e gpu benchmark-m7-ppo-controller
 ```
 
-`train-ppo` is a confirmed future task name and must be added in M7. CPU CI currently checks
-formatting, lint, CPU tests, installed wheel
-contents, strict docs, GitHub Actions syntax, and package metadata. GPU verification remains local
-for v0.1 and produces `benchmarks/v0.1/gpu_report.json`.
+The four M7 commands above implement formal Train-only optimization, frozen Validation selection,
+hash-bound inference-only Controller export, and ordinary Controller evaluation/replay respectively.
+CPU CI currently checks formatting, lint, CPU tests, installed wheel contents, strict docs, GitHub
+Actions syntax, and package metadata. GPU verification remains local for v0.1 and produces
+versioned evidence under `benchmarks/v0.1/`.
 
 Reviewed M1 CPU evidence is stored at `benchmarks/v0.1/m1_cpu_report.json`. The report records the
 source revision, dirty-worktree gate, dependency lock, model/config/protocol hashes, runtime, all
@@ -267,6 +272,29 @@ public transitions were finite, invalid-action count was zero, peak sampled proc
 396 MiB, and post-group JAX live bytes were zero. The report passed 34/34 gates, loaded only Level 0
 and Validation, and did not access Test.
 
+Reviewed M7 PPO evidence is split across the training run and three committed reports. The formal
+training source was clean revision `86f8f384`; one long-lived 1,024-world official Train environment
+completed 80 updates and 10,466,653 valid transitions at 56,245.788 end-to-end valid transitions/s.
+Peak sampled process VRAM was 1,180 MiB and no numerical error was recorded. Frozen candidate
+updates `[10, 20, 30, 40, 50, 60, 70, 80]` were evaluated once on Validation; update 70 was selected
+with 95/100 successes against 0/100 for the seeded random baseline. The exported inference-only
+NumPy policy is SHA-256
+`f3054e95c6d357f571425ad69b9ac16c713e24b9f09b7768e7a648af84731a4b`.
+
+The ordinary Controller evaluation at clean source `1b434f4` instantiated 100 fresh Controllers and
+completed 99/100 fixed Validation Tracks with a 24.316667 s mean successful lap time over 48,709
+environment steps. Controller compute timing was 0.260/0.305/0.332 ms at P50/P95/P99 with zero
+50 ms deadline misses. Peak sampled process VRAM was 364 MiB and final JAX live bytes were zero.
+Protocol v2 captured the selected row-0 replay inline from that same evaluation trajectory, with no
+cherry-picking and no second rollout. A preceding formal v1 replay attempt exposed MJX-Warp atomic
+nondeterminism, failed its gate, and fully rolled back before v2 was frozen and run.
+
+M7 performance paths never accessed Test. Routine official-asset verification may hash Test assets
+but does not instantiate a Test environment, run a policy, or observe Test performance. Before the
+formal selection, one capacity-only diagnostic loaded the Validation asset to inspect its fixed
+shape; it created no environment, ran no policy, and observed no performance. This access is
+disclosed separately from the formal selection, whose own pre-Validation access count was zero.
+
 ## Experimental Decisions
 
 M1 fixed the physics timestep at 0.005 seconds and proved the standardized actuator mapping on CPU;
@@ -279,9 +307,11 @@ quotas/namespaces/assets, canonical geometry hashes and manifests, domain-2 Trac
 numeric Track ID contract, local Train cache, bounded physical admission, and v2 full-pool
 memory/performance protocol. M6 fixed the public-only classical-Controller examples, shared
 geometry/speed-planning utilities, bounded-iteration CasADi/IPOPT MPC configuration, reusable
-batch-one formal evaluator semantics, and the reviewed Level 0/Validation timing protocol. PPO
-hyperparameters remain experimental and must be locked from Train-only evidence before formal
-Validation selection.
+batch-one formal evaluator semantics, and the reviewed Level 0/Validation timing protocol. M7 fixed
+the public PPO feature/reward wrappers, NEXT_STEP-aware training semantics, frozen Train-only PPO
+configuration, Validation-only checkpoint selection, inference-only NumPy export, and ordinary
+Controller replay protocol. The next unfrozen performance protocol is M8's final Test-only
+PID/MPC/PPO comparison; it must be frozen and committed before any Test performance access.
 
 ## External Reference
 

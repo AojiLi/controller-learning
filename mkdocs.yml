@@ -10,6 +10,7 @@ nav:
   - Tracks and Race Core: tracks.md
   - Gymnasium and Controllers: environment.md
   - Classical Controllers: controllers.md
+  - PPO Training and Export: ppo.md
   - Development: development.md
 markdown_extensions:
   - admonition
