@@ -2,13 +2,14 @@
 
 Last updated: 2026-07-11
 
-**Status:** v0.1.0 is public and frozen. The v0.1.1 usability release is in development.
+**Status:** v0.1.1 is public. Benchmark `0.1` and its accepted M8 result remain frozen.
 
 ## Main Line
 
-Close the Controller-author loop with informal Validation evaluation and replay commands, then
-improve the public presentation and hosted documentation. The accepted benchmark `0.1` artifacts,
-Test result, and Controller identities remain immutable.
+v0.1.1 closes the Controller-author loop with informal Level 0/Validation evaluation, same-rollout
+trajectory capture, offline replay, evidence-derived interpretation, portfolio-first presentation,
+and hosted documentation. The accepted benchmark `0.1` artifacts, Test result, and Controller
+identities are unchanged.
 
 ## Completed Evidence
 
@@ -55,7 +56,7 @@ Controller timing/lifecycle, and replay gates.
   execution seal, semantic validation, and exactly 24 published artifacts. Attempt 001's original
   transaction hashes remain unchanged.
 
-## Current Work
+## v0.1.1 Release
 
 - `evaluate-controller` now measures trusted plugins on Level 0 or ordered Validation prefixes,
   labels CPU/MJX-Warp scope, records source/Controller identity, writes transactional CSV/JSON, and
@@ -67,13 +68,19 @@ Controller timing/lifecycle, and replay gates.
 - The M8 interpretation script hash-pins seven accepted CSV/NPZ inputs, recomputes their central
   claims, and byte-checks the generated analysis page and distribution figure without Test access.
 - README, MkDocs navigation/metadata, Pages workflow, Controller workflow, stability policy,
-  contribution guide, changelog, and citation metadata are prepared for v0.1.1.
-- Release remains gated on complete local CPU/GPU checks, protected-identity comparison, green
-  GitHub CPU CI/Pages, and anonymous fresh-checkout verification.
+  contribution guide, changelog, and citation metadata ship with v0.1.1.
+- Local verification passed 1,108 CPU tests, all 69 GPU tests, strict docs/actions/package checks,
+  one MJX-Warp Validation-only evaluator smoke, and an anonymous clean-clone Level 0
+  evaluate/replay workflow.
+- All 14 frozen Controller files, all 24 accepted M8 outputs, and five additional protected inputs
+  matched their v0.1.0 SHA-256 identities. Formal M8 Test was not executed.
+- GitHub CPU CI and the Node.js 24 Pages build/deployment passed on `main`; the public HTTPS site and
+  its Controller workflow, analysis, and stability pages returned successfully.
 
 ## Next Step
 
-Run complete local CPU/GPU and release-integrity verification without invoking formal M8 Test.
+No implementation milestone is active. Any v0.2 work requires a separate explicit plan that follows
+the public stability policy and preserves benchmark `0.1` evidence.
 
 ## Risks and Blockers
 
