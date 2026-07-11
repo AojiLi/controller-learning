@@ -374,6 +374,33 @@ def test_frozen_config_loads_and_rejects_type_aliases_and_unknown_keys(tmp_path:
         load_ppo_controller_evaluation_config(path)
 
 
+def test_checked_in_formal_report_and_replay_are_strictly_bound() -> None:
+    from controller_learning.evaluation import load_trajectory_json
+    from controller_learning.rl.artifacts import read_strict_json, sha256_file
+
+    config = load_ppo_controller_evaluation_config(CONFIG_PATH)
+    report = read_strict_json(PROJECT_ROOT, config.report_path)
+    validate_controller_evaluation_report(report, config=config)
+
+    assert report["status"] == "passed"
+    assert report["source"]["preflight"]["revision"] == ("1b434f4128043001722e33899a0a767b8e5cdba7")
+    assert report["evaluation"]["summary"]["success_count"] == 99
+    assert report["controller"]["fresh_instance_count"] == 100
+    assert report["protocol"]["replay_environment_instances"] == 0
+
+    trajectory_record = report["replay"]["trajectory"]["artifact"]
+    trajectory = load_trajectory_json(
+        PROJECT_ROOT / trajectory_record["relative_path"],
+        expected_sha256=trajectory_record["sha256"],
+    )
+    assert trajectory.step_count == report["replay"]["trajectory"]["step_count"]
+
+    overview_record = report["replay"]["overview"]["artifact"]
+    overview_path = PROJECT_ROOT / overview_record["relative_path"]
+    assert overview_path.stat().st_size == overview_record["size_bytes"]
+    assert sha256_file(overview_path) == overview_record["sha256"]
+
+
 def test_replay_rule_is_first_success_else_first_row() -> None:
     rows = [{"track_index": index, "success": index == 7} for index in range(10)]
     assert replay_track_index(rows) == 7
