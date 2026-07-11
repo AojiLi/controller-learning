@@ -620,7 +620,10 @@ def test_run_export_binds_temp_canonical_report_checkpoint_and_fake_exporter(
     shutil.copy2(
         PROJECT_ROOT / "controllers/ppo/controller.py", root / "controllers/ppo/controller.py"
     )
-    shutil.copy2(PROJECT_ROOT / "controllers/ppo/config.toml", root / "controllers/ppo/config.toml")
+    shutil.copy2(
+        PROJECT_ROOT / "tests/fixtures/ppo_unfinalized_config.toml",
+        root / "controllers/ppo/config.toml",
+    )
 
     training_config = root / "configs/ppo.toml"
     training_sha = hashlib.sha256(training_config.read_bytes()).hexdigest()

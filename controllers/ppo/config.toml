@@ -1,21 +1,19 @@
 name = "ppo"
 description = "Torch-free deterministic PPO actor over public local-track features"
 schema_version = 1
-finalized = false
+finalized = true
 
-# This source template deliberately has no policy.npz. The M7 selection/export phase replaces
-# this file atomically with a finalized, hash-bound configuration after choosing a checkpoint.
 [policy]
 file = "policy.npz"
-sha256 = ""
-size_bytes = 0
+sha256 = "f3054e95c6d357f571425ad69b9ac16c713e24b9f09b7768e7a648af84731a4b"
+size_bytes = 120968
 schema_version = 1
 max_size_bytes = 5242880
 
 [metadata]
 file = "metadata.json"
-sha256 = ""
-size_bytes = 0
+sha256 = "514c608cc2ba559316d02e0ec5582abd673a1f3faa2884b7bbb474ed0ec6b425"
+size_bytes = 815
 schema_version = 1
 
 [feature]
@@ -25,10 +23,10 @@ preview_distance_m = 40.0
 max_speed_mps = 15.0
 
 [checkpoint]
-run_id = ""
-update_index = 0
-vector_steps = 0
-valid_transitions = 0
-checkpoint_sha256 = ""
-source_revision = ""
-training_configuration_sha256 = ""
+run_id = "m7-formal-v0-1-001"
+update_index = 70
+vector_steps = 8960
+valid_transitions = 9158458
+checkpoint_sha256 = "26463d0e3e3bde6d75b4dceeb52fc91655db9f9eee6b2f3ec35a49d513479806"
+source_revision = "86f8f384f2ed4ca147bccebca64062ee2021b2f2"
+training_configuration_sha256 = "fa60009423ea438108c8a7e66c3a84b3a8895042fe1a1e9033c1636cfd34e425"

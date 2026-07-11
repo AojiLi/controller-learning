@@ -39,12 +39,14 @@ from controller_learning.tracks.specs import (
 
 PROJECT_ROOT = Path(__file__).parents[3]
 PPO_TEMPLATE = PROJECT_ROOT / "controllers" / "ppo"
+UNFINALIZED_CONFIG = PROJECT_ROOT / "tests" / "fixtures" / "ppo_unfinalized_config.toml"
 
 
 def _copy_template(destination: Path) -> Path:
     destination.mkdir()
-    for name in ("controller.py", "config.toml", "README.md"):
+    for name in ("controller.py", "README.md"):
         shutil.copy2(PPO_TEMPLATE / name, destination / name)
+    shutil.copy2(UNFINALIZED_CONFIG, destination / "config.toml")
     return destination
 
 
@@ -178,14 +180,41 @@ class _OneStepPublicEnv:
         return self.observation, 1.0, True, False, final
 
 
-def test_checked_in_ppo_template_loads_but_refuses_construction_without_weights() -> None:
-    assert not (PPO_TEMPLATE / "policy.npz").exists()
+def test_checked_in_ppo_plugin_is_finalized_hash_bound_and_runnable() -> None:
+    assert (PPO_TEMPLATE / "policy.npz").is_file()
+    assert (PPO_TEMPLATE / "metadata.json").is_file()
     config = load_controller_config(PPO_TEMPLATE)
     controller_class = load_controller(PPO_TEMPLATE)
     observation, info = _observation_and_info()
     public = build_public_controller_config(load_project_config(PROJECT_ROOT), 1, config)
+    controller = controller_class(observation, info, public)
+    action = controller.compute_control(observation, info)
 
     assert controller_class.__name__ == "PpoController"
+    assert config["finalized"] is True
+    assert config["checkpoint"]["run_id"] == "m7-formal-v0-1-001"
+    assert config["checkpoint"]["update_index"] == 70
+    assert (
+        hashlib.sha256((PPO_TEMPLATE / "policy.npz").read_bytes()).hexdigest()
+        == (config["policy"]["sha256"])
+    )
+    assert (
+        hashlib.sha256((PPO_TEMPLATE / "metadata.json").read_bytes()).hexdigest()
+        == (config["metadata"]["sha256"])
+    )
+    assert action.shape == (2,)
+    assert action.dtype == np.float32
+    assert np.isfinite(action).all()
+
+
+def test_unfinalized_ppo_template_refuses_construction_without_weights(tmp_path: Path) -> None:
+    plugin = _copy_template(tmp_path / "ppo")
+    assert not (plugin / "policy.npz").exists()
+    config = load_controller_config(plugin)
+    controller_class = load_controller(plugin)
+    observation, info = _observation_and_info()
+    public = build_public_controller_config(load_project_config(PROJECT_ROOT), 1, config)
+
     assert config["finalized"] is False
     with pytest.raises(PpoControllerNotFinalizedError, match="not finalized"):
         controller_class(observation, info, public)
