@@ -303,6 +303,19 @@ formal selection, one capacity-only diagnostic loaded the Validation asset to in
 shape; it created no environment, ran no policy, and observed no performance. This access is
 disclosed separately from the formal selection, whose own pre-Validation access count was zero.
 
+Reviewed M8 evidence is stored in `benchmarks/v0.1/m8_final_evaluation_report.json`, the central
+comparison CSV/PNG, and the three `results/0.1/<controller>/m8-final-v0-1-002/` directories. The
+accepted clean source is `6095481`. PID completed 20/20 Test Tracks, MPC 20/20, and PPO 19/20; the
+official ranking is PID, MPC, PPO. The run executed 85,874 Environment steps in 2,873.186 seconds,
+recorded zero numerical failures, used 360 MiB peak sampled process VRAM, and ended with zero JAX
+live bytes. Its retained transaction is `COMMITTED` with 60 journal rows, 60 trajectory blobs, a
+typed execution seal, semantic validation, and exactly 24 outputs.
+
+Attempt 001 had loaded Test but stopped during Environment creation before reset, step, Controller
+construction, or performance. Its canonical failure report and unchanged retained transaction bind
+the explicit one-replacement authorization. Attempt 002 is the accepted benchmark `0.1` result;
+later executions are reproductions and no third official attempt is permitted.
+
 ## Experimental Decisions
 
 M1 fixed the physics timestep at 0.005 seconds and proved the standardized actuator mapping on CPU;
@@ -322,9 +335,9 @@ Controller replay protocol. M8's final Test-only PID/MPC/PPO comparison fixes on
 environment, 60 Controller-major episodes, same-row Track/seed identity, typed transition metrics,
 row-zero same-rollout replay, post-close runtime/memory/access evidence, and transactional
 publication. Attempt 001 reached Test loading but failed in Environment creation before reset,
-step, Controller construction, or performance. Attempt 002 retains every performance-affecting
-input and adds only the authorized pre-bind Warp initialization and lineage gates. Its
-implementation must be frozen in a clean commit before the replacement may run.
+step, Controller construction, or performance. Attempt 002 retained every performance-affecting
+input, added only the authorized pre-bind Warp initialization and lineage gates, and completed as
+the accepted result. The M8 performance protocol is now immutable within benchmark `0.1`.
 
 ## External Reference
 

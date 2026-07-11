@@ -130,3 +130,65 @@ The reviewed 1,024-world run completed 10,240,000 transitions at 165,633 transit
 transfer guards passed, every world timed out and autoreset independently in the separate health
 run, no non-finite public value was observed, and steady process VRAM grew by 10 MiB against a
 64 MiB gate. See [Gymnasium and Controller Platform](environment.md) for the full contract.
+
+## M5 Official Track Assets
+
+The normal consumer workflow verifies the committed fixed assets and materializes the ignored
+Train cache from its published manifest:
+
+```bash
+pixi run verify-track-assets
+pixi run materialize-track-pool
+pixi run verify-track-assets -- --require-train-cache
+```
+
+The formal asset-admission and full-pool GPU workflows are retained for source-matched
+reproduction, not routine setup:
+
+```bash
+pixi run -e gpu build-track-assets
+pixi run -e gpu benchmark-track-pool
+```
+
+See [Tracks and Race Core](tracks.md) for the fixed split contract and reviewed M5 evidence.
+
+## M6 Example Controllers
+
+Develop PID and MPC through the same public simulation entry point used by a new plugin:
+
+```bash
+pixi run sim -- --controller controllers/pid --level-id 0 --render
+pixi run sim -- --controller controllers/mpc --level-id 0 --render
+```
+
+The retained formal Validation workflow is `pixi run -e gpu benchmark-controllers`. Its accepted
+report is already published; a later invocation is a reproduction. See
+[Classical Controllers](controllers.md) for the Controller API, design, and timing evidence.
+
+## M7 PPO Training and Export
+
+The four formal stages are deliberately separate:
+
+```bash
+pixi run -e gpu train-ppo
+pixi run -e gpu benchmark-m7-ppo
+pixi run -e gpu export-m7-ppo-controller
+pixi run -e gpu benchmark-m7-ppo-controller
+```
+
+They implement Train-only optimization, one frozen Validation selection, hash-bound NumPy export,
+and ordinary Controller evaluation. The accepted artifacts are already published and must not be
+reselected from Test evidence. See [PPO Training and Export](ppo.md).
+
+## M8 Accepted Test Evaluation
+
+The release-maintainer task remains available for exact-protocol reproduction:
+
+```bash
+pixi run -e gpu benchmark-m8-controllers
+```
+
+Attempt 002 is the accepted benchmark `0.1` result. A later invocation cannot replace it, and no
+third official attempt is allowed. Read [Evaluation Protocol](evaluation.md) and
+[Reproducibility](reproducibility.md) before using the command; routine Controller development must
+stay on Train and Validation.

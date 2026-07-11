@@ -2,14 +2,13 @@
 
 Last updated: 2026-07-11
 
-**Status:** M7 is complete. M8 final evaluation and release work are active.
+**Status:** M8 final evaluation is complete. The v0.1 public release audit is active.
 
 ## Main Line
 
-Freeze and commit the sole authorized zero-episode replacement, then evaluate PID, MPC, and PPO on
-the same fixed-order 20-Track Test split. Attempt 001 loaded Test but failed before Environment
-creation completed, reset, step, Controller construction, or performance observation. Finish
-public documentation and release audits afterward; the repository is still private.
+Publish the accepted M8 artifacts and finish v0.1. Attempt 001's zero-episode infrastructure
+failure is retained and disclosed. Attempt 002 completed the fixed 20-Track comparison and all
+transaction/artifact gates. The repository remains private only until the final release audit.
 
 ## Completed Evidence
 
@@ -45,31 +44,30 @@ public documentation and release audits afterward; the repository is still priva
   does not run Controllers or reveal Test performance.
 
 M7 therefore clears PPO learning, frozen Validation selection, inference-only export, ordinary
-Controller timing/lifecycle, and replay gates. Final Test comparison and release proof remain M8.
+Controller timing/lifecycle, and replay gates.
+
+- M8 attempt 002 completed from clean source `6095481` after the explicitly authorized zero-episode
+  infrastructure replacement. PID completed 20/20 Test Tracks, MPC 20/20, and PPO 19/20; ranking is
+  PID, MPC, PPO.
+- The run executed 85,874 Environment steps in 2,873.186 seconds with zero numerical failures,
+  360 MiB peak sampled process VRAM, and zero final JAX live bytes.
+- The retained transaction is `COMMITTED` with 60 journal rows, 60 trajectory blobs, a typed
+  execution seal, semantic validation, and exactly 24 published artifacts. Attempt 001's original
+  transaction hashes remain unchanged.
 
 ## Current Work
 
-- commit and push attempt 002, its rejection tests, and the canonical attempt 001 failure report;
-- run the sole replacement with the same order/seeds/Controllers on all 20 Test Tracks;
-- publish strict result and replay artifacts without Test-informed tuning or checkpoint changes;
-- complete English README/tutorial/API/reproduction docs, package/privacy cleanup, and release
-  audits;
+- commit the accepted result/replay artifacts, result documentation, and v0.1.0 package metadata;
+- complete the final English documentation, package, privacy, link, and large-file audits;
 - make the repository public only after every v0.1 release gate passes.
 
 ## Next Step
 
-The replacement implementation now passes 1,086 CPU tests, all 69 GPU tests, strict docs/package
-checks, and independent red-team review with no unresolved P0/P1 issue. Complete the final
-privacy/lineage/allowlist audit, commit and push attempt 002, then execute it exactly once from that
-clean revision. No Controller performance has been observed on Test. Attempt 001 is retained at
-`TEST_BOUND` with a 0/60 journal, null execution evidence, one canonical `environment_create`
-failure with `workload=null`, and no outputs. Attempt 002 pre-initializes Warp before Test binding;
-its eligibility gate reproduces the predecessor report byte-for-byte.
+Validate and push the release candidate, make the sanitized repository public, then create the
+`v0.1.0` tag and GitHub release.
 
 ## Risks and Blockers
 
-- Attempt 002 must not run before its complete protocol is committed and pushed.
-- A post-bind attempt 002 failure cannot be retried; a third formal attempt is forbidden.
-- PID, MPC, and PPO artifact/config identities must remain frozen throughout the Test run.
-- Public-release claims remain blocked on final documentation, privacy, package, evidence, and
-  repository-visibility checks.
+- The accepted Test result is immutable; no later reproduction can replace it.
+- Public-release claims remain blocked until final documentation, privacy, package, evidence, and
+  repository-visibility checks pass.

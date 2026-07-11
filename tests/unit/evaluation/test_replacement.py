@@ -34,17 +34,146 @@ def _copy_tree(source: Path, destination: Path, *, ignore_pycache: bool = False)
     shutil.copytree(source, destination, copy_function=shutil.copy2, ignore=ignore)
 
 
+def _canonical_json_bytes(value: object) -> bytes:
+    return (
+        json.dumps(
+            value,
+            allow_nan=False,
+            ensure_ascii=True,
+            separators=(",", ":"),
+            sort_keys=True,
+        )
+        + "\n"
+    ).encode("ascii")
+
+
+def _write_fixture_file(path: Path, payload: bytes, *, mode: int = 0o600) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(payload)
+    path.chmod(mode)
+
+
+def _create_transaction_fixture(root: Path, report: dict[str, object]) -> None:
+    transaction = root / M8_ATTEMPT_001_TRANSACTION_RELATIVE_PATH
+    for relative in (".", "backups", "blobs", "blobs/failures"):
+        directory = transaction if relative == "." else transaction / relative
+        directory.mkdir(parents=True, exist_ok=True)
+        directory.chmod(0o700)
+
+    predecessor = report["predecessor"]
+    transaction_report = report["transaction"]
+    identity = predecessor["identity"]
+    output_paths = [row["path"] for row in transaction_report["outputs"]]
+    created_output_directories = [
+        "results",
+        "results/0.1",
+        "results/0.1/mpc",
+        "results/0.1/mpc/m8-final-v0-1-001",
+        "results/0.1/mpc/m8-final-v0-1-001/selected_replays",
+        "results/0.1/pid",
+        "results/0.1/pid/m8-final-v0-1-001",
+        "results/0.1/pid/m8-final-v0-1-001/selected_replays",
+        "results/0.1/ppo",
+        "results/0.1/ppo/m8-final-v0-1-001",
+        "results/0.1/ppo/m8-final-v0-1-001/selected_replays",
+    ]
+    manifest = {
+        "created_output_directories": created_output_directories,
+        "episode_protocol": {
+            "controller_order": ["pid", "mpc", "ppo"],
+            "expected_record_count": 60,
+            "ordering": "controller_major_then_row_index",
+            "rows_per_controller": 20,
+        },
+        "identity": identity,
+        "output_allowlist": output_paths,
+        "outputs": [
+            {
+                "backup_relative_path": None,
+                "existed": False,
+                "mode": None,
+                "relative_path": path,
+                "sha256": None,
+                "size_bytes": 0,
+            }
+            for path in output_paths
+        ],
+        "recovery_policy": {
+            "accepted_result": "first_complete_protocol_passing_attempt",
+            "automatic_retry_after_test_bound": False,
+            "completed_attempt_finalizes_from_durable_bytes_only": True,
+            "low_performance_can_trigger_retry": False,
+            "partial_publication_restores_originals_before_republish": True,
+        },
+        "schema_version": "controller-learning.m8-attempt-transaction.v2",
+        "transaction_relative_path": M8_ATTEMPT_001_TRANSACTION_RELATIVE_PATH,
+    }
+    manifest_bytes = _canonical_json_bytes(manifest)
+    manifest_sha256 = hashlib.sha256(manifest_bytes).hexdigest()
+    state = {
+        "evidence": None,
+        "identity": identity,
+        "manifest_sha256": manifest_sha256,
+        "phase": "TEST_BOUND",
+        "phase_index": 1,
+        "schema_version": "controller-learning.m8-attempt-transaction.v2",
+    }
+    failure = dict(report["failure"])
+    failure.pop("blob_relative_path")
+    failure_bytes = _canonical_json_bytes(failure)
+    blob_index = {
+        "mode": 0o600,
+        "relative_path": "failures/final-workload.json",
+        "sha256": hashlib.sha256(failure_bytes).hexdigest(),
+        "size_bytes": len(failure_bytes),
+    }
+    payloads = {
+        "blob-index.jsonl": _canonical_json_bytes(blob_index),
+        "blobs/failures/final-workload.json": failure_bytes,
+        "episode-journal.jsonl": b"",
+        "manifest.json": manifest_bytes,
+        "state.json": _canonical_json_bytes(state),
+    }
+    observed_identities = [
+        {
+            "mode": 0o600,
+            "path": path,
+            "sha256": hashlib.sha256(payload).hexdigest(),
+            "size_bytes": len(payload),
+        }
+        for path, payload in payloads.items()
+    ]
+    assert observed_identities == transaction_report["files"]
+    for relative, payload in payloads.items():
+        _write_fixture_file(transaction / relative, payload)
+
+
+def _create_controller_snapshot_fixture(root: Path) -> None:
+    snapshot = root / "runs/m8_final_controller_snapshot"
+    controllers = snapshot / "controllers"
+    controllers.mkdir(parents=True)
+    for controller in ("pid", "mpc", "ppo"):
+        target = controllers / controller
+        _copy_tree(
+            PROJECT_ROOT / "controllers" / controller,
+            target,
+            ignore_pycache=True,
+        )
+        for path in target.iterdir():
+            path.chmod(0o444)
+        target.chmod(0o555)
+    controllers.chmod(0o555)
+    snapshot.chmod(0o555)
+
+
 def _project_fixture(tmp_path: Path) -> Path:
     root = tmp_path / "project"
     root.mkdir(parents=True)
-    _copy_tree(
-        PROJECT_ROOT / M8_ATTEMPT_001_TRANSACTION_RELATIVE_PATH,
-        root / M8_ATTEMPT_001_TRANSACTION_RELATIVE_PATH,
-    )
-    _copy_tree(
-        PROJECT_ROOT / "runs/m8_final_controller_snapshot",
-        root / "runs/m8_final_controller_snapshot",
-    )
+    report_payload = REPORT_PATH.read_bytes()
+    assert hashlib.sha256(report_payload).hexdigest() == REPORT_SHA256
+    report_data = json.loads(report_payload)
+    _create_transaction_fixture(root, report_data)
+    _create_controller_snapshot_fixture(root)
     for controller in ("pid", "mpc", "ppo"):
         _copy_tree(
             PROJECT_ROOT / "controllers" / controller,
@@ -56,7 +185,7 @@ def _project_fixture(tmp_path: Path) -> Path:
     shutil.copy2(PROJECT_ROOT / "configs/final_evaluation.toml", config)
     report = root / M8_ATTEMPT_001_FAILURE_REPORT_RELATIVE_PATH
     report.parent.mkdir(parents=True)
-    shutil.copy2(REPORT_PATH, report)
+    report.write_bytes(report_payload)
     return root
 
 

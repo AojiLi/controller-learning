@@ -4,10 +4,10 @@ Controller Learning benchmark `0.1` compares trusted Controller plugins under on
 four-wheel car, one Level 1 Challenge, and one versioned set of Tracks. Reward is useful for
 training diagnostics, but it is never the ranking score.
 
-The formal M8 Test result is still pending. Attempt 001 loaded the fixed Test pool, then stopped in
+The formal M8 Test result is published. Attempt 001 loaded the fixed Test pool, then stopped in
 Environment creation before reset, stepping, Controller construction, or any performance
-observation. This page documents the frozen attempt 002 protocol; it does not contain or imply
-PID, MPC, or PPO Test performance.
+observation. The sole authorized replacement, attempt 002, completed the unchanged protocol and
+passed all transaction and artifact-integrity gates.
 
 ## Benchmark 0.1 split contract
 
@@ -205,17 +205,43 @@ it does not recursively delete that snapshot during the formal process. A crash 
 to tune, change a Controller, select a different checkpoint, or discard an unfavorable completed
 result.
 
-## Current status
+## Published result
 
-The authorized replacement has not run, and no Test success rate or lap time is currently claimed.
-The release-maintainer command is:
+The accepted run is `m8-final-v0-1-002`, bound to clean source
+`609548199bf1872185d5f9dc5741f3b7795ce77e`.
+
+| Rank | Controller | Success | Mean successful lap | Lateral RMS | Compute P99 | Deadline misses |
+| ---: | --- | ---: | ---: | ---: | ---: | ---: |
+| 1 | PID | 20/20 | 88.085 s | 0.0211 m | 0.340 ms | 0/35,234 |
+| 2 | MPC | 20/20 | 102.563 s | 0.0381 m | 43.902 ms | 40/41,025 |
+| 3 | PPO | 19/20 | 23.913 s | 0.2205 m | 0.281 ms | 0/9,615 |
+
+| Controller | Detailed artifacts |
+| --- | --- |
+| PID | [summary](https://github.com/AojiLi/controller-learning/blob/main/results/0.1/pid/m8-final-v0-1-002/summary.json) · [per-Track CSV](https://github.com/AojiLi/controller-learning/blob/main/results/0.1/pid/m8-final-v0-1-002/results.csv) · [trajectory](https://raw.githubusercontent.com/AojiLi/controller-learning/main/results/0.1/pid/m8-final-v0-1-002/trajectory.png) · [telemetry](https://raw.githubusercontent.com/AojiLi/controller-learning/main/results/0.1/pid/m8-final-v0-1-002/telemetry.png) |
+| MPC | [summary](https://github.com/AojiLi/controller-learning/blob/main/results/0.1/mpc/m8-final-v0-1-002/summary.json) · [per-Track CSV](https://github.com/AojiLi/controller-learning/blob/main/results/0.1/mpc/m8-final-v0-1-002/results.csv) · [trajectory](https://raw.githubusercontent.com/AojiLi/controller-learning/main/results/0.1/mpc/m8-final-v0-1-002/trajectory.png) · [telemetry](https://raw.githubusercontent.com/AojiLi/controller-learning/main/results/0.1/mpc/m8-final-v0-1-002/telemetry.png) |
+| PPO | [summary](https://github.com/AojiLi/controller-learning/blob/main/results/0.1/ppo/m8-final-v0-1-002/summary.json) · [per-Track CSV](https://github.com/AojiLi/controller-learning/blob/main/results/0.1/ppo/m8-final-v0-1-002/results.csv) · [trajectory](https://raw.githubusercontent.com/AojiLi/controller-learning/main/results/0.1/ppo/m8-final-v0-1-002/trajectory.png) · [telemetry](https://raw.githubusercontent.com/AojiLi/controller-learning/main/results/0.1/ppo/m8-final-v0-1-002/telemetry.png) |
+
+PPO's only failure was an off-track termination on Test row 14, Track ID `2000016`. It was faster
+than PID and MPC on successful laps, but ranking considers success rate first. All three Controllers
+passed the diagnostic real-time criterion. The run executed 85,874 Environment steps in 2,873.186
+seconds with zero numerical failures, 360 MiB peak sampled process VRAM, and zero final JAX live
+bytes.
+
+The canonical machine-readable evidence is the
+[global report](https://github.com/AojiLi/controller-learning/blob/main/benchmarks/v0.1/m8_final_evaluation_report.json)
+and
+[comparison CSV](https://github.com/AojiLi/controller-learning/blob/main/benchmarks/v0.1/m8_final_results.csv).
+The predeclared same-rollout Test row-0 comparison is shown below.
+
+![Benchmark 0.1 canonical Test row 0 comparison](https://raw.githubusercontent.com/AojiLi/controller-learning/main/benchmarks/v0.1/m8_test_row_000_comparison.png)
+
+The release-maintainer command remains available for reproduction:
 
 ```bash
 pixi run -e gpu benchmark-m8-controllers
 ```
 
-It is present in the locked Pixi task set, but it must be invoked only from the clean committed
-attempt 002 protocol revision after the local predecessor gate reproduces the published failure
-report exactly. A result is official only after the strict report and all 24 artifacts pass the
-publication gates. See [Reproducibility](reproducibility.md) for the development and release
-workflows.
+The published attempt 002 remains the accepted benchmark `0.1` result. A later invocation is a
+reproduction attempt and cannot replace it. See [Reproducibility](reproducibility.md) for the
+identity and artifact workflow.

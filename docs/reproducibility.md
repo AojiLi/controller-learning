@@ -5,10 +5,11 @@ configuration, Controller files, benchmark manifests, Track IDs, seeds, runtime 
 metric samples, and derived reports. A matching command without those identities is only a similar
 experiment.
 
-Formal Test results are still pending. Attempt 001 loaded Test but failed during Environment
-creation before reset, stepping, Controller construction, or any performance observation. The
-commands and artifact layout below document the single authorized replacement without inventing
-performance.
+The formal Test result is published. Attempt 001 loaded Test but failed during Environment creation
+before reset, stepping, Controller construction, or any performance observation. The sole
+authorized replacement completed from clean source
+`609548199bf1872185d5f9dc5741f3b7795ce77e`; the commands and artifact layout below document that
+evidence chain.
 
 ## Supported platform
 
@@ -87,12 +88,11 @@ The M8 release-maintainer task is:
 pixi run -e gpu benchmark-m8-controllers
 ```
 
-The task is implemented, while its formal Test result is still pending. It must not run until the
-attempt 002 implementation, canonical attempt 001 failure report, and rejection tests are frozen in
-a clean commit; the Controller identities remain fixed; and Validation-only CPU/GPU checks pass.
-Attempt 002 is the sole authorized zero-episode infrastructure replacement. A failure after its
-Test binding cannot be retried, and no third official attempt is allowed. Once an official report
-is published, a local invocation is a reproduction attempt; it cannot replace the accepted result.
+Attempt 002 is the accepted result and the sole authorized zero-episode infrastructure
+replacement. Its transaction is `COMMITTED` with 60 journal records, 60 trajectory blobs, a typed
+post-close execution seal, and 24 semantically validated outputs. A local invocation is now a
+reproduction attempt; it cannot replace the accepted result, and no third official attempt is
+allowed.
 
 ## Author a Controller without Test leakage
 
@@ -132,7 +132,8 @@ later design, report it as a new experiment or benchmark version rather than ove
 
 ## Reproduce the M8 protocol identity
 
-Before the release-maintainer run, record a clean source state:
+For a source-matched reproduction, begin from the accepted source revision and record a clean
+state:
 
 ```bash
 git status --short
@@ -156,6 +157,14 @@ The evaluator uses one shared MJX-Warp batch-one Environment for all 60 canonica
 Controller-major order `PID -> MPC -> PPO`, Test rows and reset seeds `0..19`, and a fresh plugin
 instance for each episode. See [Evaluation Protocol](evaluation.md) for ranking, metrics, replay,
 and crash policy.
+
+The accepted global report has SHA-256
+`4867035ceb7532f3dca190c344e9d2cc82b3aa3c3098d2f7169a5acb75c49e69`. Verify the committed bytes
+before comparing a reproduction:
+
+```bash
+sha256sum benchmarks/v0.1/m8_final_evaluation_report.json
+```
 
 ## Inspect published artifacts
 

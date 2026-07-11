@@ -5,8 +5,9 @@ checkpoint on Validation, and exports that checkpoint as an ordinary single-envi
 Controller. The training path does not replace the four-wheel plant or maintain a second RL
 environment.
 
-M7 is complete, but v0.1 is not: PID, MPC, and PPO have not been formally evaluated on Test, and
-no formal M8 comparison has been published. The final comparison belongs to M8.
+M7 and the final M8 evaluation are complete. The frozen PPO plugin completed 19/20 Test Tracks in
+the accepted comparison; it was not retrained or reselected after Validation. The full result and
+attempt lineage are documented in the [Evaluation Protocol](evaluation.md).
 
 ## End-to-end path
 
@@ -203,5 +204,6 @@ pixi run -e gpu sim -- \
   --render
 ```
 
-Linux x86-64 with an NVIDIA GPU is the only tested M7 platform. macOS, native Windows, and WSL2
-are not yet supported. Test evaluation and the final cross-Controller result table remain M8 work.
+Linux x86-64 with an NVIDIA GPU is the only tested M7/M8 platform. macOS, native Windows, and WSL2
+are not yet supported. The accepted cross-Controller Test table is published in the
+[Evaluation Protocol](evaluation.md).

@@ -1,0 +1,632 @@
+{
+  "benchmark": {
+    "backend": "mjx_warp",
+    "benchmark_version": "0.1",
+    "level_id": 1,
+    "test_track_count": 20
+  },
+  "controller_identity": {
+    "aggregate_sha256": "f0a288515b48ec360e72939e65184d58234b491e917c55bb5dd4e9466150c9bb",
+    "config_sha256": "0aef6eacb4f9882adf0a97d728b210d9c99b09bb694f6792a2ad53d7802281fd",
+    "controller": "mpc",
+    "directory": "controllers/mpc",
+    "files": [
+      {
+        "path": "README.md",
+        "sha256": "c1db7955fc1c2093bb7b5373eaa51ee5191e5688086f53916bc56445aaf040cf",
+        "size_bytes": 1832
+      },
+      {
+        "path": "config.toml",
+        "sha256": "0aef6eacb4f9882adf0a97d728b210d9c99b09bb694f6792a2ad53d7802281fd",
+        "size_bytes": 958
+      },
+      {
+        "path": "controller.py",
+        "sha256": "88575139263c1abcbf5779befaea144db76a9dd239cb1c6f83e33e8f24be082d",
+        "size_bytes": 12590
+      },
+      {
+        "path": "helpers.py",
+        "sha256": "875344f865730883926fc5d036c4518eac3f02169816d8613430dbeaccda852a",
+        "size_bytes": 14867
+      },
+      {
+        "path": "solver.py",
+        "sha256": "a727f7df4548dce7af24f2527a664177aba156d8bdce3d97ac3fde5dd51acdd0",
+        "size_bytes": 24225
+      }
+    ]
+  },
+  "controller_name": "mpc",
+  "dependency_lock": {
+    "media_type": "application/yaml",
+    "relative_path": "pixi.lock",
+    "schema_version": null,
+    "sha256": "c5848ce44dfe12ed2c58efb05e576aed78cc15ecc2833a1c55cd607a6b07bde4",
+    "size_bytes": 152088
+  },
+  "durable_execution_evidence": {
+    "cross_checked": true,
+    "schema_version": "controller-learning.m8-execution-evidence.v1",
+    "sha256": "f3717d1d0a9dae1fe79cf51e1b980a4bbfa1b9445086997d67080b10cf661c5f"
+  },
+  "execution": {
+    "controller_name": "mpc",
+    "controller_wall_time_s": 2035.684004347,
+    "environment_instance_count": 1,
+    "environment_lifecycle": "one_shared_batch_one_environment_all_60_episodes",
+    "environment_steps": 41025,
+    "fresh_controller_instance_count": 20,
+    "initialization_over_soft_limit_rows": [],
+    "measured_environment_lifecycle": {
+      "close_count": 1,
+      "environment_create_wall_time_s": 0.5341885319940047,
+      "environment_instance_count": 1,
+      "expected_reset_count": 60,
+      "expected_step_count": 85874,
+      "first_reset_wall_time_including_lazy_compilation_s": 0.5103042289993027,
+      "first_step_wall_time_including_lazy_compilation_s": 1.5124306279903976,
+      "method": "wall clock around environment construction and the first public reset and step; the first-call timings include any lazy compilation",
+      "reset_count": 60,
+      "schema_version": 1,
+      "step_count": 85874
+    },
+    "numerical_failure_count": 0,
+    "replay_captured_from_same_rollout": true,
+    "replay_row_index": 0,
+    "retry_count": 0,
+    "row_order": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19
+    ],
+    "schema_version": "controller-learning.m8-execution-evidence.v1"
+  },
+  "final_config": {
+    "path": "configs/final_evaluation.toml",
+    "schema_version": "controller-learning.m8-config-evidence.v2",
+    "sha256": "5e5ead637b264ed1dc39298924b3a7d8939a1e65c3e112c97b6dfd24abf67117",
+    "value": {
+      "accepted_result": "first_complete_protocol_passing_replacement_attempt",
+      "aggregate_weighting": "transition_weighted",
+      "automatic_retry_after_test_bound": false,
+      "backend": "mjx_warp",
+      "benchmark_version": "0.1",
+      "comparison_csv_path": "benchmarks/v0.1/m8_final_results.csv",
+      "comparison_png_path": "benchmarks/v0.1/m8_test_row_000_comparison.png",
+      "completed_workload_can_only_finalize_from_durable_journal_and_execution_evidence": true,
+      "compute_deadline_s": 0.05,
+      "control_dt_s": 0.05,
+      "controller_aggregate_sha256": {
+        "mpc": "f0a288515b48ec360e72939e65184d58234b491e917c55bb5dd4e9466150c9bb",
+        "pid": "4f9f63eb2b6c0862fcf3c584f73ae25e9a721fac4cf916e738657b3f6c9c0d71",
+        "ppo": "55720b360d6780704135da4670a1ac35cc13045bb11cb4866e256c494be14f2e"
+      },
+      "controller_config_sha256": {
+        "mpc": "0aef6eacb4f9882adf0a97d728b210d9c99b09bb694f6792a2ad53d7802281fd",
+        "pid": "10d661604ad1cab25bb2073d29aafb16003df3cae59026baef10a10e5e737e47",
+        "ppo": "ee9f09deb5b55f21df90f234d251b79d6dfcdfaf80f7fbf2b7b488c489acf5dc"
+      },
+      "controller_directories": {
+        "mpc": "controllers/mpc",
+        "pid": "controllers/pid",
+        "ppo": "controllers/ppo"
+      },
+      "controller_exception_policy": "invalidate_attempt_preserve_sanitized_evidence_no_automatic_retry",
+      "controller_execution_model": "ordinary_controller_plugin_runner",
+      "controller_frequency_hz": 20,
+      "controller_init_limit_exceeded_policy": "record_soft_diagnostic_and_continue",
+      "controller_init_soft_limit_s": 30.0,
+      "controller_order": [
+        "pid",
+        "mpc",
+        "ppo"
+      ],
+      "controller_seed_rule": "numpy_seedsequence_root_reset_seed_world_0_episode_0_domain_1",
+      "environment_instances": 1,
+      "environment_lifecycle": "one_shared_batch_one_environment_all_60_episodes",
+      "fresh_controller_instance_count": 60,
+      "fresh_controller_per_episode": true,
+      "input_paths": {
+        "m5_track_admission_report": "benchmarks/v0.1/m5_track_admission_report.json",
+        "m6_report": "benchmarks/v0.1/m6_controller_report.json",
+        "m7_controller_report": "benchmarks/v0.1/m7_ppo_controller_evaluation_report.json",
+        "m7_export_report": "benchmarks/v0.1/m7_ppo_export_report.json",
+        "m7_selection_report": "benchmarks/v0.1/m7_ppo_selection_report.json",
+        "m8_attempt_001_failure_report": "benchmarks/v0.1/m8_attempt_001_failure_report.json"
+      },
+      "lateral_error_sample": "post_step_topology_local_centerline_projection",
+      "level_id": 1,
+      "longitudinal_lower_mps2": -8.0,
+      "longitudinal_upper_mps2": 4.0,
+      "max_episode_steps": 4000,
+      "performance_outcome_can_trigger_retry": false,
+      "pre_test_initialization": "warp.init_before_test_bind",
+      "projection_backward_segments": 4,
+      "projection_forward_segments": 12,
+      "ranking_rule": "success_rate_desc_then_mean_successful_lap_time_asc",
+      "realtime_miss_rate_limit": 0.01,
+      "realtime_p99_limit_s": 0.05,
+      "realtime_qualification_required_for_pass": false,
+      "replacement_attempt_limit": 1,
+      "replacement_authorized": true,
+      "replacement_eligibility_rule": "predecessor_test_bound_zero_journal_null_execution_evidence_only_canonical_environment_create_workload_null_failure_no_outputs_seal_or_staged_artifacts",
+      "replacement_failure_report_path": "benchmarks/v0.1/m8_attempt_001_failure_report.json",
+      "replacement_failure_report_sha256": "60bdb6d038b27867b13e1a12455b46e6717d1840bff65f1e072de06692645235",
+      "replacement_of_run_id": "m8-final-v0-1-001",
+      "replay_capture_method": "record_all_canonical_episodes_retain_predeclared_row_zero",
+      "replay_environment_instances": 0,
+      "replay_test_row_index": 0,
+      "report_path": "benchmarks/v0.1/m8_final_evaluation_report.json",
+      "reset_seed_rule": "test_row_index_uint32_reused_for_each_controller",
+      "results_root": "results/0.1",
+      "run_id": "m8-final-v0-1-002",
+      "same_track_and_reset_seed_for_each_controller": true,
+      "saturation_sample": "requested_action_strictly_outside_physical_bounds",
+      "schema_version": 2,
+      "smoothness_sample": "successive_requested_action_delta_per_second_excluding_first_action",
+      "speed_sample": "post_step_body_velocity_norm",
+      "steering_lower_rad": -0.6,
+      "steering_upper_rad": 0.6,
+      "success_rate_pass_gate": false,
+      "test_asset_sha256": "0d654395630ec0b64952b076a2595de96f3926ea208fac3796a50be37df29c71",
+      "test_informed_tuning_allowed": false,
+      "test_manifest_sha256": "2230e29f3e13029d4ca09de32a703e9a80c070e654386563b9ef4f7a2d197f8b",
+      "test_track_count": 20,
+      "third_attempt_allowed": false,
+      "track_order_rule": "official_test_manifest_rows_0_through_19"
+    }
+  },
+  "frozen_input_reports": {
+    "m5_track_admission_report": {
+      "media_type": "application/json",
+      "relative_path": "benchmarks/v0.1/m5_track_admission_report.json",
+      "schema_version": 1,
+      "sha256": "bbae8d242f99e207c56e9eb448c97b72ce65bee87a98cf7d4c5c7af9fbae6494",
+      "size_bytes": 9309303
+    },
+    "m6_report": {
+      "media_type": "application/json",
+      "relative_path": "benchmarks/v0.1/m6_controller_report.json",
+      "schema_version": "controller-learning.m6-controllers.v1",
+      "sha256": "da4ccf1d5f97818f8d91b5da343efa6f807238c6f763cc7ecdd621a04712d195",
+      "size_bytes": 6453880
+    },
+    "m7_controller_report": {
+      "media_type": "application/json",
+      "relative_path": "benchmarks/v0.1/m7_ppo_controller_evaluation_report.json",
+      "schema_version": "controller-learning.m7-ppo-controller-evaluation.v2",
+      "sha256": "aa57d9b9af96a3714fa71c10b71b1bf7877935bd9fef2a6cc2bae3dd36303bbe",
+      "size_bytes": 651842
+    },
+    "m7_export_report": {
+      "media_type": "application/json",
+      "relative_path": "benchmarks/v0.1/m7_ppo_export_report.json",
+      "schema_version": "controller-learning.m7-ppo-controller-export.v1",
+      "sha256": "3b729b752ea32f7253d874bed0a475b7910b8f04891aa37f2b87d9e933011e1b",
+      "size_bytes": 5670
+    },
+    "m7_selection_report": {
+      "media_type": "application/json",
+      "relative_path": "benchmarks/v0.1/m7_ppo_selection_report.json",
+      "schema_version": "controller-learning.m7-ppo-selection-report.v1",
+      "sha256": "a14b7fa4487e8b3471c99f64da5d96931e4b4835e8e602f81ba822089eb35efb",
+      "size_bytes": 173663
+    },
+    "m8_attempt_001_failure_report": {
+      "media_type": "application/json",
+      "relative_path": "benchmarks/v0.1/m8_attempt_001_failure_report.json",
+      "schema_version": "controller-learning.m8-attempt-001-failure.v1",
+      "sha256": "60bdb6d038b27867b13e1a12455b46e6717d1840bff65f1e072de06692645235",
+      "size_bytes": 6573
+    }
+  },
+  "memory": {
+    "final_jax_live_bytes": 0,
+    "peak_jax_allocator_bytes": 67747072,
+    "peak_sampled_process_vram_mib": 360.0,
+    "sample_count": 5,
+    "samples": [
+      {
+        "jax_bytes_in_use": 0,
+        "jax_peak_bytes_in_use": 0,
+        "label": "before_environment_create",
+        "process_vram_mib": 216.0,
+        "synchronized": true
+      },
+      {
+        "jax_bytes_in_use": 676096,
+        "jax_peak_bytes_in_use": 67747072,
+        "label": "after_pid_controller",
+        "process_vram_mib": 360.0,
+        "synchronized": true
+      },
+      {
+        "jax_bytes_in_use": 681472,
+        "jax_peak_bytes_in_use": 67747072,
+        "label": "after_mpc_controller",
+        "process_vram_mib": 360.0,
+        "synchronized": true
+      },
+      {
+        "jax_bytes_in_use": 681984,
+        "jax_peak_bytes_in_use": 67747072,
+        "label": "after_ppo_controller",
+        "process_vram_mib": 360.0,
+        "synchronized": true
+      },
+      {
+        "jax_bytes_in_use": 0,
+        "jax_peak_bytes_in_use": 67747072,
+        "label": "after_environment_close",
+        "process_vram_mib": 360.0,
+        "synchronized": true
+      }
+    ],
+    "sampling_method": "JAX-synchronized selected-process nvidia-smi compute-app memory plus JAX allocator statistics at labelled phase boundaries",
+    "schema_version": 1
+  },
+  "output_artifact_count": 6,
+  "output_artifacts": {
+    "metrics": {
+      "media_type": "application/x-npz",
+      "relative_path": "results/0.1/mpc/m8-final-v0-1-002/metrics.npz",
+      "schema_version": 1,
+      "sha256": "fcb70ab25e5413abe3da7787a9677f06944532a17c9b4cfaa4fb2065c31286c8",
+      "size_bytes": 1398142
+    },
+    "replay_trajectory": {
+      "media_type": "application/json",
+      "relative_path": "results/0.1/mpc/m8-final-v0-1-002/selected_replays/test_row_000_trajectory.json",
+      "schema_version": "controller-learning-trajectory-v1",
+      "sha256": "3c8af51035289b3f4146f9594808285fd2c2a1d423cf1693f6d660daae200fcd",
+      "size_bytes": 451196
+    },
+    "results": {
+      "media_type": "text/csv",
+      "relative_path": "results/0.1/mpc/m8-final-v0-1-002/results.csv",
+      "schema_version": "controller-learning.m8-controller-results.v1",
+      "sha256": "bd561a80f5eb7653361c5306fe67c9a240d99a23a718c0d0d2d450155a2d27ed",
+      "size_bytes": 9752
+    },
+    "summary": {
+      "media_type": "application/json",
+      "relative_path": "results/0.1/mpc/m8-final-v0-1-002/summary.json",
+      "schema_version": "controller-learning.m8-controller-summary.v1",
+      "sha256": "076edf3b79a49208cb940286c3ca68c1288865ab4027475dda73eba00d5ee60e",
+      "size_bytes": 1530
+    },
+    "telemetry": {
+      "media_type": "image/png",
+      "relative_path": "results/0.1/mpc/m8-final-v0-1-002/telemetry.png",
+      "schema_version": null,
+      "sha256": "483247483e211f1a5c43937d6f9dcc1d980294b418f250bd48ff6a5bfe1b59b9",
+      "size_bytes": 109260
+    },
+    "trajectory": {
+      "media_type": "image/png",
+      "relative_path": "results/0.1/mpc/m8-final-v0-1-002/trajectory.png",
+      "schema_version": null,
+      "sha256": "db94da1d5bdd96a9db24b3f73dd8b88e0cb4a559a72f78d701fbc34049e4ee07",
+      "size_bytes": 75633
+    }
+  },
+  "public_controller_seeds": [
+    1745761672,
+    2784763651,
+    348405668,
+    2428393710,
+    514474025,
+    3359974012,
+    1334002942,
+    3640678208,
+    1390887409,
+    1127424140,
+    1448500881,
+    3090160286,
+    1877634677,
+    874276766,
+    1429176578,
+    3867350801,
+    1117496413,
+    396518381,
+    1130517791,
+    547342980
+  ],
+  "public_episode_seeds": [
+    3678467582,
+    1682583155,
+    3486573287,
+    2446314928,
+    3011661447,
+    1749984141,
+    456734374,
+    1235843224,
+    1891050830,
+    1606936470,
+    2281551864,
+    1779521583,
+    1022494931,
+    3555549500,
+    3544123072,
+    1061330360,
+    393510155,
+    1217920362,
+    17838891,
+    2319906299
+  ],
+  "reset_seeds": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19
+  ],
+  "result_summary": {
+    "benchmark_version": "0.1",
+    "controller_lifecycle_timing": {
+      "mean_import_time_s": 0.0090441622,
+      "mean_init_time_s": 0.02687412165
+    },
+    "controller_name": "mpc",
+    "environment_steps": 41025,
+    "mean_successful_lap_time_s": 102.56250190734863,
+    "raw_compute_timing": {
+      "deadline_miss_count": 40,
+      "deadline_miss_rate": 0.0009750152346130408,
+      "deadline_s": 0.05,
+      "max_s": 0.059659482,
+      "p50_s": 0.032362813,
+      "p95_s": 0.039545829799999994,
+      "p99_s": 0.04390225228000002,
+      "sample_count": 41025
+    },
+    "realtime_qualification": {
+      "compute_p99_within_limit": true,
+      "deadline_miss_rate_within_limit": true,
+      "miss_rate_limit": 0.01,
+      "p99_limit_s": 0.05,
+      "qualified": true,
+      "required_for_protocol_pass": false
+    },
+    "schema_version": "controller-learning.m8-controller-summary.v1",
+    "success_count": 20,
+    "success_rate": 1.0,
+    "termination_counts": {
+      "invalid_action": 0,
+      "off_track": 0,
+      "success": 20,
+      "timeout": 0
+    },
+    "track_count": 20,
+    "transition_weighted_metrics": {
+      "acceleration_rate_rms_mps3": 0.5603059305375252,
+      "action_delta_count": 41005,
+      "episode_count": 20,
+      "lateral_error_abs_max_m": 0.0637667343198075,
+      "lateral_error_abs_p95_m": 0.05247364911628254,
+      "lateral_error_rms_m": 0.038110064395098335,
+      "longitudinal_saturation_rate": 0.0,
+      "mean_speed_mps": 4.273110528507644,
+      "steering_rate_rms_rad_s": 0.22569289712195847,
+      "steering_saturation_rate": 0.0,
+      "transition_count": 41025
+    }
+  },
+  "run_id": "m8-final-v0-1-002",
+  "runtime": {
+    "cpu_model": "Intel(R) Core(TM) Ultra 9 275HX",
+    "cuda_device_order": "PCI_BUS_ID",
+    "cuda_driver": "590.48.01",
+    "cuda_runtime": "PJRT C API cuda 12090",
+    "cuda_visible_devices_configured": false,
+    "jax_device": {
+      "device_kind": "NVIDIA GeForce RTX 5070 Ti Laptop GPU",
+      "id": 0,
+      "platform": "gpu"
+    },
+    "kernel": "6.17.0-22-generic",
+    "machine": "x86_64",
+    "packages": {
+      "controller-learning": "0.1.0.dev0",
+      "jax": "0.10.2",
+      "jaxlib": "0.10.2",
+      "matplotlib": "3.11.0",
+      "mujoco": "3.10.0",
+      "mujoco-mjx": "3.10.0",
+      "numpy": "2.4.6",
+      "torch": "2.11.0+cu128",
+      "warp-lang": "1.13.0"
+    },
+    "pixi": {
+      "environment_manager": "pixi",
+      "lock_path": "pixi.lock",
+      "lock_sha256": "c5848ce44dfe12ed2c58efb05e576aed78cc15ecc2833a1c55cd607a6b07bde4"
+    },
+    "platform": "Linux",
+    "python": "3.11.15",
+    "schema_version": 1,
+    "selected_gpu": {
+      "driver_version": "590.48.01",
+      "index": 0,
+      "memory_total_mib": 12227.0,
+      "name": "NVIDIA GeForce RTX 5070 Ti Laptop GPU",
+      "uuid": "redacted"
+    },
+    "xla_python_client_preallocate": "false"
+  },
+  "schema_version": "controller-learning.m8-controller-run-manifest.v2",
+  "source": {
+    "revision": "609548199bf1872185d5f9dc5741f3b7795ce77e",
+    "schema_version": "controller-learning.m8-source-evidence.v1",
+    "worktree_clean": true
+  },
+  "test_access_audit": {
+    "all_track_reads_forbidden": true,
+    "audit_hook_installed_before_preflight": true,
+    "denied_event_count": 0,
+    "denied_mutation_event_count": 0,
+    "denied_mutation_event_types": {},
+    "open_event_counts": {
+      "official_test_asset": 5,
+      "official_test_manifest": 3
+    },
+    "open_event_sequence": [
+      {
+        "category": "official_test_manifest",
+        "flags": 524288,
+        "mode": "r"
+      },
+      {
+        "category": "official_test_manifest",
+        "flags": 524288,
+        "mode": "r"
+      },
+      {
+        "category": "official_test_manifest",
+        "flags": 524288,
+        "mode": "r"
+      },
+      {
+        "category": "official_test_asset",
+        "flags": 524288,
+        "mode": "r"
+      },
+      {
+        "category": "official_test_asset",
+        "flags": 524288,
+        "mode": "r"
+      },
+      {
+        "category": "official_test_asset",
+        "flags": 524288,
+        "mode": "r"
+      },
+      {
+        "category": "official_test_asset",
+        "flags": 524288,
+        "mode": "r"
+      },
+      {
+        "category": "official_test_asset",
+        "flags": 524288,
+        "mode": "r"
+      }
+    ],
+    "opened_path_categories": [
+      "official_test_asset",
+      "official_test_manifest"
+    ],
+    "opened_splits": [
+      "test"
+    ],
+    "pre_test_open_event_count": 0,
+    "schema_version": "controller-learning.m8-test-access-audit.v1",
+    "test_loaded": true,
+    "test_reads_enabled": true,
+    "track_cache_opened": false,
+    "train_opened": false,
+    "validation_opened": false
+  },
+  "test_pool_access": {
+    "asset_file": "test.npz",
+    "asset_file_sha256": "0d654395630ec0b64952b076a2595de96f3926ea208fac3796a50be37df29c71",
+    "benchmark_version": "0.1",
+    "capacity": {
+      "max_checkpoints": 48,
+      "max_track_points": 640
+    },
+    "generator_version": "v0.1",
+    "geometry_hashes_sha256": "e439dfa655185553472e287915329f384bebd9872efec168d4ffccb98e2dba82",
+    "level_id": 1,
+    "loaded_splits": [
+      "test"
+    ],
+    "loader_accessed_train": false,
+    "loader_accessed_validation": false,
+    "manifest_asset_sha256": "0d654395630ec0b64952b076a2595de96f3926ea208fac3796a50be37df29c71",
+    "manifest_file": "test.json",
+    "manifest_sha256": "2230e29f3e13029d4ca09de32a703e9a80c070e654386563b9ef4f7a2d197f8b",
+    "schema_version": "controller-learning.m8-test-pool-access.v1",
+    "split": "test",
+    "track_count": 20,
+    "track_ids": [
+      2000000,
+      2000001,
+      2000002,
+      2000003,
+      2000004,
+      2000005,
+      2000006,
+      2000007,
+      2000008,
+      2000010,
+      2000011,
+      2000013,
+      2000014,
+      2000015,
+      2000016,
+      2000017,
+      2000018,
+      2000020,
+      2000021,
+      2000023
+    ],
+    "track_ids_sha256": "441a899d3eae7dd820c27d46e46ce9786b38444c008d174bc77658fbb6f2d2f6"
+  },
+  "test_track_ids": [
+    2000000,
+    2000001,
+    2000002,
+    2000003,
+    2000004,
+    2000005,
+    2000006,
+    2000007,
+    2000008,
+    2000010,
+    2000011,
+    2000013,
+    2000014,
+    2000015,
+    2000016,
+    2000017,
+    2000018,
+    2000020,
+    2000021,
+    2000023
+  ]
+}

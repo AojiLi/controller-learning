@@ -4,11 +4,10 @@ Last updated: 2026-07-11
 
 ## Current Direction
 
-Execute the sole authorized M8 replacement attempt, then finish release work. Attempt 001 loaded
-the fixed Test pool but stopped during Environment creation before reset, step, Controller
-construction, or performance observation. Attempt 002 retains the frozen comparison and adds only
-pre-bind Warp initialization, predecessor lineage/eligibility gates, and disclosure. M0 through M7
-are complete. Public documentation, cleanup, and repository publication remain pending.
+Finish the v0.1 public release. M0 through M8 are implemented and the sole authorized final Test
+replacement is `COMMITTED`. Attempt 001's zero-episode infrastructure failure and attempt 002's
+accepted result are both disclosed. Release documentation, package metadata, artifact/privacy
+audits, repository visibility, and the v0.1 tag/release remain.
 
 ## M7 Handoff Evidence
 
@@ -40,18 +39,17 @@ ordinary Controller evaluation/replay. It does not provide final Test comparison
 
 ## Current Narrow Focus
 
-1. Freeze, validate, commit, and push attempt 002 plus the canonical attempt 001 failure report.
-   Prove the retained predecessor remains byte-identical and eligible before any new Test access.
-2. Run attempt 002 exactly once over the same 20 fixed Test Tracks and persist the strict report
-   and selected replay artifacts without tuning from Test results. A third attempt is forbidden.
-3. Finish English public documentation, release/package/privacy audits, and the v0.1 cleanup
-   checklist. Make the repository public only after all release gates pass.
+1. Commit the 24 accepted formal outputs with the result documentation and v0.1.0 package metadata.
+2. Re-run CPU CI/package/docs checks and complete the final Git/privacy/large-file/link audit.
+3. Push the release candidate, change the sanitized repository to public, record that final state,
+   and create the `v0.1.0` tag and GitHub release.
 
-The attempt 002 implementation passes the complete 1,086-test CPU suite, all 69 GPU tests, strict
-documentation, package, and GitHub Actions checks. Independent red-team review found no unresolved
-P0/P1 issue. The remaining accepted P2 threat boundary concerns hostile concurrent replacement of
-intermediate parent directories; the trusted single-process release-maintainer model and CLI
-symlink gates remain the declared v0.1 boundary.
+The attempt 002 implementation passes the complete 1,086-test local CPU suite, all 69 GPU tests,
+strict documentation/package checks, and GitHub Actions syntax validation. Independent red-team
+review found no unresolved protocol P0/P1 issue. The release candidate still requires a green
+clean-checkout GitHub CPU CI run. The remaining accepted P2 threat boundary concerns hostile
+concurrent replacement of intermediate parent directories; the trusted single-process
+release-maintainer model and CLI symlink gates remain the declared v0.1 boundary.
 
 The attempt 002 boundary installs a Test-only audit guard before project imports, captures a
 read-only hash-bound snapshot of every Controller, uses one environment for the fixed 60-episode
@@ -68,6 +66,13 @@ sanitized `environment_create` failure with `workload=null`. It loaded Test geom
 create an environment, reset, step, instantiate a Controller, or observe performance. Its
 transaction and original Controller snapshot remain read-only. The canonical failure report binds
 their hashes and authorizes only attempt 002.
+
+Attempt 002 completed 60/60 durable episodes from clean source `6095481`: PID succeeded on 20/20
+Test Tracks, MPC on 20/20, and PPO on 19/20. The accepted ranking is PID, MPC, PPO. The run used
+85,874 Environment steps over 2,873.186 seconds, recorded zero numerical failures, peaked at
+360 MiB sampled process VRAM, and returned JAX live bytes to zero. Its transaction contains 60
+journal rows, 60 trajectory blobs, a typed execution seal, 24 exact outputs, semantic validation,
+and durable `COMMITTED` state. No further official Test attempt is permitted.
 
 ## Scope Boundaries
 
@@ -94,14 +99,12 @@ Out of scope:
   selection phase. Test results may be reported but may not feed back into v0.1 Controller changes.
 - PID, MPC, and PPO must use the ordinary Controller interface and the same formal four-wheel
   MJX-Warp Challenge; no Controller-specific environment path is permitted.
-- No Test performance has been observed. Attempt 001's Test load and zero-episode failure are
-  disclosed; attempt 002 must be in a clean committed revision before it runs.
-- Attempt 002 runs once across all three Controllers and 20 Tracks. Its post-bind failure must be
-  retained and cannot be converted into a retry; no third formal attempt is allowed.
+- Attempt 002 is the accepted benchmark `0.1` result. Later invocations are reproductions and may
+  not replace it; no third official attempt is allowed.
 - Repository visibility remains private until final docs, privacy, package, evidence, and release
   checks pass.
 
 ## Next Step
 
-Complete the final privacy/lineage/allowlist audit, commit and push attempt 002, then execute it
-exactly once from that clean revision.
+Commit and validate the release candidate, publish the sanitized repository, then tag and release
+v0.1.0.

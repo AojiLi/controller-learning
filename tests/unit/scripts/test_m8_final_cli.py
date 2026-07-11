@@ -392,6 +392,7 @@ def test_private_guard_requires_audit_response_and_is_consumed_once(
     )
     guard = guard_type()
     monkeypatch.setattr(cli_module, "_assert_project_not_imported", lambda: None)
+    monkeypatch.setattr(cli_module, "_active_attempt_transaction_exists", lambda _root: False)
     cli_module._BOOTSTRAP_STATE = cli_module._BootstrapState(
         guard=guard,
         guard_class=guard_type,

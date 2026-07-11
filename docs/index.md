@@ -3,14 +3,15 @@
 Controller Learning is a GPU-parallel race-car control benchmark with procedurally generated
 tracks, pluggable Controllers, and reproducible evaluation.
 
-The project is being implemented through explicit milestone gates. Published documentation will
-only claim features and performance that have passed their corresponding tests and benchmarks.
+The project was implemented through explicit milestone gates. Published documentation only claims
+features and performance that passed their corresponding tests and benchmarks.
 
-M7 is complete: PPO trained on the official 1,024-world vector environment, a frozen Validation
+M8 is complete. PPO trained on the official 1,024-world vector environment, a frozen Validation
 selection chose update 70 at 95/100 successes against a 0/100 seeded-random baseline, and the
 Torch-free exported plugin completed 99/100 Validation Tracks through the ordinary batch-one
-Controller Runner. PID, MPC, and PPO have not been formally evaluated on Test, and no formal M8
-comparison has been published; final evaluation and release remain pending.
+Controller Runner. The final fixed Test comparison then completed 20/20 Tracks for PID, 20/20 for
+MPC, and 19/20 for PPO. See the [Evaluation Protocol](evaluation.md) for the accepted result,
+attempt lineage, metrics, and artifacts.
 
 ## Design Principles
 

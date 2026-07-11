@@ -1,0 +1,51 @@
+{
+  "benchmark_version": "0.1",
+  "controller_lifecycle_timing": {
+    "mean_import_time_s": 0.0037724790500000003,
+    "mean_init_time_s": 0.00028767945
+  },
+  "controller_name": "pid",
+  "environment_steps": 35234,
+  "mean_successful_lap_time_s": 88.08500175476074,
+  "raw_compute_timing": {
+    "deadline_miss_count": 0,
+    "deadline_miss_rate": 0.0,
+    "deadline_s": 0.05,
+    "max_s": 0.000755682,
+    "p50_s": 0.0002703615,
+    "p95_s": 0.00033586069999999997,
+    "p99_s": 0.00034043469,
+    "sample_count": 35234
+  },
+  "realtime_qualification": {
+    "compute_p99_within_limit": true,
+    "deadline_miss_rate_within_limit": true,
+    "miss_rate_limit": 0.01,
+    "p99_limit_s": 0.05,
+    "qualified": true,
+    "required_for_protocol_pass": false
+  },
+  "schema_version": "controller-learning.m8-controller-summary.v1",
+  "success_count": 20,
+  "success_rate": 1.0,
+  "termination_counts": {
+    "invalid_action": 0,
+    "off_track": 0,
+    "success": 20,
+    "timeout": 0
+  },
+  "track_count": 20,
+  "transition_weighted_metrics": {
+    "acceleration_rate_rms_mps3": 0.33543464337234996,
+    "action_delta_count": 35214,
+    "episode_count": 20,
+    "lateral_error_abs_max_m": 0.10369834185137719,
+    "lateral_error_abs_p95_m": 0.04198664600248863,
+    "lateral_error_rms_m": 0.021095358579857244,
+    "longitudinal_saturation_rate": 0.0,
+    "mean_speed_mps": 4.973925773873391,
+    "steering_rate_rms_rad_s": 0.3072635847406031,
+    "steering_saturation_rate": 0.0,
+    "transition_count": 35234
+  }
+}

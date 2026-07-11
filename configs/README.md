@@ -65,8 +65,8 @@ The release-maintainer task is:
 pixi run -e gpu benchmark-m8-controllers
 ```
 
-No formal Test result has been published yet. Attempt 001 loaded Test but stopped during
-Environment creation before reset, stepping, Controller construction, or performance observation.
-The task is not a tuning loop: Controllers, learned assets, configuration, dependencies, and
-source are unchanged for the single authorized replacement. An undesirable performance result
-cannot trigger a retry or a v0.1 Controller change.
+Attempt 002 completed the formal Test protocol from clean source
+`609548199bf1872185d5f9dc5741f3b7795ce77e`. PID and MPC completed 20/20 Tracks; PPO completed
+19/20. Attempt 001's zero-episode failure and attempt 002's accepted result are both published. The
+task is not a tuning loop: a later invocation is only a reproduction and cannot replace the
+accepted benchmark `0.1` result.

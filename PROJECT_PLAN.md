@@ -1,6 +1,6 @@
 # Controller Learning 项目计划（v0.1）
 
-> 状态：v0.1 架构与范围已确认，正在按 M0 → M8 实施（进度见 STATUS.md）
+> 状态：M0 → M8 实施与正式评测已完成，正在执行 v0.1 公开发布审计（进度见 STATUS.md）
 >
 > GitHub 仓库：controller-learning（开发阶段 private，v0.1 完成后 public）
 >
