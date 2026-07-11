@@ -4,10 +4,10 @@ Last updated: 2026-07-11
 
 ## Current Direction
 
-Preserve the completed v0.1 release. M0 through M8 are implemented, the sole authorized final Test
-replacement is `COMMITTED`, and the repository is public. Attempt 001's zero-episode infrastructure
-failure and attempt 002's accepted result are both disclosed. Documentation, package metadata,
-artifact/privacy audits, local validation, and clean-checkout GitHub CPU CI are complete.
+Build v0.1.1 as a maintenance release that closes the public Controller-author workflow and improves
+the portfolio presentation without changing benchmark `0.1`. The accepted M8 result, Test assets,
+formal configuration, and PID/MPC/PPO Controller identities are frozen. No formal Test execution is
+permitted during this work.
 
 ## M7 Handoff Evidence
 
@@ -39,11 +39,17 @@ ordinary Controller evaluation/replay. It does not provide final Test comparison
 
 ## Current Narrow Focus
 
-1. Keep benchmark `0.1` and its accepted Test result immutable.
-2. Preserve the public Controller and Challenge contracts for v0.1 maintenance.
-3. Start a future version only after its scope and compatibility policy are explicitly planned.
+The v0.1.1 implementation is complete: informal Level 0/Validation evaluation, same-rollout
+trajectory capture, strict offline replay, hash-pinned M8 interpretation, README restructuring,
+Pages configuration, contribution/citation metadata, and the public stability policy are present.
+The current work is release verification:
 
-The released implementation passes the complete 1,086-test local CPU suite, all 69 GPU tests,
+1. run the complete CPU and GPU checks without formal Test;
+2. prove every v0.1.0 Controller and accepted M8 artifact identity is unchanged; and
+3. publish only after GitHub CPU CI and Pages deployment are green, then verify v0.1.1 from an
+   anonymous fresh checkout.
+
+The v0.1.0 baseline passes the complete 1,086-test local CPU suite, all 69 GPU tests,
 strict documentation/package checks, and GitHub Actions syntax validation. The public release
 commit also passed clean-checkout GitHub CPU CI. Independent red-team review found no unresolved
 protocol P0/P1 issue. The remaining accepted P2 threat boundary concerns hostile concurrent
@@ -105,4 +111,5 @@ Out of scope:
 
 ## Next Step
 
-No v0.1 implementation step remains. Define a separate plan before starting post-v0.1 scope.
+Run the complete local CPU/GPU, privacy, package, and protected-identity verification suite. Do not
+invoke the formal M8 command.

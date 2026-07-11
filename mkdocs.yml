@@ -1,10 +1,20 @@
 site_name: Controller Learning
 site_description: A GPU-parallel race car control benchmark
-repo_name: controller-learning
+site_author: Aoji Li
+site_url: https://aojili.github.io/controller-learning/
+repo_name: AojiLi/controller-learning
+repo_url: https://github.com/AojiLi/controller-learning
+edit_uri: edit/main/docs/
+copyright: Copyright &copy; 2026 Aoji Li
 theme:
   name: material
+  features:
+    - content.code.copy
+    - navigation.sections
+    - navigation.top
 nav:
   - Home: index.md
+  - Controller Workflow: getting-started.md
   - CPU Vehicle: vehicle.md
   - GPU Vehicle: gpu.md
   - Tracks and Race Core: tracks.md
@@ -12,7 +22,9 @@ nav:
   - Classical Controllers: controllers.md
   - PPO Training and Export: ppo.md
   - Evaluation Protocol: evaluation.md
+  - Result Interpretation: analysis.md
   - Reproducibility: reproducibility.md
+  - Stability and Versioning: stability.md
   - Development: development.md
 markdown_extensions:
   - admonition
