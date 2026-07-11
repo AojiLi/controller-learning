@@ -746,7 +746,7 @@ Weights & Biases 仅作为可选功能，不要求账号和网络。
 - Level 1：v0.1 正式 Benchmark。
 - 公开固定 Test 几何：至少 20 条。
 - 每个 Controller 使用完全相同的测试顺序。
-- Controller seed 由 episode seed 确定性派生。
+- Episode seed 和 Controller seed 由同一 reset/root seed 通过独立 randomness domain 确定性派生。
 - 正式单 Controller 评测逐赛道执行，不使用批量 Controller API。
 
 ### 15.2 排名
@@ -793,6 +793,7 @@ results/<benchmark_version>/<controller>/<run_id>/
 ├── results.csv
 ├── summary.json
 ├── run_manifest.json
+├── metrics.npz
 ├── trajectory.png
 ├── telemetry.png
 └── selected_replays/
@@ -831,7 +832,9 @@ v0.1 主要使用高质量 2D 俯视 replay：
 
 MuJoCo 3D Viewer 只用于检查车辆关节、车轮接触和姿态。
 
-正式 20-track 评测默认 headless。评测结束后选择成功/失败 track 单独 replay 和录制 MP4/GIF。
+正式 20-track 评测默认 headless。v0.1 正式发布只保留事先声明的 Test row 0 同次
+rollout replay；任何根据成功/失败结果后选的额外可视化都不属于 benchmark 0.1
+正式 allowlist。
 
 完整 3D 随机赛道是 Future Work，不阻塞 v0.1。
 

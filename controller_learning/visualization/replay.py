@@ -137,6 +137,17 @@ def write_trajectory_overview_png(
     if path.suffix.lower() != ".png":
         raise ValueError("overview output_path must use the .png suffix")
 
+    content = render_trajectory_overview_png(trajectory)
+    indices = tuple(range(trajectory.frame_count))
+    return _artifact(path, content, trajectory, indices)
+
+
+def render_trajectory_overview_png(trajectory: EpisodeTrajectory) -> bytes:
+    """Return deterministic top-down trajectory overview PNG bytes."""
+
+    if not isinstance(trajectory, EpisodeTrajectory):
+        raise TypeError("trajectory must be an EpisodeTrajectory")
+
     centerline, left_boundary, right_boundary = _valid_track_geometry(trajectory)
     figure = Figure(figsize=(8.0, 6.0), dpi=100, facecolor="white")
     FigureCanvasAgg(figure)
@@ -203,11 +214,13 @@ def write_trajectory_overview_png(
     )
     content = output.getvalue()
     figure.clear()
-    indices = tuple(range(trajectory.frame_count))
-    return _artifact(path, content, trajectory, indices)
+    if not content.startswith(b"\x89PNG\r\n\x1a\n"):
+        raise RuntimeError("Matplotlib did not produce a PNG artifact")
+    return content
 
 
 __all__ = [
     "ReplayArtifact",
+    "render_trajectory_overview_png",
     "write_trajectory_overview_png",
 ]

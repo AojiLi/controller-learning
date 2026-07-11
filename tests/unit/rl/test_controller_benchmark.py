@@ -292,7 +292,7 @@ def _report() -> tuple[object, dict[str, object]]:
                 "index": 0,
                 "memory_total_mib": 16_384.0,
                 "name": "fake GPU",
-                "uuid": "GPU-01234567-89ab-cdef-0123-456789abcdef",
+                "uuid": "redacted",
             },
             "xla_python_client_preallocate": "false",
         },

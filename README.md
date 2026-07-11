@@ -10,8 +10,9 @@ product.
 
 > **Project status:** M7 is complete. PPO trained through the official 1,024-world vector
 > environment, passed frozen Validation selection, and was exported as an ordinary Torch-free
-> Controller plugin. No Controller has been evaluated on Test and Test performance remains
-> unopened; M8 final evaluation and public v0.1 release remain pending.
+> Controller plugin. The M8 Test-only comparison protocol and public documentation are being
+> prepared. PID, MPC, and PPO have not been formally evaluated on Test, and no formal Test
+> comparison has been published. The public v0.1 release remains pending.
 
 Reviewed machine-readable evidence is available in the
 [M1 CPU report](benchmarks/v0.1/m1_cpu_report.json) and
@@ -55,6 +56,10 @@ The [Classical Controllers tutorial](docs/controllers.md) explains the Controlle
 observation-only geometry, PID and MPC designs, DebugDraw output, and timing interpretation.
 The [PPO tutorial](docs/ppo.md) covers the official training stack, DLPack exchange, NEXT_STEP
 rollout masks, frozen checkpoint selection, NumPy export, and replay.
+The [Evaluation Protocol](docs/evaluation.md) defines the fixed M8 PID/MPC/PPO comparison, ranking,
+metrics, same-rollout replay, and one-shot attempt policy. The
+[Reproducibility Guide](docs/reproducibility.md) separates CPU development from formal NVIDIA GPU
+work and explains how to add a Controller without tuning on Test.
 
 ## Development Setup
 
@@ -62,9 +67,7 @@ Pixi is the only supported environment workflow for v0.1.
 
 ```bash
 pixi install
-pixi run tests
-pixi run lint
-pixi run docs
+pixi run ci
 ```
 
 Run the template Controller through one complete development episode:
@@ -84,6 +87,25 @@ pixi run -e gpu gpu-tests
 
 These commands are verified as part of M0. Linux x86-64 with glibc 2.28 or newer is the only
 supported v0.1 platform; macOS, native Windows, and WSL2 are future work.
+
+## Add a Controller
+
+Start from `controllers/template`, keep algorithm-specific settings in the plugin's `config.toml`,
+and implement the public `Controller` lifecycle. A plugin may use public observations, restricted
+info, immutable public configuration, and write-only `DebugDraw`; it cannot read Environment,
+Race Core, TrackPool, or simulator internals.
+
+Develop first on Level 0 or generated Level 1 seeds:
+
+```bash
+cp -R controllers/template controllers/my_controller
+pixi run sim -- --controller controllers/my_controller --level-id 0 --render
+pixi run sim -- --controller controllers/my_controller --level-id 1 --track-seed 42
+```
+
+Use Train for learning and Validation for selection. Benchmark `0.1` Test is reserved for final
+reporting and must not drive tuning, checkpoint selection, or Controller changes. See the
+[Reproducibility Guide](docs/reproducibility.md) for the full workflow.
 
 ## Architecture
 
@@ -230,6 +252,32 @@ The published replay is Validation row 0 (Track ID `1000000`), captured directly
 See [PPO: GPU Training to Controller Plugin](docs/ppo.md) for the method, commands, artifact chain,
 and measurement scope. Final Test evaluation and the PID/MPC/PPO comparison remain M8 work.
 
+## M8 Final Evaluation Protocol — Results Pending
+
+The frozen design evaluates PID, MPC, and PPO in that order on Test manifest rows 0 through 19.
+All 60 episodes use one shared batch-one MJX-Warp Environment; each episode receives a fresh plugin
+instance. Every Controller sees the same Track order and reset seeds `0..19`, with independent
+Controller seeds derived by the public domain-separated `SeedSequence` contract. The same row
+therefore produces the same Controller seed for all three algorithms, while the episode and
+Controller randomness domains remain separate.
+
+Ranking is success rate descending, then mean successful lap time ascending. There is no combined
+score and no minimum success-rate release gate. The evaluator also records tracking error, speed,
+raw requested-action saturation and smoothness, Controller compute timing, failure causes, and
+per-Track results. The predeclared replay is Test row 0 for every Controller and is retained from
+the canonical measured rollout—never from a second simulation or an outcome-selected episode.
+
+The formal release-maintainer command is:
+
+```bash
+pixi run -e gpu benchmark-m8-controllers
+```
+
+The command is not a tuning loop and is not routine development tooling. It requires a clean
+committed source revision, crosses an irreversible Test boundary, and refuses automatic retry.
+No formal Test result is published yet. See the [Evaluation Protocol](docs/evaluation.md) for exact
+definitions and crash/retry behavior.
+
 ## Roadmap
 
 The implementation follows strict milestone gates:
@@ -242,7 +290,8 @@ The implementation follows strict milestone gates:
 - M5: Level 0/1 and versioned track pools — complete
 - M6: PID and MPC — complete
 - M7: PPO on the official vector environment — complete
-- M8: final Test evaluation, public documentation, and v0.1 release — pending
+- M8: frozen final Test evaluation, public documentation, and v0.1 release — active; Test results
+  pending
 
 The detailed confirmed design is recorded in [PROJECT_PLAN.md](PROJECT_PLAN.md).
 

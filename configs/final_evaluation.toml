@@ -1,0 +1,87 @@
+schema_version = 1
+run_id = "m8-final-v0-1-001"
+
+[protocol]
+benchmark_version = "0.1"
+level_id = 1
+backend = "mjx_warp"
+test_track_count = 20
+controller_order = ["pid", "mpc", "ppo"]
+reset_seed_rule = "test_row_index_uint32_reused_for_each_controller"
+controller_seed_rule = "numpy_seedsequence_root_reset_seed_world_0_episode_0_domain_1"
+track_order_rule = "official_test_manifest_rows_0_through_19"
+controller_execution_model = "ordinary_controller_plugin_runner"
+environment_lifecycle = "one_shared_batch_one_environment_all_60_episodes"
+max_episode_steps = 4000
+environment_instances = 1
+fresh_controller_per_episode = true
+fresh_controller_instance_count = 60
+same_track_and_reset_seed_for_each_controller = true
+controller_frequency_hz = 20
+compute_deadline_s = 0.05
+controller_init_soft_limit_s = 30.0
+realtime_p99_limit_s = 0.05
+realtime_miss_rate_limit = 0.01
+realtime_qualification_required_for_pass = false
+controller_exception_policy = "invalidate_attempt_preserve_sanitized_evidence_no_automatic_retry"
+controller_init_limit_exceeded_policy = "record_soft_diagnostic_and_continue"
+ranking_rule = "success_rate_desc_then_mean_successful_lap_time_asc"
+test_informed_tuning_allowed = false
+success_rate_pass_gate = false
+
+[metrics]
+projection_backward_segments = 4
+projection_forward_segments = 12
+speed_sample = "post_step_body_velocity_norm"
+lateral_error_sample = "post_step_topology_local_centerline_projection"
+saturation_sample = "requested_action_strictly_outside_physical_bounds"
+smoothness_sample = "successive_requested_action_delta_per_second_excluding_first_action"
+aggregate_weighting = "transition_weighted"
+control_dt_s = 0.05
+steering_lower_rad = -0.6
+steering_upper_rad = 0.6
+longitudinal_lower_mps2 = -8.0
+longitudinal_upper_mps2 = 4.0
+
+[replay]
+test_row_index = 0
+capture_method = "record_all_canonical_episodes_retain_predeclared_row_zero"
+replay_environment_instances = 0
+
+[retry]
+accepted_result = "first_complete_protocol_passing_attempt"
+automatic_retry_after_test_bound = false
+performance_outcome_can_trigger_retry = false
+completed_workload_can_only_finalize_from_durable_journal_and_execution_evidence = true
+
+[controllers.pid]
+directory = "controllers/pid"
+aggregate_sha256 = "4f9f63eb2b6c0862fcf3c584f73ae25e9a721fac4cf916e738657b3f6c9c0d71"
+config_sha256 = "10d661604ad1cab25bb2073d29aafb16003df3cae59026baef10a10e5e737e47"
+
+[controllers.mpc]
+directory = "controllers/mpc"
+aggregate_sha256 = "f0a288515b48ec360e72939e65184d58234b491e917c55bb5dd4e9466150c9bb"
+config_sha256 = "0aef6eacb4f9882adf0a97d728b210d9c99b09bb694f6792a2ad53d7802281fd"
+
+[controllers.ppo]
+directory = "controllers/ppo"
+aggregate_sha256 = "55720b360d6780704135da4670a1ac35cc13045bb11cb4866e256c494be14f2e"
+config_sha256 = "ee9f09deb5b55f21df90f234d251b79d6dfcdfaf80f7fbf2b7b488c489acf5dc"
+
+[test_assets]
+manifest_sha256 = "2230e29f3e13029d4ca09de32a703e9a80c070e654386563b9ef4f7a2d197f8b"
+asset_sha256 = "0d654395630ec0b64952b076a2595de96f3926ea208fac3796a50be37df29c71"
+
+[inputs]
+m5_track_admission_report = "benchmarks/v0.1/m5_track_admission_report.json"
+m6_report = "benchmarks/v0.1/m6_controller_report.json"
+m7_selection_report = "benchmarks/v0.1/m7_ppo_selection_report.json"
+m7_export_report = "benchmarks/v0.1/m7_ppo_export_report.json"
+m7_controller_report = "benchmarks/v0.1/m7_ppo_controller_evaluation_report.json"
+
+[outputs]
+results_root = "results/0.1"
+report_path = "benchmarks/v0.1/m8_final_evaluation_report.json"
+comparison_csv_path = "benchmarks/v0.1/m8_final_results.csv"
+comparison_png_path = "benchmarks/v0.1/m8_test_row_000_comparison.png"

@@ -518,7 +518,7 @@ def _runtime_evidence(jax_module: Any) -> tuple[dict[str, Any], str]:
                 "index": int(selected[0]),
                 "memory_total_mib": float(selected[4]),
                 "name": selected[2],
-                "uuid": selected[1],
+                "uuid": "redacted",
             },
             "xla_python_client_preallocate": os.environ.get("XLA_PYTHON_CLIENT_PREALLOCATE"),
         },

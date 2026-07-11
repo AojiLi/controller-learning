@@ -9,8 +9,8 @@ only claim features and performance that have passed their corresponding tests a
 M7 is complete: PPO trained on the official 1,024-world vector environment, a frozen Validation
 selection chose update 70 at 95/100 successes against a 0/100 seeded-random baseline, and the
 Torch-free exported plugin completed 99/100 Validation Tracks through the ordinary batch-one
-Controller Runner. No Controller has been evaluated on Test and Test performance remains unopened;
-M8 final evaluation and release remain pending.
+Controller Runner. PID, MPC, and PPO have not been formally evaluated on Test, and no formal M8
+comparison has been published; final evaluation and release remain pending.
 
 ## Design Principles
 

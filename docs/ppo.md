@@ -5,8 +5,8 @@ checkpoint on Validation, and exports that checkpoint as an ordinary single-envi
 Controller. The training path does not replace the four-wheel plant or maintain a second RL
 environment.
 
-M7 is complete, but v0.1 is not: no Controller has been evaluated on Test and Test performance
-remains unopened. The final PID, MPC, and PPO comparison belongs to M8.
+M7 is complete, but v0.1 is not: PID, MPC, and PPO have not been formally evaluated on Test, and
+no formal M8 comparison has been published. The final comparison belongs to M8.
 
 ## End-to-end path
 

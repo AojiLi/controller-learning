@@ -39,16 +39,24 @@ ordinary Controller evaluation/replay. It does not provide final Test comparison
 
 ## Current Narrow Focus
 
-1. Specify the one-shot M8 Test protocol completely: fixed 20-Track order, reset and Controller
-   seeds, PID/MPC/PPO artifact identities, environment lifecycle, metrics, timing, replay selection,
-   memory/numerical gates, output paths, and rollback behavior.
-2. Add validators and tests that prove the protocol rejects dirty source, configuration drift,
-   split leakage, reordered rows, Controller mutation, incomplete metrics, and partial publication.
-3. Freeze and commit the protocol plus configuration while Test performance remains unopened.
-4. Run one formal PID/MPC/PPO evaluation over the same 20 fixed Test Tracks and persist the strict
+1. Freeze and commit the now-implemented protocol plus configuration while Test performance remains
+   unopened. The repository-wide CPU CI passes 1,055 tests, and the Linux/NVIDIA GPU environment plus
+   Validation-only racing/PPO Controller smoke tests pass.
+2. Run one formal PID/MPC/PPO evaluation over the same 20 fixed Test Tracks and persist the strict
    report and selected replay artifacts without tuning from Test results.
-5. Finish English public documentation, release/package/privacy audits, and the v0.1 cleanup
+3. Finish English public documentation, release/package/privacy audits, and the v0.1 cleanup
    checklist. Make the repository public only after all release gates pass.
+
+The implemented boundary installs a Test-only audit guard before project imports, captures a
+read-only hash-bound snapshot of every Controller, uses one environment for the fixed 60-episode
+order, fsyncs each canonical trajectory/journal pair, and requires a typed post-close execution
+seal before deterministic artifact construction can recover. Exactly 24 outputs must pass semantic
+recomputation before transactional publication. The durable `COMMITTED` transaction is retained,
+and the runtime Controller snapshot is atomically quarantined under ignored `runs/` after
+publication so an interrupted cleanup remains recoverable without rerunning Test. Test-pool loading
+then closes all Track reads and all process creation except the fixed `nvidia-smi` VRAM query.
+Independent red-team review drove the PID-binding, nested-seal, journal-reload,
+partial-publication, private-bootstrap, post-bind access, and cleanup-crash fixes.
 
 ## Scope Boundaries
 
@@ -85,5 +93,5 @@ Out of scope:
 
 ## Next Step
 
-Freeze, test, and commit the Test-only M8 final evaluation protocol before opening Test for any
-Controller performance run; then execute one formal PID/MPC/PPO 20-Track comparison.
+Commit and push the CPU/GPU-smoke-verified Test-only protocol without opening Test; then execute the
+single formal PID/MPC/PPO 20-Track comparison from that clean revision.

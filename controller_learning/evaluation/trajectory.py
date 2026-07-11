@@ -669,6 +669,17 @@ def _canonical_json_bytes(payload: object) -> bytes:
     ).encode("utf-8")
 
 
+def canonical_trajectory_json_bytes(trajectory: EpisodeTrajectory) -> bytes:
+    """Serialize one public trajectory into its deterministic artifact bytes."""
+
+    if not isinstance(trajectory, EpisodeTrajectory):
+        raise TypeError("trajectory must be an EpisodeTrajectory")
+    content = _canonical_json_bytes(_trajectory_payload(trajectory))
+    if len(content) > MAX_TRAJECTORY_JSON_BYTES:
+        raise ValueError(f"trajectory artifact exceeds {MAX_TRAJECTORY_JSON_BYTES} bytes")
+    return content
+
+
 def _atomic_write(path: Path, content: bytes) -> None:
     if path.is_symlink():
         raise ValueError("trajectory output_path cannot be a symbolic link")
@@ -713,9 +724,7 @@ def write_trajectory_json(
     path = Path(output_path)
     if path.suffix.lower() != ".json":
         raise ValueError("trajectory output_path must use the .json suffix")
-    content = _canonical_json_bytes(_trajectory_payload(trajectory))
-    if len(content) > MAX_TRAJECTORY_JSON_BYTES:
-        raise ValueError(f"trajectory artifact exceeds {MAX_TRAJECTORY_JSON_BYTES} bytes")
+    content = canonical_trajectory_json_bytes(trajectory)
     _atomic_write(path, content)
     return TrajectoryArtifact(
         path=path,
@@ -749,35 +758,17 @@ def _reject_duplicate_keys(pairs: list[tuple[str, object]]) -> dict[str, object]
     return result
 
 
-def load_trajectory_json(
-    input_path: str | Path,
+def load_trajectory_json_bytes(
+    content: bytes,
     *,
     expected_sha256: str | None = None,
 ) -> EpisodeTrajectory:
-    """Load and strictly validate one canonical trajectory JSON artifact."""
+    """Load and strictly validate canonical public trajectory bytes."""
 
-    path = Path(input_path)
-    try:
-        metadata = path.lstat()
-    except FileNotFoundError:
-        raise
-    if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISREG(metadata.st_mode):
-        raise ValueError("trajectory input_path must be a non-symlink regular file")
-    if metadata.st_size <= 0 or metadata.st_size > MAX_TRAJECTORY_JSON_BYTES:
+    if not isinstance(content, bytes):
+        raise TypeError("content must be bytes")
+    if not 0 < len(content) <= MAX_TRAJECTORY_JSON_BYTES:
         raise ValueError(f"trajectory input size must be in [1, {MAX_TRAJECTORY_JSON_BYTES}] bytes")
-    descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
-    try:
-        opened_metadata = os.fstat(descriptor)
-        if not stat.S_ISREG(opened_metadata.st_mode):
-            raise ValueError("trajectory input_path must remain a regular file")
-        if opened_metadata.st_size != metadata.st_size:
-            raise ValueError("trajectory input_path changed while it was being opened")
-        with os.fdopen(descriptor, "rb", closefd=False) as stream:
-            content = stream.read(MAX_TRAJECTORY_JSON_BYTES + 1)
-    finally:
-        os.close(descriptor)
-    if len(content) != opened_metadata.st_size:
-        raise ValueError("trajectory input_path changed while it was being read")
     digest = hashlib.sha256(content).hexdigest()
     if expected_sha256 is not None:
         if (
@@ -846,9 +837,41 @@ def load_trajectory_json(
         terminated=transitions["terminated"],  # type: ignore[arg-type]
         truncated=transitions["truncated"],  # type: ignore[arg-type]
     )
-    if content != _canonical_json_bytes(_trajectory_payload(trajectory)):
+    if content != canonical_trajectory_json_bytes(trajectory):
         raise ValueError("trajectory JSON is valid but not in canonical serialized form")
     return trajectory
+
+
+def load_trajectory_json(
+    input_path: str | Path,
+    *,
+    expected_sha256: str | None = None,
+) -> EpisodeTrajectory:
+    """Load and strictly validate one canonical trajectory JSON artifact."""
+
+    path = Path(input_path)
+    try:
+        metadata = path.lstat()
+    except FileNotFoundError:
+        raise
+    if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISREG(metadata.st_mode):
+        raise ValueError("trajectory input_path must be a non-symlink regular file")
+    if metadata.st_size <= 0 or metadata.st_size > MAX_TRAJECTORY_JSON_BYTES:
+        raise ValueError(f"trajectory input size must be in [1, {MAX_TRAJECTORY_JSON_BYTES}] bytes")
+    descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+    try:
+        opened_metadata = os.fstat(descriptor)
+        if not stat.S_ISREG(opened_metadata.st_mode):
+            raise ValueError("trajectory input_path must remain a regular file")
+        if opened_metadata.st_size != metadata.st_size:
+            raise ValueError("trajectory input_path changed while it was being opened")
+        with os.fdopen(descriptor, "rb", closefd=False) as stream:
+            content = stream.read(MAX_TRAJECTORY_JSON_BYTES + 1)
+    finally:
+        os.close(descriptor)
+    if len(content) != opened_metadata.st_size:
+        raise ValueError("trajectory input_path changed while it was being read")
+    return load_trajectory_json_bytes(content, expected_sha256=expected_sha256)
 
 
 __all__ = [
@@ -857,7 +880,9 @@ __all__ = [
     "EpisodeTrajectory",
     "RecordedControllerEpisode",
     "TrajectoryArtifact",
+    "canonical_trajectory_json_bytes",
     "load_trajectory_json",
+    "load_trajectory_json_bytes",
     "record_controller_episode",
     "write_trajectory_json",
 ]

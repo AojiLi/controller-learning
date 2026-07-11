@@ -11,6 +11,8 @@ nav:
   - Gymnasium and Controllers: environment.md
   - Classical Controllers: controllers.md
   - PPO Training and Export: ppo.md
+  - Evaluation Protocol: evaluation.md
+  - Reproducibility: reproducibility.md
   - Development: development.md
 markdown_extensions:
   - admonition

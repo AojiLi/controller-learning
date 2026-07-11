@@ -95,10 +95,10 @@ def test_evidence_redaction_removes_paths_and_gpu_uuid(tmp_path) -> None:
     project_root = tmp_path / "project"
     temporary_root = tmp_path / "worker"
     payload = {
-        "uuid": "GPU-67c4c378-9c6a-8b7d-3285-82fb2b068357",
+        "uuid": "GPU-00000000-1111-2222-3333-444444444444",
         "log": (
             f"model={project_root}/car.xml output={temporary_root}/result.json "
-            "device=GPU-67c4c378-9c6a-8b7d-3285-82fb2b068357"
+            "device=GPU-00000000-1111-2222-3333-444444444444"
         ),
     }
 

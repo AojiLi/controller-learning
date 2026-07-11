@@ -797,8 +797,7 @@ def _validate_runtime(value: object, *, expected_policy_ids: list[str]) -> None:
         or not gpu["name"]
         or not isinstance(gpu["driver_version"], str)
         or not gpu["driver_version"]
-        or not isinstance(gpu["uuid"], str)
-        or not gpu["uuid"]
+        or gpu["uuid"] != "redacted"
         or _finite_number(gpu["memory_total_mib"], field="memory_total_mib") <= 0.0
     ):
         raise SelectionProtocolError("runtime selected_gpu evidence is invalid")

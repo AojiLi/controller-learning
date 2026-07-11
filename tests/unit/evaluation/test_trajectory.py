@@ -19,6 +19,10 @@ from controller_learning.evaluation import (
     write_trajectory_json,
 )
 from controller_learning.evaluation import trajectory as trajectory_module
+from controller_learning.evaluation.trajectory import (
+    canonical_trajectory_json_bytes,
+    load_trajectory_json_bytes,
+)
 
 PROJECT_ROOT = Path(__file__).parents[3]
 
@@ -174,15 +178,22 @@ def test_canonical_json_roundtrip_is_deterministic_and_hash_bound(tmp_path: Path
     second = write_trajectory_json(trajectory, second_path)
 
     assert first_path.read_bytes() == second_path.read_bytes()
+    assert first_path.read_bytes() == canonical_trajectory_json_bytes(trajectory)
     assert first.sha256 == second.sha256
     assert first.size_bytes == second.size_bytes == first_path.stat().st_size
     loaded = load_trajectory_json(first_path, expected_sha256=first.sha256)
     np.testing.assert_array_equal(loaded.position_m, trajectory.position_m)
     np.testing.assert_array_equal(loaded.action, trajectory.action)
     assert dict(loaded.final_info) == dict(trajectory.final_info)
+    loaded_from_bytes = load_trajectory_json_bytes(
+        first_path.read_bytes(), expected_sha256=first.sha256
+    )
+    np.testing.assert_array_equal(loaded_from_bytes.position_m, trajectory.position_m)
 
     with pytest.raises(ValueError, match="does not match"):
         load_trajectory_json(first_path, expected_sha256="0" * 64)
+    with pytest.raises(ValueError, match="does not match"):
+        load_trajectory_json_bytes(first_path.read_bytes(), expected_sha256="0" * 64)
 
 
 def test_loader_rejects_noncanonical_symlink_and_oversize_inputs(

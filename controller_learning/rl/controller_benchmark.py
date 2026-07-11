@@ -1232,12 +1232,7 @@ def controller_evaluation_report_findings(
             or not gpu["name"]
             or not isinstance(gpu["driver_version"], str)
             or not gpu["driver_version"]
-            or not isinstance(gpu["uuid"], str)
-            or re.fullmatch(
-                r"GPU-[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}",
-                gpu["uuid"],
-            )
-            is None
+            or gpu["uuid"] != "redacted"
             or _finite_number(gpu["memory_total_mib"], field="memory_total_mib") <= 0.0
         ):
             raise ControllerBenchmarkProtocolError("selected GPU evidence is invalid")

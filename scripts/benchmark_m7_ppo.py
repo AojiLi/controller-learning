@@ -324,7 +324,7 @@ def _runtime_evidence(torch_module: Any) -> tuple[dict[str, Any], str]:
                 "index": int(selected[0].strip()),
                 "memory_total_mib": float(selected[4].strip()),
                 "name": selected[2].strip(),
-                "uuid": selected[1].strip(),
+                "uuid": "redacted",
             },
             "torch_cuda_runtime": cuda_runtime,
             "torch_device": FORMAL_DEVICE,

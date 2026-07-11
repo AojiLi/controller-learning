@@ -48,8 +48,7 @@ Controller timing/lifecycle, and replay gates. Final Test comparison and release
 
 ## Current Work
 
-- freeze and commit the complete Test-only M8 protocol and rejection tests before performance
-  access;
+- commit and push the complete Test-only M8 protocol and rejection tests before performance access;
 - run one formal same-order/same-seed PID/MPC/PPO comparison on all 20 Test Tracks;
 - publish strict result and replay artifacts without Test-informed tuning or checkpoint changes;
 - complete English README/tutorial/API/reproduction docs, package/privacy cleanup, and release
@@ -58,8 +57,9 @@ Controller timing/lifecycle, and replay gates. Final Test comparison and release
 
 ## Next Step
 
-Freeze, test, and commit the Test-only M8 final evaluation protocol before any Test performance
-access, then execute the single formal PID/MPC/PPO 20-Track run.
+Commit and push the Test-only M8 protocol, which now passes the full 1,055-test CPU CI plus Linux GPU
+and Validation-only smoke checks, then execute the single formal PID/MPC/PPO 20-Track run from that
+clean revision. No formal Test Controller performance has been opened yet.
 
 ## Risks and Blockers
 

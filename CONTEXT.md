@@ -218,10 +218,15 @@ pixi run -e gpu train-ppo
 pixi run -e gpu benchmark-m7-ppo
 pixi run -e gpu export-m7-ppo-controller
 pixi run -e gpu benchmark-m7-ppo-controller
+pixi run -e gpu benchmark-m8-controllers
 ```
 
 The four M7 commands above implement formal Train-only optimization, frozen Validation selection,
 hash-bound inference-only Controller export, and ordinary Controller evaluation/replay respectively.
+The M8 command is a one-shot release-maintainer workflow guarded by a clean revision, immutable
+Controller snapshots, Test-only process access, durable episode and post-close evidence, semantic
+validation of exactly 24 outputs, and no automatic retry after Test binding. It is not routine
+development or tuning tooling.
 CPU CI currently checks formatting, lint, CPU tests, installed wheel contents, strict docs, GitHub
 Actions syntax, and package metadata. GPU verification remains local for v0.1 and produces
 versioned evidence under `benchmarks/v0.1/`.
@@ -311,7 +316,10 @@ batch-one formal evaluator semantics, and the reviewed Level 0/Validation timing
 the public PPO feature/reward wrappers, NEXT_STEP-aware training semantics, frozen Train-only PPO
 configuration, Validation-only checkpoint selection, inference-only NumPy export, and ordinary
 Controller replay protocol. The next unfrozen performance protocol is M8's final Test-only
-PID/MPC/PPO comparison; it must be frozen and committed before any Test performance access.
+PID/MPC/PPO comparison. Its implementation fixes one shared environment, 60 Controller-major
+episodes, same-row Track/seed identity, typed transition metrics, row-zero same-rollout replay,
+post-close runtime/memory/access evidence, and transactional publication. The implementation must
+be frozen in a clean commit before the command may open Test or observe Controller performance.
 
 ## External Reference
 

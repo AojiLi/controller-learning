@@ -230,7 +230,7 @@ def _valid_report() -> tuple[dict[str, Any], Any]:
                 "index": 0,
                 "memory_total_mib": 24_576.0,
                 "name": "test GPU",
-                "uuid": "GPU-test",
+                "uuid": "redacted",
             },
             "torch_cuda_runtime": "12.8",
             "torch_device": "cuda:0",

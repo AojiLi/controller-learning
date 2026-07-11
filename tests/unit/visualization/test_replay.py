@@ -10,8 +10,11 @@ import numpy as np
 import pytest
 
 from controller_learning.evaluation import EpisodeTrajectory
+from controller_learning.visualization import (
+    render_trajectory_overview_png,
+    write_trajectory_overview_png,
+)
 from controller_learning.visualization import replay as replay_module
-from controller_learning.visualization import write_trajectory_overview_png
 
 
 def _trajectory() -> EpisodeTrajectory:
@@ -67,6 +70,7 @@ def test_overview_png_is_byte_deterministic_and_records_every_source_frame(
     second = write_trajectory_overview_png(trajectory, tmp_path / "second.png")
 
     assert first.path.read_bytes() == second.path.read_bytes()
+    assert first.path.read_bytes() == render_trajectory_overview_png(trajectory)
     assert first.path.read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
     assert first.sha256 == second.sha256
     assert first.size_bytes == second.size_bytes == first.path.stat().st_size
