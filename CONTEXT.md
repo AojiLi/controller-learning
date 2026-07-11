@@ -214,7 +214,7 @@ pixi run -e gpu validate-track-driveability
 pixi run -e gpu build-track-assets
 pixi run -e gpu benchmark-track-pool
 pixi run -e gpu benchmark-controllers
-pixi run -e gpu train-ppo
+pixi run -e gpu train-ppo -- --run-id my-ppo-run
 pixi run -e gpu benchmark-m7-ppo
 pixi run -e gpu export-m7-ppo-controller
 pixi run -e gpu benchmark-m7-ppo-controller

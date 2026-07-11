@@ -118,8 +118,19 @@ Run the new plugin on development Tracks:
 ```bash
 pixi run sim -- --controller controllers/my_controller --level-id 0 --render
 pixi run sim -- --controller controllers/my_controller --level-id 1 --track-seed 42
+pixi run evaluate-controller -- \
+  --controller controllers/my_controller \
+  --run-id my-validation-10 \
+  --split validation \
+  --count 10 \
+  --capture-row 0
 pixi run tests
 ```
+
+The informal evaluator uses deterministic manifest-order rows and reset seeds, labels CPU and
+MJX-Warp development results separately, and exposes no Test option. Its selected trajectory is
+captured from the measured rollout and can be inspected with `pixi run replay`; see the
+[Controller workflow](getting-started.md).
 
 The Controller may implement PID, MPC, RL, or another method internally, including a simplified
 prediction model. The official simulation truth remains the same physical four-wheel car. Do not

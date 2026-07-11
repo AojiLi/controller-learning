@@ -2,13 +2,13 @@
 
 Last updated: 2026-07-11
 
-**Status:** M0 through M8 are complete, and the v0.1 repository is public.
+**Status:** v0.1.0 is public and frozen. The v0.1.1 usability release is in development.
 
 ## Main Line
 
-Maintain the released v0.1 evidence and interfaces. Attempt 001's zero-episode infrastructure
-failure is retained and disclosed. Attempt 002 completed the fixed 20-Track comparison and all
-transaction/artifact gates. The accepted artifacts, documentation, and source are public.
+Close the Controller-author loop with informal Validation evaluation and replay commands, then
+improve the public presentation and hosted documentation. The accepted benchmark `0.1` artifacts,
+Test result, and Controller identities remain immutable.
 
 ## Completed Evidence
 
@@ -57,18 +57,28 @@ Controller timing/lifecycle, and replay gates.
 
 ## Current Work
 
-- No v0.1 implementation work remains.
-- Preserve benchmark `0.1`, the accepted Test result, and the public Controller boundary.
-- Treat maintenance fixes as non-performance-changing unless a future benchmark version is
-  explicitly planned.
+- `evaluate-controller` now measures trusted plugins on Level 0 or ordered Validation prefixes,
+  labels CPU/MJX-Warp scope, records source/Controller identity, writes transactional CSV/JSON, and
+  optionally retains the selected same-rollout trajectory. Test is not a parser choice or loader
+  path.
+- `replay` now strictly loads canonical trajectory JSON, refuses PNG overwrite, renders a
+  deterministic overview, and can play reconstructed public observations interactively without
+  executing simulation.
+- The M8 interpretation script hash-pins seven accepted CSV/NPZ inputs, recomputes their central
+  claims, and byte-checks the generated analysis page and distribution figure without Test access.
+- README, MkDocs navigation/metadata, Pages workflow, Controller workflow, stability policy,
+  contribution guide, changelog, and citation metadata are prepared for v0.1.1.
+- Release remains gated on complete local CPU/GPU checks, protected-identity comparison, green
+  GitHub CPU CI/Pages, and anonymous fresh-checkout verification.
 
 ## Next Step
 
-Plan any post-v0.1 work as a separate version without changing the published benchmark `0.1`
-result.
+Run complete local CPU/GPU and release-integrity verification without invoking formal M8 Test.
 
 ## Risks and Blockers
 
 - The accepted Test result is immutable; no later reproduction can replace it.
+- Development evaluation must never expose Test as a selectable split or write into
+  `results/0.1/`.
 - Linux x86-64 remains the only supported v0.1 platform; macOS, native Windows, and WSL2 require
   future test evidence before support claims.

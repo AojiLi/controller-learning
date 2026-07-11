@@ -161,6 +161,24 @@ pixi run sim -- --controller controllers/pid --level-id 0 --render
 pixi run sim -- --controller controllers/mpc --level-id 0 --render
 ```
 
+Measure any trusted plugin on Level 0 or an ordered Validation prefix, then render the selected
+same-rollout trajectory without another simulation:
+
+```bash
+pixi run evaluate-controller -- \
+  --controller controllers/pid \
+  --run-id pid-validation-10 \
+  --split validation \
+  --count 10 \
+  --capture-row 0
+pixi run replay -- \
+  runs/evaluations/pid-validation-10/selected_replays/row_000_trajectory.json \
+  --overview runs/evaluations/pid-validation-10/overview.png
+```
+
+These outputs are informal development evidence and cannot access or replace Test. The complete
+workflow and output contracts are documented in [Controller Workflow](getting-started.md).
+
 The retained formal Validation workflow is `pixi run -e gpu benchmark-controllers`. Its accepted
 report is already published; a later invocation is a reproduction. See
 [Classical Controllers](controllers.md) for the Controller API, design, and timing evidence.
@@ -170,11 +188,14 @@ report is already published; a later invocation is a reproduction. See
 The four formal stages are deliberately separate:
 
 ```bash
-pixi run -e gpu train-ppo
+pixi run -e gpu train-ppo -- --run-id my-ppo-run
 pixi run -e gpu benchmark-m7-ppo
 pixi run -e gpu export-m7-ppo-controller
 pixi run -e gpu benchmark-m7-ppo-controller
 ```
+
+`--run-id` is required and must be a new lowercase local identifier. Training also requires a clean
+source revision; the accepted historical run ID is evidence, not a destination for new output.
 
 They implement Train-only optimization, one frozen Validation selection, hash-bound NumPy export,
 and ordinary Controller evaluation. The accepted artifacts are already published and must not be

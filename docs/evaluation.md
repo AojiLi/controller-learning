@@ -4,6 +4,11 @@ Controller Learning benchmark `0.1` compares trusted Controller plugins under on
 four-wheel car, one Level 1 Challenge, and one versioned set of Tracks. Reward is useful for
 training diagnostics, but it is never the ranking score.
 
+For routine work on a new Controller, use the informal Level 0/Validation command documented in the
+[Controller workflow](getting-started.md). It writes clearly labeled local CSV/JSON evidence and can
+capture a trajectory from the measured rollout. It has no Test option and cannot replace the
+accepted result described below.
+
 The formal M8 Test result is published. Attempt 001 loaded the fixed Test pool, then stopped in
 Environment creation before reset, stepping, Controller construction, or any performance
 observation. The sole authorized replacement, attempt 002, completed the unchanged protocol and
@@ -232,6 +237,8 @@ The canonical machine-readable evidence is the
 [global report](https://github.com/AojiLi/controller-learning/blob/main/benchmarks/v0.1/m8_final_evaluation_report.json)
 and
 [comparison CSV](https://github.com/AojiLi/controller-learning/blob/main/benchmarks/v0.1/m8_final_results.csv).
+The [result interpretation](analysis.md) deterministically derives descriptive plots and paired
+comparisons from the frozen CSV/NPZ artifacts without another Test execution.
 The predeclared same-rollout Test row-0 comparison is shown below.
 
 ![Benchmark 0.1 canonical Test row 0 comparison](https://raw.githubusercontent.com/AojiLi/controller-learning/main/benchmarks/v0.1/m8_test_row_000_comparison.png)

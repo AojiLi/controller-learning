@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "controller-learning"
-version = "0.1.0"
+version = "0.1.1"
 description = "A GPU-parallel race car control benchmark"
 readme = "README.md"
 requires-python = ">=3.11,<3.12"
@@ -32,7 +32,7 @@ dependencies = [
 
 [project.urls]
 Repository = "https://github.com/AojiLi/controller-learning"
-Documentation = "https://github.com/AojiLi/controller-learning/tree/main/docs"
+Documentation = "https://aojili.github.io/controller-learning/"
 Issues = "https://github.com/AojiLi/controller-learning/issues"
 
 [tool.hatch.build.targets.wheel]
@@ -77,6 +77,10 @@ format-check = { cmd = "ruff format --check .", description = "Check Python form
 lint = { cmd = "ruff check .", description = "Run Python lint checks" }
 tests = { cmd = "pytest", description = "Run CPU tests" }
 sim = { cmd = "python scripts/sim.py", description = "Run one Controller episode on a fixed Level 0 or generated Level 1 Track" }
+evaluate-controller = { cmd = "python scripts/evaluate_controller.py", description = "Run an informal Controller evaluation on Level 0 or Validation without Test access" }
+replay = { cmd = "python scripts/replay.py", description = "Render or interactively play a canonical trajectory without rerunning simulation" }
+build-result-analysis = { cmd = "python scripts/analyze_m8_results.py --write", description = "Regenerate the descriptive M8 analysis from frozen CSV/NPZ evidence" }
+check-result-analysis = { cmd = "python scripts/analyze_m8_results.py --check", description = "Verify the deterministic M8 analysis page and figure" }
 verify-track-assets = { cmd = "python scripts/verify_track_assets.py", description = "Verify official manifests and fixed Track assets" }
 materialize-track-pool = { cmd = "python scripts/materialize_track_pool.py", description = "Reproduce the verified local Level 1 training pool cache" }
 docs = { cmd = "mkdocs build --strict", description = "Build documentation" }
@@ -86,7 +90,7 @@ package-check = { cmd = "twine check dist/*", depends-on = ["package"], descript
 benchmark-cpu-vehicle = { cmd = "python scripts/benchmark_cpu_vehicle.py", description = "Run the formal M1 CPU vehicle benchmark" }
 benchmark-track-capacity = { cmd = "python scripts/benchmark_track_capacity.py", description = "Run the formal M3 Track capacity benchmark" }
 view-cpu-vehicle = { cmd = "python scripts/view_cpu_vehicle.py", description = "Open the CPU MuJoCo vehicle viewer" }
-ci = { depends-on = ["format-check", "lint", "tests", "verify-track-assets", "docs", "actions-lint", "package-check"], description = "Run CPU CI checks" }
+ci = { depends-on = ["format-check", "lint", "tests", "verify-track-assets", "check-result-analysis", "docs", "actions-lint", "package-check"], description = "Run CPU CI checks" }
 
 [tool.pixi.feature.gpu.tasks]
 gpu-check = { cmd = "python scripts/check_gpu_environment.py", description = "Verify GPU dependencies and one MJX-Warp step" }

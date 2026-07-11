@@ -939,7 +939,7 @@ pixi run sim
 pixi install -e gpu
 pixi run -e gpu gpu-tests
 pixi run -e gpu benchmark-gpu
-pixi run -e gpu train-ppo
+pixi run -e gpu train-ppo -- --run-id my-ppo-run
 ~~~
 
 所有 Controller 共享根 Pixi 环境和 pixi.lock。
